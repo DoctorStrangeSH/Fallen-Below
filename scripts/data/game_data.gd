@@ -41,24 +41,33 @@ const VICTORY_BONUS := 25
 # --- the Warden (your monster) ---
 const WARDEN := {"name": "The Bone Warden", "hp": 60.0, "dmg": 6.0, "speed": 1.3,
 	"color": Color(0.55, 0.85, 1.0)}
-const XP_PER_KILL := 10
-const XP_LEVELS := [20, 45, 80, 125, 180, 250, 330, 420]
 const DEVOUR_HEAL := 0.25         # share of max HP restored by devouring
-const LEVEL_UP_HEAL := 0.3
-const ABILITY_CHOICES := 3
+const LOOP_HEAL := 0.15           # each completed patrol loop the dungeon feeds the Warden
 
-const ABILITIES := {
-	"thick_hide": {"name": "Thick Hide", "desc": "+25% max HP."},
-	"brutal": {"name": "Brutal", "desc": "+3 damage."},
-	"cleave": {"name": "Cleave", "desc": "Hits every traveler on the tile."},
-	"vampiric": {"name": "Vampiric", "desc": "Heals 20% of damage dealt."},
-	"dread": {"name": "Dread", "desc": "Travelers fighting the Warden deal 25% less damage."},
-	"swift": {"name": "Swift", "desc": "Patrols 40% faster."},
-	"commander": {"name": "Commander", "desc": "Your monsters on the Warden's tile deal +50% damage."},
-	"glutton": {"name": "Glutton", "desc": "Devouring heals twice as much and gives +5 XP."},
-	"spiked_bones": {"name": "Spiked Bones", "desc": "Travelers take 3 damage when they strike the Warden."},
-	"undying": {"name": "Undying", "desc": "Once per run, rise again with 40% HP."},
+## Warden stats. Gear and diet add to them.
+## pct = shown as a percentage; cap = hard limit for chance stats.
+const STATS := {
+	"dmg": {"name": "Damage", "pct": false},
+	"hp": {"name": "Max HP", "pct": false},
+	"def": {"name": "Defense", "pct": false},      # flat damage removed from each hit
+	"regen": {"name": "Regen", "pct": false},      # HP per second
+	"vamp": {"name": "Vampirism", "pct": true, "cap": 40.0},
+	"evade": {"name": "Evasion", "pct": true, "cap": 50.0},
+	"counter": {"name": "Counter", "pct": true, "cap": 50.0},
 }
+
+## "You are what you eat": every devoured traveler permanently feeds one stat for this run.
+const DIET := {
+	"hunter": {"stat": "hp", "amount": 2.0, "desc": "Hunters make the Warden tougher (+2 max HP)"},
+	"seeker": {"stat": "evade", "amount": 1.0, "desc": "Seekers make it quicker (+1% evasion)"},
+	"pilgrim": {"stat": "regen", "amount": 0.1, "desc": "Pilgrims make it mend (+0.1 regen)"},
+	"mage": {"stat": "dmg", "amount": 0.3, "desc": "Arcanists make it crueler (+0.3 damage)"},
+}
+
+# --- loop scaling (like Loop Hero): every patrol loop the Warden completes
+#     makes new travelers stronger and their gear better ---
+const LOOP_POWER := 0.15          # +15% traveler HP/damage per loop
+const ITEM_LEVEL_PER_LOOP := 1
 
 # --- economy: resources harvested from the dead, paid out when the run ends ---
 const RESOURCES := {
@@ -131,26 +140,63 @@ const MONSTERS := {
 	"mimic": {"name": "Mimic", "hp": 30, "dmg": 8.0, "color": Color(0.95, 0.55, 0.15)},
 }
 
-# --- loot: gear for the Warden ---
-const GEAR_SLOTS := ["weapon", "armor", "amulet", "ring"]
+# --- loot: gear for the Warden (Loop Hero style) ---
+## Each slot has several item types: a main stat, a fixed secondary stat,
+## plus random extra stats depending on rarity. Values grow with item level (= loop).
+const GEAR_SLOTS := ["weapon", "shield", "armor", "amulet", "ring"]
+const ITEM_TYPES := {
+	"weapon": [
+		{"name": "Rusted Cleaver", "main": "dmg", "second": "counter"},
+		{"name": "Hunter's Spear", "main": "dmg", "second": "evade"},
+		{"name": "Bone Saw", "main": "dmg", "second": "vamp"},
+		{"name": "Pilgrim's Mace", "main": "dmg", "second": "def"},
+		{"name": "Arcane Rod", "main": "dmg", "second": "regen"},
+	],
+	"shield": [
+		{"name": "Tower Shield", "main": "def", "second": "hp"},
+		{"name": "Buckler", "main": "def", "second": "evade"},
+		{"name": "Spiked Shield", "main": "def", "second": "counter"},
+		{"name": "Holy Aegis", "main": "def", "second": "regen"},
+		{"name": "Bone Ward", "main": "def", "second": "vamp"},
+	],
+	"armor": [
+		{"name": "Chainmail", "main": "hp", "second": "def"},
+		{"name": "Leather Coat", "main": "hp", "second": "evade"},
+		{"name": "Pilgrim Robe", "main": "hp", "second": "regen"},
+		{"name": "Hide Cloak", "main": "hp", "second": "counter"},
+		{"name": "Blood-soaked Vest", "main": "hp", "second": "vamp"},
+	],
+	"amulet": [
+		{"name": "Saint's Pendant", "main": "regen", "second": "hp"},
+		{"name": "Blood Charm", "main": "regen", "second": "vamp"},
+		{"name": "Fang Necklace", "main": "regen", "second": "dmg"},
+		{"name": "Moon Locket", "main": "regen", "second": "evade"},
+	],
+	"ring": [
+		{"name": "Signet of Wrath", "main": "counter", "second": "dmg"},
+		{"name": "Thief's Band", "main": "evade", "second": "def"},
+		{"name": "Leech Ring", "main": "vamp", "second": "hp"},
+		{"name": "Iron Loop", "main": "def", "second": "regen"},
+	],
+}
+## Base value of a stat on an item of level L: base + per_level * L.
+const STAT_ROLL := {
+	"dmg": [1.0, 0.6], "hp": [6.0, 4.0], "def": [0.5, 0.3], "regen": [0.3, 0.15],
+	"vamp": [3.0, 1.0], "evade": [3.0, 1.0], "counter": [4.0, 1.0],
+}
+## Which slots each kind of traveler tends to carry.
 const ITEM_SLOTS := {
-	"seeker": [["ring", "Signet"], ["weapon", "Dagger"]],
-	"pilgrim": [["amulet", "Relic Pendant"], ["armor", "Robe"]],
-	"hunter": [["weapon", "Greatsword"], ["armor", "Plate"]],
-	"mage": [["amulet", "Orb"], ["ring", "Band"]],
+	"seeker": ["ring", "weapon", "armor"],
+	"pilgrim": ["amulet", "shield", "armor"],
+	"hunter": ["weapon", "shield", "armor"],
+	"mage": ["amulet", "ring", "weapon"],
 }
 const RARITIES := [
-	{"name": "Common", "mult": 1.0, "weight": 60, "color": Color(0.8, 0.8, 0.8)},
-	{"name": "Rare", "mult": 1.6, "weight": 28, "color": Color(0.4, 0.65, 1.0)},
-	{"name": "Epic", "mult": 2.4, "weight": 10, "color": Color(0.75, 0.4, 1.0)},
-	{"name": "Legendary", "mult": 3.5, "weight": 2, "color": Color(1.0, 0.6, 0.15)},
+	{"name": "Common", "mult": 1.0, "extras": 0, "weight": 60, "color": Color(0.8, 0.8, 0.8)},
+	{"name": "Rare", "mult": 1.15, "extras": 1, "weight": 28, "color": Color(0.4, 0.65, 1.0)},
+	{"name": "Epic", "mult": 1.3, "extras": 2, "weight": 10, "color": Color(0.75, 0.4, 1.0)},
+	{"name": "Legendary", "mult": 1.5, "extras": 3, "weight": 2, "color": Color(1.0, 0.6, 0.15)},
 ]
-const AFFIXES := {
-	"lifesteal": {"name": "Lifesteal", "desc": "heals 15% of damage dealt"},
-	"thorns": {"name": "Thorns", "desc": "hurts travelers who strike"},
-	"regen": {"name": "Regeneration", "desc": "heals 1 HP every tick"},
-	"crit": {"name": "Cruelty", "desc": "20% chance to deal double damage"},
-}
 
 # --- secret combos (discovery is saved in Meta) ---
 const COMBOS := {
@@ -262,7 +308,8 @@ const BEATS := {
 	"first_kill": "The first one falls. Something in the dark goes quiet, almost content. Almost.",
 	"first_raise": "The dead traveler stands, and looks at the Warden for a long moment, as if trying to remember where it has seen that face before.",
 	"first_escape": "One got away. Tonight a tavern will hear the story. By morning, so will the Order.",
-	"first_level": "The Warden's bones crack and grow. For a moment a name almost rises to the surface. Then it is gone.",
+	"first_loop": "The Warden completes its round. The dungeon grows deeper, and whatever comes down next will be stronger. So will what they carry.",
+	"first_devour": "The Warden eats. Its bones crack and grow. For a moment a name almost rises to the surface. Then it is gone.",
 	"attention_half": "Bells ring in the white towers. The Order has noticed you. Something bright is being prepared.",
 	"first_sleep": "The door in the mountain closes. The dungeon curls around its full belly and dreams of the next door.",
 }

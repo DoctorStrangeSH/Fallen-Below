@@ -16,7 +16,6 @@ var day_label: Label
 var day_bar: ProgressBar
 var warden_label: Label
 var hp_bar: ProgressBar
-var xp_bar: ProgressBar
 var warden_stats: Label
 var gear_label: Label
 var attention_bar: ProgressBar
@@ -32,8 +31,6 @@ var log_label: Label
 
 # bottom & overlays
 var hand_box: HBoxContainer
-var level_panel: PanelContainer
-var level_box: HBoxContainer
 var end_panel: PanelContainer
 var end_label: Label
 var end_buttons: VBoxContainer
@@ -52,7 +49,6 @@ func _ready() -> void:
 	hand_box.position = Vector2(16, D.HAND_Y)
 	hand_box.add_theme_constant_override("separation", 6)
 	add_child(hand_box)
-	_build_level_panel()
 	_build_end_panel()
 	_build_overlays()
 
@@ -61,7 +57,6 @@ func _ready() -> void:
 	s.hand_changed.connect(rebuild_hand)
 	s.inventory_changed.connect(rebuild_trophies)
 	s.combo_found.connect(show_banner)
-	s.level_up.connect(show_level_up)
 	s.narrate.connect(_on_narrate)
 	act_label.text = D.ACTS[s.act]["name"]
 	rebuild_hand()
@@ -117,8 +112,6 @@ func _build_panel() -> void:
 	v.add_child(warden_label)
 	hp_bar = _bar(100, Color(0.4, 0.85, 1.0), 14)
 	v.add_child(hp_bar)
-	xp_bar = _bar(100, Color(0.75, 0.55, 1.0), 6)
-	v.add_child(xp_bar)
 	warden_stats = _small("", 12, Color(1, 1, 1, 0.85))
 	v.add_child(warden_stats)
 	gear_label = _small("", 11, Color(1, 0.85, 0.55))
@@ -177,23 +170,6 @@ func _modal(width: float, border: Color) -> PanelContainer:
 	p.visible = false
 	add_child(p)
 	return p
-
-
-func _build_level_panel() -> void:
-	level_panel = _modal(640, Color(0.4, 0.85, 1.0))
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
-	level_panel.add_child(v)
-	var title := UI.label("THE WARDEN GROWS", 22, Color(0.6, 0.9, 1.0))
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(title)
-	var sub := UI.label("Choose an ability", 13, Color(1, 1, 1, 0.6))
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(sub)
-	level_box = HBoxContainer.new()
-	level_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	level_box.add_theme_constant_override("separation", 10)
-	v.add_child(level_box)
 
 
 func _build_end_panel() -> void:
@@ -322,55 +298,39 @@ func rebuild_lures() -> void:
 		lure_box.add_child(btn)
 
 
-func show_level_up() -> void:
-	var s = run.state
-	for c in level_box.get_children():
-		c.queue_free()
-	if s.level_choices.is_empty() or s.game_over:
-		level_panel.visible = false
-		return
-	for i in s.level_choices.size():
-		var def: Dictionary = D.ABILITIES[s.level_choices[i]]
-		var btn := Button.new()
-		btn.text = "%s\n\n%s" % [def["name"], def["desc"]]
-		btn.custom_minimum_size = Vector2(190, 150)
-		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		btn.focus_mode = Control.FOCUS_NONE
-		btn.add_theme_font_size_override("font_size", 14)
-		btn.add_theme_stylebox_override("normal", UI.box(Color(0.08, 0.16, 0.24), Color(0.4, 0.85, 1.0)))
-		btn.add_theme_stylebox_override("hover", UI.box(Color(0.12, 0.24, 0.34), Color(1, 1, 1)))
-		btn.pressed.connect(func(): run.warden.pick_ability(i))
-		level_box.add_child(btn)
-	level_panel.visible = true
-
-
 # ============================================================ update
 
 func refresh() -> void:
 	var s = run.state
-	day_label.text = "Day %d   ·   week ends on day %d" % [s.day, (s.day + D.SEAL_EVERY - 1) / D.SEAL_EVERY * D.SEAL_EVERY]
+	day_label.text = "Loop %d   ·   Day %d   ·   week ends on day %d" % [s.loop, s.day, (s.day + D.SEAL_EVERY - 1) / D.SEAL_EVERY * D.SEAL_EVERY]
 	day_bar.value = s.day_timer
 
 	var w: Dictionary = s.warden
-	warden_label.text = "%s   Lv %d" % [w["name"], w["level"]]
+	warden_label.text = str(w["name"])
 	hp_bar.max_value = w["max_hp"]
 	hp_bar.value = w["hp"]
-	var need: int = run.warden.xp_to_next()
-	xp_bar.max_value = maxf(1.0, float(need))
-	xp_bar.value = float(w["xp"]) if need > 0 else xp_bar.max_value
-	var abil: Array = []
-	for a in w["abilities"]:
-		abil.append(D.ABILITIES[a]["name"])
-	warden_stats.text = "HP %d/%d   DMG %.1f   XP %d/%s\n%s" % [
-		int(w["hp"]), int(w["max_hp"]), w["dmg"], int(w["xp"]), str(need) if need > 0 else "max",
-		"Abilities: " + (", ".join(abil) if not abil.is_empty() else "none yet")]
+	var st: Dictionary = w["stats"]
+	var parts: Array = ["HP %d/%d" % [int(w["hp"]), int(w["max_hp"])], "DMG %.1f" % st["dmg"]]
+	for k in ["def", "regen", "vamp", "evade", "counter"]:
+		var v: float = st[k]
+		if v > 0.0:
+			var def: Dictionary = D.STATS[k]
+			if def["pct"]:
+				parts.append("%s %d%%" % [def["name"], int(v)])
+			else:
+				parts.append("%s %.1f" % [def["name"], v])
+	var eaten: Dictionary = w["eaten"]
+	var diet_parts: Array = []
+	for kind in eaten:
+		diet_parts.append("%d %s" % [int(eaten[kind]), D.HERO_CLASSES[kind]["name"]])
+	warden_stats.text = "   ".join(parts) + "\nEaten: " + (", ".join(diet_parts) if not diet_parts.is_empty() else "nothing yet")
 	var gear_lines: Array = []
 	var gear: Dictionary = w["gear"]
 	for slot in D.GEAR_SLOTS:
 		if gear.has(slot):
-			gear_lines.append("%s: %s" % [slot.capitalize(), gear[slot]["name"]])
+			gear_lines.append("%s: %s" % [str(slot).capitalize(), gear[slot]["name"]])
 		else:
-			gear_lines.append("%s: -" % slot.capitalize())
+			gear_lines.append("%s: -" % str(slot).capitalize())
 	gear_label.text = "\n".join(gear_lines)
 
 	attention_bar.value = s.threat
@@ -399,7 +359,6 @@ func refresh() -> void:
 
 
 func show_end(outcome: String, payout: Dictionary, pct: float, kept: Array, lost: Array) -> void:
-	level_panel.visible = false
 	tooltip.visible = false
 	var s = run.state
 	var head := ""
@@ -436,7 +395,7 @@ func show_end(outcome: String, payout: Dictionary, pct: float, kept: Array, lost
 
 func rebuild_trophies() -> void:
 	var s = run.state
-	trophy_title.text = "Trophies %d/%d   (click: the Warden wears it · RMB: grind to bones)" % [s.inventory.size(), D.INVENTORY_MAX]
+	trophy_title.text = "Loot %d/%d   (click: the Warden wears it · RMB: throw away)" % [s.inventory.size(), D.INVENTORY_MAX]
 	for c in trophy_box.get_children():
 		c.queue_free()
 	for i in s.inventory.size():
@@ -444,8 +403,9 @@ func rebuild_trophies() -> void:
 		var rar: Dictionary = D.RARITIES[item["rarity"]]
 		var col: Color = rar["color"]
 		var btn := Button.new()
-		btn.text = "%s  (%s)" % [item["name"], LootSystem.describe(item)]
-		btn.tooltip_text = "%s slot: %s" % [str(item["slot"]).capitalize(), btn.text]
+		btn.text = "%s  %s" % [item["name"], LootSystem.describe(item)]
+		btn.tooltip_text = "%s  (%s, level %d)\n%s\n\nWearing now: %s" % [item["name"], str(item["slot"]).capitalize(),
+			int(item["level"]), LootSystem.describe(item).replace(", ", "\n"), _worn_text(item["slot"])]
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		btn.custom_minimum_size = Vector2(300, 20)
@@ -460,9 +420,17 @@ func rebuild_trophies() -> void:
 		btn.gui_input.connect(func(ev: InputEvent):
 			var mb := ev as InputEventMouseButton
 			if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
-				run.loot.melt(i)
+				run.loot.discard(i)
 		)
 		trophy_box.add_child(btn)
+
+
+func _worn_text(slot: String) -> String:
+	var gear: Dictionary = run.state.warden["gear"]
+	if not gear.has(slot):
+		return "nothing"
+	var it: Dictionary = gear[slot]
+	return "%s  %s" % [it["name"], LootSystem.describe(it)]
 
 
 func show_banner(text: String) -> void:
@@ -479,7 +447,7 @@ func _on_log() -> void:
 
 func _update_tooltip() -> void:
 	var s = run.state
-	if s.game_over or level_panel.visible:
+	if s.game_over:
 		tooltip.visible = false
 		return
 	var cell: Vector2i = run.view.mouse_cell()
@@ -496,7 +464,7 @@ func _update_tooltip() -> void:
 		if s.forks.has(t):
 			lines.append("Fork: each traveler picks a branch by personality.")
 		if s.warden_at(t):
-			lines.append("The Warden  %d/%d HP  %.1f dmg" % [int(s.warden["hp"]), int(s.warden["max_hp"]), s.warden["dmg"]])
+			lines.append("%s  %d/%d HP  %.1f dmg" % [s.warden["name"], int(s.warden["hp"]), int(s.warden["max_hp"]), s.warden["dmg"]])
 		for u in s.alive_units(t):
 			lines.append("%s  %d/%d HP  %.1f dmg" % [u["name"], int(u["hp"]), int(u["max_hp"]), u["dmg"]])
 		for h in s.travelers_at(t):

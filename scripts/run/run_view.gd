@@ -133,7 +133,7 @@ func _draw_warden(s, font: Font) -> void:
 	var frac: float = clampf(w["hp"] / w["max_hp"], 0.0, 1.0)
 	draw_rect(Rect2(p + Vector2(-18, -24), Vector2(36, 4)), Color(0.1, 0.1, 0.15))
 	draw_rect(Rect2(p + Vector2(-18, -24), Vector2(36 * frac, 4)), Color(0.4, 0.85, 1.0))
-	draw_string(font, p + Vector2(-20, 28), "Lv %d" % w["level"], HORIZONTAL_ALIGNMENT_CENTER, 40, 10, Color(0.6, 0.9, 1.0))
+	draw_string(font, p + Vector2(-30, 28), "WARDEN", HORIZONTAL_ALIGNMENT_CENTER, 60, 9, Color(0.6, 0.9, 1.0))
 
 
 func _draw_preview(s) -> void:

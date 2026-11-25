@@ -11,7 +11,7 @@ var s: RunState
 
 func tick() -> void:
 	_radiance()
-	run.warden.tick_regen()
+	run.warden.tick_regen(D.COMBAT_TICK)
 	var by_tile := {}
 	for h in s.heroes:
 		if h["gone"] or h["delay"] > 0.0:
@@ -63,9 +63,7 @@ func _travelers_strike(hs: Array, units: Array, warden_here: bool) -> void:
 		var dmg: float = h["dmg"] * (1.3 if h["revenge"] else 1.0)
 		var pick := s.rng.randi() % targets
 		if pick >= units.size():
-			if run.warden.has("dread"):
-				dmg *= 0.75
-			run.warden.take_damage(dmg, h)
+			run.warden.take_hit(dmg, h)
 			continue
 		var target: Dictionary = units[pick]
 		if target["undead"] and h["cls"] == "pilgrim":
@@ -77,15 +75,13 @@ func _travelers_strike(hs: Array, units: Array, warden_here: bool) -> void:
 
 func _monsters_strike(t: int, hs: Array, units: Array, warden_here: bool) -> void:
 	var bonus := 2.0 * s.scenery_near(t, "altar") + 5.0 * s.scenery_near(t, "spire")
-	var commanded := warden_here and run.warden.has("commander")
+
 	for u in units:
 		var alive_h := hs.filter(func(x): return not x["gone"])
 		if alive_h.is_empty():
 			return
 		var target: Dictionary = alive_h[s.rng.randi() % alive_h.size()]
 		var dmg: float = u["dmg"] + bonus
-		if commanded:
-			dmg *= 1.5
 		if u["undead"] and s.has_relic("iron_chains"):
 			dmg *= 0.8
 		if u["undead"] and u["party"] == target["party"]:

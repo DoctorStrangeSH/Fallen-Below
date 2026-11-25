@@ -47,7 +47,7 @@ func spawn_party() -> void:
 	var pid := s.next_party_id
 	s.next_party_id += 1
 	var size := party_size(s.day)
-	var mult := 1.0 + 0.12 * (s.day - 1)
+	var mult := 1.0 + D.LOOP_POWER * (s.loop - 1)
 	var lured: String = D.LURES[s.lure]["traveler"]
 	var names: Array = []
 	for i in size:
@@ -57,7 +57,7 @@ func spawn_party() -> void:
 		var hero_name: String = D.FIRST_NAMES[s.rng.randi() % D.FIRST_NAMES.size()]
 		make_hero(cls, hero_name, mult, pid, i)
 		names.append(D.HERO_CLASSES[cls]["name"])
-	s.add_log("Day %d: lured below: %s." % [s.day, ", ".join(names)])
+	s.add_log("Day %d (loop %d): lured below: %s." % [s.day, s.loop, ", ".join(names)])
 
 
 func spawn_boss() -> void:
@@ -68,9 +68,9 @@ func spawn_boss() -> void:
 	h["trait"] = ""
 	h["boss"] = true
 	h["title"] = act["boss_title"]
-	h["hp"] = 140.0 + s.day * 10.0
+	h["hp"] = 140.0 + s.loop * 15.0
 	h["max_hp"] = h["hp"]
-	h["dmg"] = 7.0 + s.day * 0.5
+	h["dmg"] = 7.0 + s.loop * 1.0
 	h["speed"] = 1.3
 	h["color"] = Color(1, 1, 1)
 	for line in D.BOSS_LINES["arrive"]:

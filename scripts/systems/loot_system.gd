@@ -1,5 +1,6 @@
 extends Node
-## Trophies: fallen travelers drop gear for the Warden.
+## Gear dropped by the dead, Loop Hero style: a slot, an item type with a main
+## and a secondary stat, plus random extra stats by rarity. Item level = current loop.
 
 const D = preload("res://scripts/data/game_data.gd")
 const RunState = preload("res://scripts/run/run_state.gd")
@@ -14,47 +15,46 @@ func drop_from(h: Dictionary) -> void:
 		return
 	var item := make_item(h)
 	if s.inventory.size() >= D.INVENTORY_MAX:
-		s.gain("bones", 1)
-		s.add_log("No room for %s, ground into bones." % item["name"])
-		return
+		var lost: Dictionary = s.inventory.pop_front()  # the oldest item is left behind
+		s.add_log("No room: %s is left in the dark." % lost["name"])
 	s.inventory.append(item)
 	s.add_log("%s dropped %s." % [h["name"], item["name"]])
 	s.inventory_changed.emit()
 
 
 func make_item(h: Dictionary) -> Dictionary:
-	var options: Array = D.ITEM_SLOTS[h["cls"]]
-	var pick: Array = options[s.rng.randi() % options.size()]
-	var slot: String = pick[0]
-	var noun: String = pick[1]
+	var slots: Array = D.ITEM_SLOTS[h["cls"]]
+	var slot: String = slots[s.rng.randi() % slots.size()]
+	var types: Array = D.ITEM_TYPES[slot]
+	var type_def: Dictionary = types[s.rng.randi() % types.size()]
 	var r := _roll_rarity(h["boss"])
 	var rar: Dictionary = D.RARITIES[r]
-	var mult: float = rar["mult"] * (1.0 + 0.1 * s.day)
-	var item := {
-		"name": "%s %s of %s" % [rar["name"], noun, h["name"]],
-		"slot": slot, "rarity": r, "dmg": 0.0, "hp": 0.0, "affix": "",
+	var level: int = s.loop * D.ITEM_LEVEL_PER_LOOP
+	var stats := {}
+	var main_stat: String = type_def["main"]
+	var second_stat: String = type_def["second"]
+	stats[main_stat] = _roll(main_stat, level, 1.5 * rar["mult"])
+	stats[second_stat] = float(stats.get(second_stat, 0.0)) + _roll(second_stat, level, 0.8 * rar["mult"])
+	var pool: Array = D.STATS.keys().filter(func(k): return k != main_stat and k != second_stat)
+	pool.shuffle()
+	for i in int(rar["extras"]):
+		if i >= pool.size():
+			break
+		var k: String = pool[i]
+		stats[k] = _roll(k, level, 0.6 * rar["mult"])
+	return {
+		"name": "%s %s" % [rar["name"], type_def["name"]] if r > 0 else str(type_def["name"]),
+		"slot": slot, "rarity": r, "level": level, "stats": stats,
 	}
-	match slot:
-		"weapon":
-			item["dmg"] = snappedf(2.0 * mult, 0.5)
-		"armor":
-			item["hp"] = round(10.0 * mult)
-		"amulet":
-			item["hp"] = round(4.0 * mult)
-			item["affix"] = _random_affix()
-		"ring":
-			item["dmg"] = snappedf(1.0 * mult, 0.5)
-			item["hp"] = round(3.0 * mult)
-	if (slot == "weapon" or slot == "armor") and r >= 2:
-		item["affix"] = _random_affix()
-	if slot == "ring" and r >= 1:
-		item["affix"] = _random_affix()
-	return item
 
 
-func _random_affix() -> String:
-	var keys: Array = D.AFFIXES.keys()
-	return keys[s.rng.randi() % keys.size()]
+## One stat value with +-20% spread, rounded to something readable.
+func _roll(k: String, level: int, mult: float) -> float:
+	var roll: Array = D.STAT_ROLL[k]
+	var v: float = (float(roll[0]) + float(roll[1]) * level) * mult * s.rng.randf_range(0.8, 1.2)
+	if k == "hp" or k == "vamp" or k == "evade" or k == "counter":
+		return maxf(1.0, round(v))
+	return snappedf(v, 0.1)
 
 
 func _roll_rarity(boss: bool) -> int:
@@ -64,8 +64,8 @@ func _roll_rarity(boss: bool) -> int:
 	var total := 0.0
 	for i in D.RARITIES.size():
 		var w: float = D.RARITIES[i]["weight"]
-		if i >= 2:
-			w += s.day * 0.5  # better loot later in the run
+		if i >= 1:
+			w *= 1.0 + 0.25 * (s.loop - 1)  # deeper loops, better loot
 		weights.append(w)
 		total += w
 	var roll := s.rng.randf() * total
@@ -76,15 +76,20 @@ func _roll_rarity(boss: bool) -> int:
 	return 0
 
 
+static func stat_text(k: String, v: float) -> String:
+	var def: Dictionary = D.STATS[k]
+	if def["pct"]:
+		return "+%d%% %s" % [int(v), def["name"]]
+	if k == "hp":
+		return "+%d %s" % [int(v), def["name"]]
+	return "+%s %s" % [str(snappedf(v, 0.1)), def["name"]]
+
+
 static func describe(item: Dictionary) -> String:
 	var parts: Array = []
-	if item["dmg"] > 0.0:
-		parts.append("+%s dmg" % str(item["dmg"]))
-	if item["hp"] > 0.0:
-		parts.append("+%d HP" % int(item["hp"]))
-	var affix: String = item["affix"]
-	if affix != "":
-		parts.append(D.AFFIXES[affix]["name"])
+	var stats: Dictionary = item["stats"]
+	for k in stats:
+		parts.append(stat_text(k, stats[k]))
 	return ", ".join(parts)
 
 
@@ -103,10 +108,9 @@ func equip(i: int) -> void:
 	s.inventory_changed.emit()
 
 
-## Right-click a trophy: grind it into bones.
-func melt(i: int) -> void:
+## Right-click a trophy: throw it away.
+func discard(i: int) -> void:
 	if i < 0 or i >= s.inventory.size():
 		return
 	s.inventory.remove_at(i)
-	s.gain("bones", 1)
 	s.inventory_changed.emit()
