@@ -25,7 +25,9 @@ func setup(base_hp: float, base_dmg: float) -> void:
 		"base": base, "diet": base.duplicate(), "stats": base.duplicate(),
 		"hp": base_hp, "max_hp": base_hp, "dmg": base_dmg,
 		"gear": {}, "eaten": {}, "cur": s.loop_size / 2, "prog": 0.0, "relic_used": false,
-		"cooldown": 0.0,
+		"cooldown": 0.0, "title": Meta.warden_title(),
+		"level": 1, "xp": 0, "abilities": [], "growth": Meta.growth_unlocked(), "unbroken_used": false,
+		"bonus_dmg": 0.0,
 	}
 	for k in s.warden["diet"]:
 		s.warden["diet"][k] = 0.0
@@ -35,6 +37,14 @@ func setup(base_hp: float, base_dmg: float) -> void:
 func stat(k: String) -> float:
 	var st: Dictionary = s.warden["stats"]
 	return float(st.get(k, 0.0))
+
+
+var pending_levels := 0
+
+
+func has(ability: String) -> bool:
+	var list: Array = s.warden.get("abilities", [])
+	return list.has(ability)
 
 
 func is_kind(id: String) -> bool:
@@ -87,12 +97,24 @@ func _complete_loop() -> void:
 func strike(targets: Array) -> void:
 	if not alive() or targets.is_empty():
 		return
-	var h: Dictionary = targets[s.rng.randi() % targets.size()]
 	var dmg: float = s.warden["dmg"]
-	run.heroes_sys.damage(h, dmg)
-	heal_by(dmg * stat("vamp") / 100.0)
-	if h["gone"] and is_kind("brood"):
-		run.cards.spawn_at(s.warden["cur"], "spider")
+	if has("wrath"):
+		dmg += s.count_units(s.warden["cur"], "Spider")
+	var hit: Array = targets.duplicate() if has("cleaving_arm") else [targets[s.rng.randi() % targets.size()]]
+	var dealt := 0.0
+	for h in hit:
+		run.heroes_sys.damage(h, dmg)
+		dealt += dmg
+		if has("venom") and not h["gone"]:
+			h["poison"] = 3
+		if h["gone"] and is_kind("brood"):
+			run.cards.spawn_at(s.warden["cur"], "spider")
+	if has("second_mouth"):
+		var others: Array = targets.filter(func(x): return not x["gone"] and not hit.has(x))
+		if not others.is_empty():
+			run.heroes_sys.damage(others[0], dmg * 0.5)
+			dealt += dmg * 0.5
+	heal_by(dealt * stat("vamp") / 100.0)
 
 
 ## A traveler hits the Warden: evasion, then defense; counter-attack chance.
@@ -101,13 +123,22 @@ func take_hit(amount: float, attacker: Dictionary) -> void:
 		return
 	if s.rng.randf() * 100.0 < stat("evade"):
 		return
+	if has("halo"):
+		amount *= 0.75
 	var dmg := maxf(amount - stat("def"), amount * 0.2)
 	s.warden["hp"] -= dmg
 	if s.rng.randf() * 100.0 < stat("counter"):
 		run.heroes_sys.damage(attacker, s.warden["dmg"])
+	if has("bone_spurs"):
+		run.heroes_sys.damage(attacker, 3.0)
 	if s.warden["hp"] > 0.0:
 		return
-	if s.has_relic("second_heartbeat") and not s.warden["relic_used"]:
+	if has("unbroken") and not s.warden["unbroken_used"]:
+		s.warden["unbroken_used"] = true
+		s.warden["hp"] = s.warden["max_hp"] * 0.4
+		s.add_log("%s refuses to break!" % s.warden["name"])
+		s.combo_found.emit("UNBROKEN")
+	elif s.has_relic("second_heartbeat") and not s.warden["relic_used"]:
 		s.warden["relic_used"] = true
 		s.warden["hp"] = s.warden["max_hp"] * 0.5
 		s.add_log("Second Heartbeat! The Warden rises again.")
@@ -146,11 +177,16 @@ func devour(h: Dictionary) -> void:
 		heal = w["max_hp"] * 0.4
 	elif is_kind("saint"):
 		heal *= 0.5
+	if has("gnaw"):
+		heal += w["max_hp"] * 0.1
+		w["bonus_dmg"] += 0.5
+		recompute()
 	if s.has_relic("hungry_dark"):
 		heal *= 1.5
 		s.gain("blood", 2)
 	heal_by(heal)
 	run.beat("first_devour")
+	gain_xp(int(D.XP_DEVOUR.get(w["id"], 4)) * (3 if h["boss"] else 1))
 
 
 # ---------------------------------------------------------- gear
@@ -207,8 +243,21 @@ func recompute() -> void:
 		var def: Dictionary = D.STATS[k]
 		if def.has("cap"):
 			st[k] = minf(st[k], float(def["cap"]))
+	var gold := int(s.pouch.get("gold", 0))
 	if is_kind("mimic"):
-		st["dmg"] += 0.1 * int(s.pouch.get("gold", 0))
+		st["dmg"] += (0.15 if has("gilded_teeth") else 0.1) * gold
+	st["dmg"] += float(w.get("bonus_dmg", 0.0))
+	if has("thick_marrow"):
+		st["hp"] *= 1.25
+	if has("reliquary_bones"):
+		st["hp"] *= 1.2
+		st["def"] += 1.0
+	if has("ossified") or has("chitin"):
+		st["def"] += 2.0
+	if has("coin_armor"):
+		st["def"] += float(gold / 20)
+	if has("sharp_hinges"):
+		st["counter"] = minf(st["counter"] + 15.0, 50.0)
 	w["stats"] = st
 	var gain: float = st["hp"] - w["max_hp"]
 	w["max_hp"] = st["hp"]
@@ -222,6 +271,8 @@ func cooldown_max() -> float:
 	var cd: float = Meta.warden_def()["cooldown"]
 	if s.has_relic("cracked_hourglass"):
 		cd *= 0.7
+	if has("quick_hunger"):
+		cd *= 0.6
 	return cd
 
 
@@ -239,7 +290,7 @@ func use_active() -> void:
 		"bone":
 			used = _bone_storm()
 		"brood":
-			for k in 3:
+			for k in (5 if has("clutch") else 3):
 				run.cards.spawn_at(s.warden["cur"], "spider")
 			used = true
 		"mimic":
@@ -253,11 +304,20 @@ func use_active() -> void:
 
 func _bone_storm() -> bool:
 	var area: Array = [int(s.warden["cur"])]
-	area.append_array(s.path_neighbors(s.warden["cur"]))
+	var reach := 3 if has("splinters") else 1
+	for r in reach:
+		var ring: Array = []
+		for t in area:
+			for nb in s.path_neighbors(t):
+				if not area.has(nb) and not ring.has(nb):
+					ring.append(nb)
+		area.append_array(ring)
 	var hit := false
 	for t in area:
 		for h in s.travelers_at(t):
 			run.heroes_sys.damage(h, s.warden["dmg"] * 2.0)
+			if has("splinters") and not h["gone"]:
+				h["stun"] = maxf(h["stun"], 1.0)
 			hit = true
 	if not hit:
 		s.add_log("Bone Storm: no travelers near the Warden.")
@@ -267,7 +327,7 @@ func _bone_storm() -> bool:
 func _swallow() -> bool:
 	var best = null
 	for h in s.travelers_at(s.warden["cur"]):
-		if h["boss"] or h["hp"] >= h["max_hp"] * 0.4:
+		if h["boss"] or h["hp"] >= h["max_hp"] * (0.6 if has("wide_jaw") else 0.4):
 			continue
 		if best == null or h["hp"] < best["hp"]:
 			best = h
@@ -289,4 +349,69 @@ func _call_the_dead() -> bool:
 		s.add_log("Call the Dead: you have no servants.")
 		return false
 	heal_by(s.warden["max_hp"] * 0.05 * count)
+	if has("resurrection"):
+		for k in 2:
+			run.cards.spawn_at(s.warden["cur"], "skeleton")
 	return true
+
+
+# ---------------------------------------------------------- experience & abilities
+
+func gain_xp(amount: int) -> void:
+	var w := s.warden
+	if not w.get("growth", false) or amount <= 0 or not alive():
+		return
+	w["xp"] += amount
+	while xp_to_next() > 0 and int(w["xp"]) >= xp_to_next():
+		w["level"] += 1
+		heal_by(w["max_hp"] * D.LEVEL_UP_HEAL)
+		s.add_log("%s reaches level %d." % [w["name"], w["level"]])
+		run.beat("first_level")
+		pending_levels += 1
+	if s.level_choices.is_empty():
+		_offer_ability()
+
+
+func xp_to_next() -> int:
+	var lvl: int = s.warden.get("level", 1)
+	if lvl - 1 >= D.XP_LEVELS.size():
+		return -1
+	return D.XP_LEVELS[lvl - 1]
+
+
+func _pool() -> Dictionary:
+	return D.ABILITIES.get(s.warden["id"], {})
+
+
+func _offer_ability() -> void:
+	if pending_levels <= 0 or s.game_over:
+		return
+	var pool: Array = []
+	for id in _pool():
+		if not has(id):
+			pool.append(id)
+	pool.shuffle()
+	if pool.is_empty():
+		pending_levels = 0
+		return
+	s.level_choices = pool.slice(0, D.ABILITY_CHOICES)
+	s.level_up.emit()
+
+
+func ability_def(id: String) -> Dictionary:
+	return _pool().get(id, {"name": id, "desc": ""})
+
+
+func pick_ability(i: int) -> void:
+	if i < 0 or i >= s.level_choices.size():
+		return
+	var id: String = s.level_choices[i]
+	s.warden["abilities"].append(id)
+	s.add_log("New ability: %s." % ability_def(id)["name"])
+	if id == "mass":
+		s.jar_cap += 2
+	recompute()
+	s.level_choices = []
+	pending_levels -= 1
+	_offer_ability()
+	s.level_up.emit()

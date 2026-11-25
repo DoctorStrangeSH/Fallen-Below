@@ -48,7 +48,8 @@ const VICTORY_BONUS := 25
 # --- the Wardens (your monster). Each has its own gear slots, a passive and an active ability ---
 const WARDENS := {
 	"bone": {
-		"name": "The Bone Warden", "color": Color(0.55, 0.85, 1.0),
+		"name": "Marrowgrave", "title": "the Bone Warden", "color": Color(0.55, 0.85, 1.0),
+		"xp_source": "Learns by devouring.",
 		"hp": 110.0, "dmg": 8.0, "def": 1.0, "speed": 1.3,
 		"slots": ["weapon", "shield", "armor", "amulet", "ring"],
 		"passive": "Marrow Feast", "passive_desc": "Devouring heals 40% HP instead of 25%.",
@@ -57,7 +58,8 @@ const WARDENS := {
 		"style": "Balanced. Eats, wears heavy gear, holds the line.",
 	},
 	"brood": {
-		"name": "The Broodmother", "color": Color(0.45, 0.9, 0.4),
+		"name": "Vesh'ka", "title": "Mother of Threads", "color": Color(0.45, 0.9, 0.4),
+		"xp_source": "Learns when travelers die among her spiders.",
 		"hp": 110.0, "dmg": 6.0, "def": 1.5, "speed": 1.1,
 		"slots": ["armor", "amulet", "amulet", "ring", "ring"],
 		"passive": "Brood", "passive_desc": "Every traveler she kills leaves a spider on that tile. Her spiders are 30% stronger. Spider Nests come twice as often.",
@@ -67,7 +69,8 @@ const WARDENS := {
 		"unlock_building": "brood_chamber",
 	},
 	"mimic": {
-		"name": "The Mimic King", "color": Color(1.0, 0.75, 0.25),
+		"name": "Goldtooth", "title": "the Mimic King", "color": Color(1.0, 0.75, 0.25),
+		"xp_source": "Learns from every coin of gold harvested.",
 		"hp": 100.0, "dmg": 7.0, "def": 0.5, "speed": 1.5,
 		"slots": ["weapon", "weapon", "ring", "ring", "ring"],
 		"passive": "Hoard", "passive_desc": "+0.1 damage for every Gold in this run's harvest. Cursed Chests come twice as often.",
@@ -77,7 +80,8 @@ const WARDENS := {
 		"unlock_building": "golden_hoard",
 	},
 	"saint": {
-		"name": "The Hollow Saint", "color": Color(0.95, 0.9, 0.75),
+		"name": "Sister Ashen", "title": "the Hollow Saint", "color": Color(0.95, 0.9, 0.75),
+		"xp_source": "Learns by raising the dead.",
 		"hp": 125.0, "dmg": 7.0, "def": 1.5, "speed": 1.2,
 		"slots": ["weapon", "armor", "amulet", "amulet", "ring"],
 		"passive": "Shepherd of the Dead", "passive_desc": "+2 undead servant slots, servants rise with 50% more HP. Devouring heals only half.",
@@ -88,6 +92,59 @@ const WARDENS := {
 	},
 }
 const DEVOUR_HEAL := 0.25         # share of max HP restored by devouring
+
+# --- growth: unlocked by the Hungering Pit in the Lair ---
+const XP_LEVELS := [35, 85, 150, 235, 340, 470, 620, 800]
+const XP_DEVOUR := {"bone": 10, "brood": 4, "mimic": 4, "saint": 4}
+const XP_BROOD_KILL := 10         # a traveler dies on a tile with Vesh'ka's spiders
+const XP_PER_GOLD := 2            # Goldtooth
+const XP_RAISE := 12              # Sister Ashen
+const LEVEL_UP_HEAL := 0.25
+const ABILITY_CHOICES := 3
+
+## Each Warden has its own pool of 8 abilities. 1 of 3 is offered on every level up.
+const ABILITIES := {
+	"bone": {
+		"thick_marrow": {"name": "Thick Marrow", "desc": "+25% max HP."},
+		"bone_spurs": {"name": "Bone Spurs", "desc": "Travelers take 3 damage whenever they hit him."},
+		"cleaving_arm": {"name": "Cleaving Arm", "desc": "His attacks hit every traveler on the tile."},
+		"splinters": {"name": "Storm of Splinters", "desc": "Bone Storm reaches two tiles further and stuns for 1s."},
+		"ossified": {"name": "Ossified", "desc": "+2 defense."},
+		"gnaw": {"name": "Gnaw", "desc": "Devouring heals 10% more and gives +0.5 damage for the run."},
+		"grave_call": {"name": "Grave Call", "desc": "Skeletons fighting beside him deal +50% damage."},
+		"unbroken": {"name": "Unbroken", "desc": "Once per run, he rises again with 40% HP."},
+	},
+	"brood": {
+		"venom": {"name": "Venom", "desc": "Her bite poisons: 2 damage per tick for 3 ticks."},
+		"clutch": {"name": "Great Clutch", "desc": "Swarm lays 5 spiders instead of 3."},
+		"silk_snare": {"name": "Silk Snare", "desc": "Travelers on tiles with her spiders move 35% slower."},
+		"wrath": {"name": "Mother's Wrath", "desc": "+1 damage for every spider on her tile."},
+		"hatchery": {"name": "Hatchery", "desc": "Spider Nests hatch one more spider every day."},
+		"chitin": {"name": "Chitin", "desc": "+2 defense."},
+		"cannibal": {"name": "Cannibal Mother", "desc": "When one of her spiders dies beside her, she heals 4."},
+		"queens_blood": {"name": "Queen's Blood", "desc": "All her spiders are 50% stronger."},
+	},
+	"mimic": {
+		"gilded_teeth": {"name": "Gilded Teeth", "desc": "Hoard gives 50% more damage per Gold."},
+		"wide_jaw": {"name": "Wide Jaw", "desc": "Swallow works on travelers below 60% HP."},
+		"coin_armor": {"name": "Coin Armor", "desc": "+1 defense for every 20 Gold harvested."},
+		"golden_bait": {"name": "Golden Bait", "desc": "Cursed Chests and Mimics deal double damage."},
+		"quick_hunger": {"name": "Quick Hunger", "desc": "Swallow recharges 40% faster."},
+		"hoard_heal": {"name": "Hoard Healing", "desc": "Every Gold harvested heals him 1 HP."},
+		"sharp_hinges": {"name": "Sharp Hinges", "desc": "+15% counter."},
+		"second_mouth": {"name": "Second Mouth", "desc": "Each attack also bites a second traveler for half damage."},
+	},
+	"saint": {
+		"choir": {"name": "Choir of the Dead", "desc": "Servants fighting beside her deal +50% damage."},
+		"resurrection": {"name": "Resurrection", "desc": "Call the Dead also raises 2 Skeletons on her tile."},
+		"martyrs_grace": {"name": "Martyr's Grace", "desc": "She heals 0.5 HP every time a servant strikes."},
+		"faith": {"name": "Unbreakable Faith", "desc": "Servants never betray her."},
+		"mass": {"name": "Mass", "desc": "+2 servant slots."},
+		"halo": {"name": "Hollow Halo", "desc": "Travelers fighting her deal 25% less damage."},
+		"last_rites": {"name": "Last Rites", "desc": "Servants burst when they fall: 6 damage to travelers on their tile."},
+		"reliquary_bones": {"name": "Reliquary Bones", "desc": "+20% max HP and +1 defense."},
+	},
+}
 const LOOP_HEAL := 0.15           # each completed patrol loop the dungeon feeds the Warden
 
 ## Warden stats. Gear and diet add to them.
@@ -286,6 +343,8 @@ const BUILDINGS := {
 		"cost": [{"gold": 15, "bones": 10}]},
 	"library": {"name": "Forbidden Library", "desc": "Unlocks the Graveyard card.", "unlock": "graveyard",
 		"cost": [{"bones": 25, "blood": 15}]},
+	"pit": {"name": "The Hungering Pit", "desc": "Your Wardens gain experience and choose 1 of 3 of their own abilities on every level up.",
+		"cost": [{"bones": 30, "blood": 10}]},
 	"jars": {"name": "Trophy Hall", "desc": "+1 undead servant slot per level.",
 		"cost": [{"bones": 25, "blood": 5}, {"bones": 55, "blood": 20}]},
 	"brood_chamber": {"name": "Brood Chamber", "desc": "A new Warden: the Broodmother.",
@@ -325,7 +384,7 @@ const ACTS := {
 }
 
 ## The Warden remembers its name after Act I.
-const WARDEN_TRUE_NAME := "Ren, the Bone Warden"
+const WARDEN_TRUE_NAME := "Ren"
 
 const STORY := {
 	"intro": [
@@ -369,6 +428,7 @@ const BEATS := {
 	"first_escape": "One got away. Tonight a tavern will hear the story. By morning, so will the Order.",
 	"first_loop": "The Warden completes its round. The dungeon grows deeper, and whatever comes down next will be stronger. So will what they carry.",
 	"first_devour": "The Warden eats. Its bones crack and grow. For a moment a name almost rises to the surface. Then it is gone.",
+	"first_level": "Something old wakes in the Warden. It remembers a way to kill it had forgotten.",
 	"attention_half": "Bells ring in the white towers. The Order has noticed you. Something bright is being prepared.",
 	"first_sleep": "The door in the mountain closes. The dungeon curls around its full belly and dreams of the next door.",
 	# tutorial hints (first run)

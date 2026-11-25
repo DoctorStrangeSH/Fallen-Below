@@ -104,7 +104,9 @@ func place_selected(cell: Vector2i) -> void:
 func make_monster(id: String) -> Dictionary:
 	var m: Dictionary = D.MONSTERS[id]
 	var mult := 1.0 + D.MONSTER_LOOP_POWER * (s.loop - 1)  # the dungeon deepens with every loop too
-	var brood := 1.3 if id == "spider" and s.warden.get("id", "") == "brood" else 1.0
+	var brood := 1.0
+	if id == "spider" and s.warden.get("id", "") == "brood":
+		brood = 1.3 * (1.5 if run.warden.has("queens_blood") else 1.0)
 	var hp: float = round(float(m["hp"]) * mult * brood)
 	return {"name": m["name"], "hp": hp, "max_hp": hp, "dmg": float(m["dmg"]) * mult * brood,
 		"color": m["color"], "undead": false, "party": -1, "kind": id}
@@ -143,7 +145,7 @@ func respawn_rooms() -> void:
 		elif card == "mimic" and s.count_units(i, "Mimic") == 0:
 			_spawn(i, "mimic")
 		elif card == "spider" or card == "queen":
-			var hatch := 2 if s.has_relic("brood_eye") else 1
+			var hatch := (2 if s.has_relic("brood_eye") else 1) + (1 if run.warden.has("hatchery") else 0)
 			for k in hatch:
 				if s.count_units(i, "Spider") < 4 + hatch:
 					_spawn(i, "spider")

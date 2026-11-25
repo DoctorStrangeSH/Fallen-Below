@@ -19,7 +19,7 @@ func make_hero(cls: String, hero_name: String, mult: float, party: int, idx: int
 		"speed": base["speed"], "color": base["color"],
 		"party": party, "cur": 0, "nxt": 0, "prog": 0.0, "delay": idx * 0.8, "stun": 0.0,
 		"laps": 0, "revenge": false, "boss": false, "gone": false, "death_tile": 0,
-		"trait": "", "baited": false, "half_said": false,
+		"trait": "", "baited": false, "half_said": false, "poison": 0,
 	}
 	if s.rng.randf() < D.TRAIT_CHANCE:
 		set_trait(h, D.TRAITS.keys()[s.rng.randi() % D.TRAITS.size()])
@@ -98,7 +98,10 @@ func move(delta: float) -> void:
 			continue
 		if _blocked(h["cur"]):
 			continue  # fighting
-		h["prog"] += h["speed"] * delta
+		var speed: float = h["speed"]
+		if run.warden.has("silk_snare") and s.count_units(h["cur"], "Spider") > 0:
+			speed *= 0.65
+		h["prog"] += speed * delta
 		while h["prog"] >= 1.0 and not h["gone"] and not s.game_over:
 			h["prog"] -= 1.0
 			var t: int = h["nxt"]
@@ -218,6 +221,8 @@ func _on_enter_tile(h: Dictionary, t: int) -> void:
 	elif card == "chest":
 		h["stun"] = D.CHEST_STUN
 		h["baited"] = true
+	if (card == "chest") and run.warden.has("golden_bait"):
+		dmg *= 2.0
 	damage(h, dmg)
 
 
@@ -245,6 +250,8 @@ func _kill(h: Dictionary) -> void:
 	h["death_tile"] = h["cur"]
 	remove(h)
 	s.kills += 1
+	if run.warden.is_kind("brood") and s.count_units(h["cur"], "Spider") > 0:
+		run.warden.gain_xp(D.XP_BROOD_KILL)
 	s.add_threat(D.THREAT_PER_KILL, "kills")
 	_harvest(h)
 	run.cards.draw_card()
@@ -269,6 +276,7 @@ func _kill(h: Dictionary) -> void:
 func _harvest(h: Dictionary) -> void:
 	var drop: Dictionary = D.HERO_CLASSES[h["cls"]]["drop"]
 	var times := 2 if h.get("swallowed", false) else 1
+	var gold_before := int(s.pouch.get("gold", 0))
 	for k in drop:
 		s.gain(k, int(drop[k]) * times)
 	if h["baited"] and s.has_relic("gilded_bait"):
@@ -283,6 +291,11 @@ func _harvest(h: Dictionary) -> void:
 		relic_chance = D.MAGE_RELIC_CHANCE
 	if h["boss"] or s.rng.randf() < relic_chance:
 		_find_relic(h)
+	var gold_gained := int(s.pouch.get("gold", 0)) - gold_before
+	if run.warden.is_kind("mimic") and gold_gained > 0:
+		run.warden.gain_xp(gold_gained * D.XP_PER_GOLD)
+		if run.warden.has("hoard_heal"):
+			run.warden.heal_by(gold_gained)
 	run.warden.recompute()  # the Mimic King grows with the gold
 
 

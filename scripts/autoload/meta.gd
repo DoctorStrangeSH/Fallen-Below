@@ -300,6 +300,15 @@ func warden_name() -> String:
 	return str(warden_def()["name"])
 
 
+func warden_title() -> String:
+	return str(warden_def()["title"])
+
+
+## Experience and abilities exist only once the Hungering Pit is built.
+func growth_unlocked() -> bool:
+	return level("pit") > 0
+
+
 ## Marks a combo as discovered. Returns true the first time.
 func discover(id: String) -> bool:
 	if discovered.has(id):

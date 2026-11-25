@@ -17,6 +17,9 @@ var day_label: Label
 var day_bar: ProgressBar
 var warden_label: Label
 var hp_bar: ProgressBar
+var xp_bar: ProgressBar
+var level_panel: PanelContainer
+var level_box: HBoxContainer
 var warden_stats: Label
 var gear_label: Label
 var active_btn: Button
@@ -52,6 +55,7 @@ func _ready() -> void:
 	hand_box.add_theme_constant_override("separation", 6)
 	add_child(hand_box)
 	_build_end_panel()
+	_build_level_panel()
 	_build_overlays()
 
 	var s = run.state
@@ -60,6 +64,7 @@ func _ready() -> void:
 	s.inventory_changed.connect(rebuild_trophies)
 	s.combo_found.connect(show_banner)
 	s.narrate.connect(_on_narrate)
+	s.level_up.connect(show_level_up)
 	act_label.text = D.ACTS[s.act]["name"]
 	rebuild_hand()
 	rebuild_trophies()
@@ -114,6 +119,8 @@ func _build_panel() -> void:
 	v.add_child(warden_label)
 	hp_bar = _bar(100, Color(0.4, 0.85, 1.0), 14)
 	v.add_child(hp_bar)
+	xp_bar = _bar(100, Color(0.75, 0.55, 1.0), 5)
+	v.add_child(xp_bar)
 	warden_stats = _small("", 12, Color(1, 1, 1, 0.85))
 	v.add_child(warden_stats)
 	gear_label = _small("", 10, Color(1, 0.85, 0.55))
@@ -176,6 +183,45 @@ func _modal(width: float, border: Color) -> PanelContainer:
 	p.visible = false
 	add_child(p)
 	return p
+
+
+func _build_level_panel() -> void:
+	level_panel = _modal(640, Color(0.75, 0.55, 1.0))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	level_panel.add_child(v)
+	var title := UI.label("THE WARDEN REMEMBERS", 22, Color(0.8, 0.65, 1.0))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(title)
+	var sub := UI.label("Choose an ability", 13, Color(1, 1, 1, 0.6))
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(sub)
+	level_box = HBoxContainer.new()
+	level_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	level_box.add_theme_constant_override("separation", 10)
+	v.add_child(level_box)
+
+
+func show_level_up() -> void:
+	var s = run.state
+	for c in level_box.get_children():
+		c.queue_free()
+	if s.level_choices.is_empty() or s.game_over:
+		level_panel.visible = false
+		return
+	for i in s.level_choices.size():
+		var def: Dictionary = run.warden.ability_def(s.level_choices[i])
+		var btn := Button.new()
+		btn.text = "%s\n\n%s" % [def["name"], def["desc"]]
+		btn.custom_minimum_size = Vector2(190, 150)
+		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.add_theme_font_size_override("font_size", 14)
+		btn.add_theme_stylebox_override("normal", UI.box(Color(0.14, 0.08, 0.22), Color(0.75, 0.55, 1.0)))
+		btn.add_theme_stylebox_override("hover", UI.box(Color(0.22, 0.13, 0.32), Color(1, 1, 1)))
+		btn.pressed.connect(func(): run.warden.pick_ability(i))
+		level_box.add_child(btn)
+	level_panel.visible = true
 
 
 func _build_end_panel() -> void:
@@ -317,7 +363,13 @@ func refresh() -> void:
 	day_bar.value = s.day_timer
 
 	var w: Dictionary = s.warden
-	warden_label.text = str(w["name"])
+	var growth: bool = w.get("growth", false)
+	warden_label.text = "%s, %s%s" % [w["name"], w["title"], ("   Lv %d" % int(w["level"])) if growth else ""]
+	xp_bar.visible = growth
+	if growth:
+		var need: int = run.warden.xp_to_next()
+		xp_bar.max_value = maxf(1.0, float(need))
+		xp_bar.value = float(w["xp"]) if need > 0 else xp_bar.max_value
 	hp_bar.max_value = w["max_hp"]
 	hp_bar.value = w["hp"]
 	var st: Dictionary = w["stats"]
@@ -334,7 +386,12 @@ func refresh() -> void:
 	var diet_parts: Array = []
 	for kind in eaten:
 		diet_parts.append("%d %s" % [int(eaten[kind]), D.HERO_CLASSES[kind]["name"]])
+	var abil: Array = []
+	for a in w.get("abilities", []):
+		abil.append(run.warden.ability_def(a)["name"])
 	warden_stats.text = "   ".join(parts) + "\nEaten: " + (", ".join(diet_parts) if not diet_parts.is_empty() else "nothing yet")
+	if not abil.is_empty():
+		warden_stats.text += "\nAbilities: " + ", ".join(abil)
 	var gear_parts: Array = []
 	var gear: Dictionary = w["gear"]
 	var slots: Array = w["slots"]
@@ -378,6 +435,7 @@ func refresh() -> void:
 
 func show_end(outcome: String, payout: Dictionary, pct: float, kept: Array, lost: Array) -> void:
 	tooltip.visible = false
+	level_panel.visible = false
 	var s = run.state
 	var head := ""
 	match outcome:
@@ -468,7 +526,7 @@ func _on_log() -> void:
 
 func _update_tooltip() -> void:
 	var s = run.state
-	if s.game_over:
+	if s.game_over or level_panel.visible:
 		tooltip.visible = false
 		return
 	var cell: Vector2i = run.view.mouse_cell()

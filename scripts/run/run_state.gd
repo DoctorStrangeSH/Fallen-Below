@@ -13,6 +13,7 @@ signal souls_changed
 signal inventory_changed
 signal combo_found(combo_name: String)
 signal narrate(text: String)
+signal level_up
 
 var rng := RandomNumberGenerator.new()
 
@@ -46,6 +47,7 @@ var jar_cap := 2           # undead servant slots
 var lure := "gold"
 var raise_souls := false   # soul stance: false = Warden devours, true = raise as servant
 var loop := 1              # patrol loops completed by the Warden + 1; scales travelers and loot
+var level_choices := []    # ability ids offered on level up (the game waits while non-empty)
 var threat := 0.0
 var boss_spawned := false
 var kills := 0
@@ -379,7 +381,7 @@ func seal_pct() -> float:
 
 
 func is_blocked() -> bool:
-	return game_over or paused
+	return game_over or paused or not level_choices.is_empty()
 
 
 func in_grid(c: Vector2i) -> bool:

@@ -11,6 +11,7 @@ var s: RunState
 
 func tick() -> void:
 	_radiance()
+	_poison()
 	run.warden.tick_regen(D.COMBAT_TICK)
 	var by_tile := {}
 	for h in s.heroes:
@@ -46,8 +47,10 @@ func tick() -> void:
 			var burst := 0.0
 			if u["name"] == "Skeleton" and s.has_relic("brittle_bones"):
 				burst = 4.0
-			elif u["undead"] and s.has_relic("sweet_rot"):
+			elif u["undead"] and (s.has_relic("sweet_rot") or run.warden.has("last_rites")):
 				burst = 6.0
+			if warden_here and u["name"] == "Spider" and run.warden.has("cannibal"):
+				run.warden.heal_by(4.0)
 			if burst > 0.0:
 				for h in hs:
 					run.heroes_sys.damage(h, burst)
@@ -90,8 +93,15 @@ func _monsters_strike(t: int, hs: Array, units: Array, warden_here: bool) -> voi
 		var dmg: float = u["dmg"] + bonus
 		if u["undead"] and s.has_relic("iron_chains"):
 			dmg *= 0.8
+		if warden_here and u["name"] == "Skeleton" and run.warden.has("grave_call"):
+			dmg *= 1.5
+		if warden_here and u["undead"] and run.warden.has("choir"):
+			dmg *= 1.5
+		if u["undead"] and run.warden.has("martyrs_grace"):
+			run.warden.heal_by(0.5)
+		var loyal_dead: bool = s.has_relic("iron_chains") or run.warden.has("faith")
 		if u["undead"] and u["party"] == target["party"]:
-			if not s.has_relic("iron_chains") and s.rng.randf() < D.BETRAY_CHANCE:
+			if not loyal_dead and s.rng.randf() < D.BETRAY_CHANCE:
 				u["hp"] = 0.0
 				run.heroes_sys.heal(target, 10.0)
 				s.add_log("%s remembers %s... and abandons you!" % [u["name"], target["name"]])
@@ -112,6 +122,15 @@ func _radiance() -> void:
 			for u in s.undead_at(a):
 				u["hp"] -= D.RADIANCE_DMG
 			s.tiles[a]["units"] = s.alive_units(a)
+
+
+## Vesh'ka's venom: poisoned travelers take 2 damage per tick.
+func _poison() -> void:
+	for h in s.heroes.duplicate():
+		var p: int = h.get("poison", 0)
+		if p > 0 and not h["gone"]:
+			h["poison"] = p - 1
+			run.heroes_sys.damage(h, 2.0)
 
 
 func _pilgrim_heal(hs: Array) -> void:

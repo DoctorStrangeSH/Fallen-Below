@@ -45,6 +45,8 @@ func _ready() -> void:
 				shot_path = kv[1]
 			"shot_day":
 				shot_day = int(kv[1])
+			"growth":
+				Meta.buildings["pit"] = int(kv[1])
 	rng.seed = 12345
 	Meta.no_save = true
 	# make every Warden and lure available to the bot (does not touch buildings permanently)
@@ -91,6 +93,8 @@ func _think(run) -> void:
 	if s.game_over:
 		return
 	s.paused = false
+	if not s.level_choices.is_empty():
+		run.warden.pick_ability(rng.randi() % s.level_choices.size())
 	_play_cards(run)
 	_manage_loot(run)
 	# raise while there are free servant slots and the Warden is healthy, otherwise devour
@@ -223,10 +227,11 @@ func _finish_run(run) -> void:
 	results.append({"outcome": outcome, "day": s.day, "loop": s.loop, "kills": s.kills,
 		"boss": s.boss_spawned, "hp": int(s.warden["hp"]), "max_hp": int(s.warden["max_hp"]),
 		"dmg": snappedf(s.warden["dmg"], 0.1), "gear": gear_count, "pouch": s.pouch.duplicate(),
-		"undead": s.undead_count(), "escapes": s.escapes})
+		"undead": s.undead_count(), "escapes": s.escapes, "level": s.warden.get("level", 1)})
 	var tf := {}
 	for k in s.threat_from:
 		tf[k] = int(s.threat_from[k])
+	print("lv %d " % int(s.warden.get("level", 1)) + str(s.warden.get("abilities", [])))
 	print("run %2d: %-12s day %2d loop %2d kills %3d esc %2d boss %-5s warden %d/%d dmg %.1f gear %d undead %d threat %s" % [
 		results.size(), outcome, s.day, s.loop, s.kills, s.escapes, str(s.boss_spawned), int(s.warden["hp"]),
 		int(s.warden["max_hp"]), s.warden["dmg"], gear_count, s.undead_count(), str(tf)])

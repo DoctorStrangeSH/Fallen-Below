@@ -43,6 +43,8 @@ func _raise(h: Dictionary) -> void:
 			x["revenge"] = true
 			avengers += 1
 	s.add_log("%s rises to serve you." % unit["name"])
+	if run.warden.is_kind("saint"):
+		run.warden.gain_xp(D.XP_RAISE)
 	run.beat("first_raise")
 	var page: String = Meta.next_fragment(h["cls"])
 	if page != "":
