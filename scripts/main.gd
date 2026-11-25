@@ -18,12 +18,14 @@ const RESTORE_COST := 10
 
 const CARDS := {
 	"crypt": {"name": "Crypt", "kind": "path", "color": Color(0.55, 0.5, 0.7), "desc": "Room. 2 Skeletons, respawn daily."},
-	"spider": {"name": "Spider Nest", "kind": "path", "color": Color(0.4, 0.6, 0.35), "desc": "Room. 3 Spiders, +1 daily."},
-	"spikes": {"name": "Spikes", "kind": "path", "color": Color(0.7, 0.35, 0.3), "desc": "Trap. 5 dmg to each hero passing."},
+	"spider": {"name": "Spider Nest", "kind": "path", "color": Color(0.4, 0.6, 0.35), "desc": "Room. 3 Spiders, +1 daily. 3 in a row: Queen!"},
+	"queen": {"name": "Queen's Lair", "kind": "path", "color": Color(0.3, 0.75, 0.3), "desc": "Born from 3 nests."},
+	"spikes": {"name": "Spikes", "kind": "path", "color": Color(0.7, 0.35, 0.3), "desc": "Trap. 5 dmg, +2 per adjacent Spikes."},
 	"altar": {"name": "Dark Altar", "kind": "scenery", "color": Color(0.6, 0.2, 0.55), "desc": "Beside path. Nearby units +2 dmg."},
+	"graveyard": {"name": "Graveyard", "kind": "scenery", "color": Color(0.35, 0.45, 0.4), "desc": "Beside path. Crypts +1 Skeleton, undead regen."},
 	"jar": {"name": "Soul Jar", "kind": "instant", "color": Color(0.3, 0.55, 0.8), "desc": "Instant. +1 undead capacity."},
 }
-const CARD_WEIGHTS := {"crypt": 3, "spider": 3, "spikes": 3, "altar": 2, "jar": 1}
+const CARD_WEIGHTS := {"crypt": 3, "spider": 3, "spikes": 3, "altar": 2, "graveyard": 2, "jar": 1}
 
 const HERO_CLASSES := {
 	"warrior": {"name": "Warrior", "hp": 30, "dmg": 4.0, "speed": 1.8, "greed": 1, "color": Color(0.9, 0.6, 0.3), "dark": "Death Knight"},
@@ -34,7 +36,16 @@ const HERO_CLASSES := {
 const MONSTERS := {
 	"skeleton": {"name": "Skeleton", "hp": 12, "dmg": 3.0, "color": Color(0.85, 0.85, 0.78)},
 	"spider": {"name": "Spider", "hp": 7, "dmg": 3.0, "color": Color(0.35, 0.3, 0.3)},
+	"queen": {"name": "Spider Queen", "hp": 40, "dmg": 6.0, "color": Color(0.2, 0.9, 0.3)},
 }
+const TRAITS := {
+	"coward": {"name": "Coward", "desc": "flees at 30% HP"},
+	"greedy": {"name": "Greedy", "desc": "steals more, moves faster"},
+	"loyal": {"name": "Loyal", "desc": "grows stronger when allies fall"},
+	"zealot": {"name": "Zealot", "desc": "x1.5 damage vs undead"},
+	"veteran": {"name": "Veteran", "desc": "+30% HP, drops an extra card"},
+}
+const TRAIT_CHANCE := 0.6
 const FIRST_NAMES := ["Alric", "Brann", "Cedric", "Dara", "Elowen", "Finn", "Greta", "Hector",
 	"Isolde", "Jorah", "Kael", "Lyra", "Mira", "Nolan", "Orin", "Petra", "Quinn", "Rowan",
 	"Sable", "Tamsin", "Ulric", "Vera", "Wren", "Yorick"]
@@ -63,6 +74,8 @@ var next_party_id := 0
 var nemesis_pool := []
 var pending_souls := []
 var game_over := false
+var paused := false
+var time_scale := 1.0
 var log_lines := []
 
 # --- ui ---
@@ -71,6 +84,8 @@ var info_label: Label
 var day_bar: ProgressBar
 var threat_bar: ProgressBar
 var restore_btn: Button
+var pause_btn: Button
+var speed_btn: Button
 var log_label: Label
 var hand_box: HBoxContainer
 var soul_panel: PanelContainer
@@ -150,9 +165,19 @@ func _build_ui() -> void:
 	top.add_child(threat_bar)
 
 	restore_btn = Button.new()
-	restore_btn.text = "Restore Heart (%d essence)" % RESTORE_COST
+	restore_btn.text = "Heal Heart (%d ess.)" % RESTORE_COST
 	restore_btn.pressed.connect(_on_restore)
+	restore_btn.focus_mode = Control.FOCUS_NONE
 	top.add_child(restore_btn)
+
+	pause_btn = Button.new()
+	pause_btn.focus_mode = Control.FOCUS_NONE
+	pause_btn.pressed.connect(_toggle_pause)
+	top.add_child(pause_btn)
+	speed_btn = Button.new()
+	speed_btn.focus_mode = Control.FOCUS_NONE
+	speed_btn.pressed.connect(func(): _set_speed(1.0 if time_scale >= 3.0 else time_scale + 1.0))
+	top.add_child(speed_btn)
 
 	log_label = Label.new()
 	log_label.position = MAP_OFFSET + Vector2(2.3 * CELL, 1.2 * CELL)
@@ -161,7 +186,7 @@ func _build_ui() -> void:
 	ui.add_child(log_label)
 
 	var hint := Label.new()
-	hint.text = "Click a card, then a tile. Right-click to cancel. Rooms/traps go on the path, altars beside it."
+	hint.text = "Click a card, then a tile. Right-click: cancel. Space: pause. 1/2/3: speed. Rooms/traps on the path, scenery beside it."
 	hint.position = Vector2(40, 556)
 	hint.add_theme_font_size_override("font_size", 13)
 	hint.modulate = Color(1, 1, 1, 0.6)
@@ -223,8 +248,9 @@ func _build_ui() -> void:
 
 func _process(delta: float) -> void:
 	queue_redraw()
-	if game_over or not pending_souls.is_empty():
+	if game_over or paused or not pending_souls.is_empty():
 		return
+	delta *= time_scale
 	day_timer += delta
 	if day_timer >= DAY_LENGTH:
 		day_timer -= DAY_LENGTH
@@ -245,9 +271,10 @@ func _new_day() -> void:
 	for i in tiles.size():
 		var card: String = tiles[i]["card"]
 		if card == "crypt":
-			while _count_units(i, "Skeleton") < 2:
+			var cap := 2 + _scenery_near(i, "graveyard")
+			while _count_units(i, "Skeleton") < cap:
 				tiles[i]["units"].append(_make_monster("skeleton"))
-		elif card == "spider":
+		elif card == "spider" or card == "queen":
 			if _count_units(i, "Spider") < 4:
 				tiles[i]["units"].append(_make_monster("spider"))
 	_spawn_party()
@@ -293,13 +320,18 @@ func _on_lap(h: Dictionary) -> void:
 		return
 	if not h["boss"] and h["loot"] >= FLEE_LOOT:
 		_remove_hero(h)
-		nemesis_pool.append({"name": h["name"], "cls": h["cls"], "level": h["level"] + 1})
+		_add_nemesis(h, "the Vengeful")
 		_log("%s escaped with your gold... They will return." % _hero_name(h))
 
 
 func _on_enter_tile(h: Dictionary, t: int) -> void:
 	if tiles[t]["card"] == "spikes":
-		_damage_hero(h, 5.0)
+		var n := path.size()
+		var chain := 0
+		for d in [-1, 1]:
+			if tiles[posmod(t + d, n)]["card"] == "spikes":
+				chain += 1
+		_damage_hero(h, 5.0 + 2.0 * chain)
 
 
 func _combat_tick() -> void:
@@ -317,6 +349,11 @@ func _combat_tick() -> void:
 		if units.is_empty():
 			continue
 		var hs: Array = by_tile[t]
+		var regen := _scenery_near(t, "graveyard")
+		if regen > 0:
+			for u in units:
+				if u["undead"]:
+					u["hp"] = minf(u["max_hp"], u["hp"] + regen)
 
 		# heroes strike
 		for h in hs:
@@ -328,6 +365,8 @@ func _combat_tick() -> void:
 			var dmg: float = h["dmg"] * (1.3 if h["revenge"] else 1.0)
 			if target["undead"] and h["cls"] == "paladin":
 				dmg *= 2.0
+			if target["undead"] and h["trait"] == "zealot":
+				dmg *= 1.5
 			target["hp"] -= dmg
 		units = _alive_units(t)
 		tiles[t]["units"] = units
@@ -368,6 +407,10 @@ func _damage_hero(h: Dictionary, amount: float) -> void:
 	h["hp"] -= amount
 	if h["hp"] <= 0.0:
 		_kill_hero(h)
+	elif h["trait"] == "coward" and not h["boss"] and h["hp"] < h["max_hp"] * 0.3:
+		_remove_hero(h)
+		_add_nemesis(h, "the Survivor")
+		_log("%s the Coward runs for their life!" % h["name"])
 
 
 func _kill_hero(h: Dictionary) -> void:
@@ -376,6 +419,13 @@ func _kill_hero(h: Dictionary) -> void:
 	essence += 2
 	threat += 5.0
 	_draw_card()
+	if h["trait"] == "veteran":
+		_draw_card()
+	for x in heroes:
+		if x["party"] == h["party"] and x["trait"] == "loyal":
+			x["dmg"] += 2.0
+			x["revenge"] = true
+			_log("%s the Loyal swears to avenge %s!" % [x["name"], h["name"]])
 	_rebuild_hand()
 	if h["boss"]:
 		_log("%s has fallen!" % _hero_name(h))
@@ -401,7 +451,10 @@ func _make_hero(cls: String, hero_name: String, mult: float, party: int, idx: in
 		"speed": base["speed"], "greed": base["greed"], "color": base["color"],
 		"party": party, "pos": 0.0, "delay": idx * 0.8, "loot": 0, "level": 0,
 		"revenge": false, "nemesis": false, "boss": false, "gone": false, "death_tile": 0,
+		"trait": "",
 	}
+	if rng.randf() < TRAIT_CHANCE:
+		_set_trait(h, TRAITS.keys()[rng.randi() % TRAITS.size()])
 	next_hero_id += 1
 	heroes.append(h)
 	return h
@@ -420,7 +473,9 @@ func _spawn_party() -> void:
 		var h := _make_hero(nem["cls"], nem["name"], mult * (1.2 + 0.25 * nem["level"]), pid, size)
 		h["nemesis"] = true
 		h["level"] = nem["level"]
-		h["title"] = "the Vengeful"
+		h["title"] = nem["title"]
+		if nem["trait"] != "" and h["trait"] == "":
+			_set_trait(h, nem["trait"])
 		_log("NEMESIS: %s has returned (lvl %d)!" % [_hero_name(h), h["level"]])
 	_log("Day %d: a party of %d enters." % [day, size])
 
@@ -443,6 +498,21 @@ func _make_monster(id: String) -> Dictionary:
 	var m: Dictionary = MONSTERS[id]
 	return {"name": m["name"], "hp": float(m["hp"]), "max_hp": float(m["hp"]), "dmg": m["dmg"],
 		"color": m["color"], "undead": false, "party": -1}
+
+
+func _set_trait(h: Dictionary, trait_id: String) -> void:
+	h["trait"] = trait_id
+	if trait_id == "greedy":
+		h["greed"] += 1
+		h["speed"] *= 1.2
+	elif trait_id == "veteran":
+		h["max_hp"] = round(h["max_hp"] * 1.3)
+		h["hp"] = h["max_hp"]
+
+
+func _add_nemesis(h: Dictionary, title: String) -> void:
+	nemesis_pool.append({"name": h["name"], "cls": h["cls"], "level": h["level"] + 1,
+		"title": title, "trait": h["trait"]})
 
 
 # ============================================================ cards
@@ -478,6 +548,7 @@ func _rebuild_hand() -> void:
 		btn.add_theme_stylebox_override("normal", _style(col, border))
 		btn.add_theme_stylebox_override("hover", _style(col.lightened(0.15), border))
 		btn.add_theme_stylebox_override("pressed", _style(col.lightened(0.25), Color(1, 1, 1)))
+		btn.focus_mode = Control.FOCUS_NONE
 		btn.pressed.connect(_on_card_pressed.bind(i))
 		hand_box.add_child(btn)
 
@@ -526,6 +597,7 @@ func _place(id: String, cell: Vector2i) -> void:
 		elif id == "spider":
 			for k in 3:
 				tiles[idx]["units"].append(_make_monster("spider"))
+			_check_queen(idx)
 	else:
 		scenery[cell] = id
 	threat += 8.0
@@ -535,7 +607,45 @@ func _place(id: String, cell: Vector2i) -> void:
 	_refresh_ui()
 
 
+func _check_queen(idx: int) -> void:
+	var n := path.size()
+	for s in [idx - 2, idx - 1, idx]:
+		var ok := true
+		for k in 3:
+			if tiles[posmod(s + k, n)]["card"] != "spider":
+				ok = false
+		if ok:
+			var mid := posmod(s + 1, n)
+			tiles[mid]["card"] = "queen"
+			tiles[mid]["units"].append(_make_monster("queen"))
+			threat += 10.0
+			_log("Three nests merge: the Spider Queen awakens!")
+			return
+
+
+func _toggle_pause() -> void:
+	paused = not paused
+	_refresh_ui()
+
+
+func _set_speed(s: float) -> void:
+	time_scale = s
+	_refresh_ui()
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key != null and key.pressed and not key.echo:
+		match key.keycode:
+			KEY_SPACE:
+				_toggle_pause()
+			KEY_1:
+				_set_speed(1.0)
+			KEY_2:
+				_set_speed(2.0)
+			KEY_3:
+				_set_speed(3.0)
+		return
 	var mb := event as InputEventMouseButton
 	if mb == null or not mb.pressed:
 		return
@@ -561,7 +671,10 @@ func _show_soul_choice() -> void:
 	var h: Dictionary = pending_souls[0]
 	var dark: String = HERO_CLASSES[h["cls"]]["dark"]
 	var used := _undead_count()
-	soul_label.text = "%s the %s has fallen.\nTheir soul is yours." % [_hero_name(h), HERO_CLASSES[h["cls"]]["name"]]
+	var trait_line := ""
+	if h["trait"] != "":
+		trait_line = "\nTrait: %s (%s)" % [TRAITS[h["trait"]]["name"], TRAITS[h["trait"]]["desc"]]
+	soul_label.text = "%s the %s has fallen.%s\nTheir soul is yours." % [_hero_name(h), HERO_CLASSES[h["cls"]]["name"], trait_line]
 	raise_btn.text = "Raise as %s  (undead %d/%d)" % [dark, used, jar_cap]
 	raise_btn.disabled = used >= jar_cap
 	soul_panel.visible = true
@@ -644,6 +757,14 @@ func _undead_count() -> int:
 	return c
 
 
+func _scenery_near(t: int, id: String) -> int:
+	var c := 0
+	for nb in _neighbors(path[t]):
+		if scenery.get(nb, "") == id:
+			c += 1
+	return c
+
+
 func _altar_bonus(t: int) -> float:
 	var bonus := 0.0
 	for nb in _neighbors(path[t]):
@@ -692,11 +813,13 @@ func _log(msg: String) -> void:
 
 
 func _refresh_ui() -> void:
-	info_label.text = "Day %d    Heart %d/%d    Essence %d    Undead %d/%d    Nemeses %d" % [
+	info_label.text = "Day %d   Heart %d/%d   Essence %d   Undead %d/%d   Nemeses %d" % [
 		day, heart_hp, HEART_MAX, essence, _undead_count(), jar_cap, nemesis_pool.size()]
 	day_bar.value = day_timer
 	threat_bar.value = threat
 	restore_btn.disabled = essence < RESTORE_COST or heart_hp >= HEART_MAX or game_over
+	pause_btn.text = "Play" if paused else "Pause"
+	speed_btn.text = "Speed x%d" % int(time_scale)
 
 
 # ============================================================ drawing
@@ -733,7 +856,8 @@ func _draw() -> void:
 		var r := Rect2(MAP_OFFSET + Vector2(c) * CELL, Vector2(CELL, CELL)).grow(-6)
 		var id: String = scenery[c]
 		draw_rect(r, CARDS[id]["color"])
-		draw_string(font, r.position + Vector2(0, 24), "ALTAR", HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 10)
+		var label: String = CARDS[id]["name"].substr(0, 5).to_upper()
+		draw_string(font, r.position + Vector2(0, 24), label, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 10)
 
 	# heart
 	var center := (_cell_center(LOOP_MIN) + _cell_center(LOOP_MAX)) * 0.5 + Vector2(0, 40)
@@ -787,3 +911,10 @@ func _draw() -> void:
 		draw_rect(Rect2(p + Vector2(-rad, -rad - 6), Vector2(rad * 2 * frac, 3)), Color(1, 0.3, 0.3))
 		if h["revenge"]:
 			draw_string(font, p + Vector2(rad, -rad), "!", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 0.3, 0.2))
+		if h["trait"] != "":
+			var tl: String = TRAITS[h["trait"]]["name"].substr(0, 1)
+			draw_string(font, p + Vector2(rad - 2, rad + 8), tl, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 0.85, 0.3))
+
+	if paused and not game_over:
+		var vr := get_viewport_rect()
+		draw_string(font, Vector2(0, vr.size.y * 0.42), "PAUSED", HORIZONTAL_ALIGNMENT_CENTER, vr.size.x, 40, Color(1, 1, 1, 0.8))
