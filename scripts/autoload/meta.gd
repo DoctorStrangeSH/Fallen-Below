@@ -1,16 +1,21 @@
 extends Node
 ## Meta progression between runs. Registered as autoload "Meta".
+## Holds resources, Lair buildings, relic collection, the chosen loadout and saves.
 
 const D = preload("res://scripts/data/game_data.gd")
 const SAVE_PATH := "user://save.json"
+const SAVE_VERSION := 2
 
-var bones := 0
-var buildings := {}  # building id -> level
+var res := {"bones": 0, "blood": 0, "gold": 0}
+var buildings := {}      # building id -> level
+var relics := []         # owned relic ids
+var deck := []           # card ids chosen for the next run
+var loadout := []        # relic ids equipped for the next run
 var runs := 0
 var wins := 0
 var best_day := 0
 var total_kills := 0
-var discovered := []  # combo ids
+var discovered := []     # combo ids
 var seen_intro := false
 var acts_cleared := []
 
@@ -21,6 +26,28 @@ var story_next := ""
 
 func _ready() -> void:
 	load_game()
+	_sanitize_loadout()
+
+
+# ---------------------------------------------------------- resources
+
+func can_afford(cost: Dictionary) -> bool:
+	for k in cost:
+		if int(res.get(k, 0)) < int(cost[k]):
+			return false
+	return true
+
+
+func pay(cost: Dictionary) -> void:
+	for k in cost:
+		res[k] = int(res.get(k, 0)) - int(cost[k])
+
+
+static func cost_text(cost: Dictionary) -> String:
+	var parts: Array = []
+	for k in cost:
+		parts.append("%d %s" % [int(cost[k]), D.RESOURCES[k]["name"]])
+	return ", ".join(parts)
 
 
 # ---------------------------------------------------------- buildings
@@ -34,54 +61,106 @@ func max_level(id: String) -> int:
 	return costs.size()
 
 
-## Cost of the next level, or -1 if maxed.
-func next_cost(id: String) -> int:
+## Cost of the next level, or {} if maxed.
+func next_cost(id: String) -> Dictionary:
 	var lvl := level(id)
 	if lvl >= max_level(id):
-		return -1
+		return {}
 	var costs: Array = D.BUILDINGS[id]["cost"]
-	return int(costs[lvl])
+	return costs[lvl]
 
 
 func buy(id: String) -> bool:
 	var c := next_cost(id)
-	if c < 0 or bones < c:
+	if c.is_empty() or not can_afford(c):
 		return false
-	bones -= c
+	pay(c)
 	buildings[id] = level(id) + 1
+	var unlock: String = D.BUILDINGS[id].get("unlock", "")
+	if unlock != "" and deck.size() < deck_slots() and not deck.has(unlock):
+		deck.append(unlock)
 	save_game()
 	return true
+
+
+# ---------------------------------------------------------- deck & relics
+
+func unlocked_cards() -> Array:
+	var out: Array = D.START_CARDS.duplicate()
+	for id in D.BUILDINGS:
+		var unlock: String = D.BUILDINGS[id].get("unlock", "")
+		if unlock != "" and level(id) > 0:
+			out.append(unlock)
+	return out
+
+
+func deck_slots() -> int:
+	return D.BASE_DECK_SLOTS + level("archive")
+
+
+func relic_slots() -> int:
+	return D.BASE_RELIC_SLOTS + level("reliquary")
+
+
+func toggle_card(id: String) -> void:
+	if deck.has(id):
+		if deck.size() > 1:
+			deck.erase(id)
+	elif deck.size() < deck_slots() and unlocked_cards().has(id):
+		deck.append(id)
+	save_game()
+
+
+func toggle_relic(id: String) -> void:
+	if loadout.has(id):
+		loadout.erase(id)
+	elif loadout.size() < relic_slots() and relics.has(id):
+		loadout.append(id)
+	save_game()
+
+
+func _sanitize_loadout() -> void:
+	var unlocked := unlocked_cards()
+	deck = deck.filter(func(c): return unlocked.has(c))
+	if deck.is_empty():
+		deck = D.START_CARDS.duplicate()
+	while deck.size() > deck_slots():
+		deck.pop_back()
+	loadout = loadout.filter(func(r): return relics.has(r))
+	while loadout.size() > relic_slots():
+		loadout.pop_back()
+
+
+## Draw weights for the next run, built from the chosen deck.
+func card_weights() -> Dictionary:
+	var w := {}
+	for id in deck:
+		w[id] = D.CARD_WEIGHTS.get(id, 1)
+	return w
 
 
 # ---------------------------------------------------------- run modifiers
 
 func heart_max() -> int:
-	return D.HEART_BASE + 5 * level("heart")
+	var hp: int = D.HEART_BASE + 5 * level("heart")
+	if loadout.has("blood_price"):
+		hp -= 5
+	return hp
 
 
 func start_jars() -> int:
-	return 2 + level("jars")
+	return 2 + level("jars") + (1 if loadout.has("mass_grave") else 0)
 
 
 func start_cards() -> int:
-	return 4 + level("crypt")
+	return 4
 
 
 func start_essence() -> int:
-	return 5 * level("well")
+	return 5 * level("well") + (15 if loadout.has("blood_price") else 0)
 
 
-func card_weights() -> Dictionary:
-	var w: Dictionary = D.CARD_WEIGHTS.duplicate()
-	if level("library") < 1:
-		w.erase("graveyard")
-	return w
-
-
-## Raw bones value of a run before the payout percentage.
-static func bones_value(days: int, kills: int) -> int:
-	return days * 3 + kills
-
+# ---------------------------------------------------------- flow
 
 func clear_act(act: int) -> void:
 	if not acts_cleared.has(act):
@@ -96,14 +175,14 @@ func play_story(id: String, next_scene: String) -> void:
 	get_tree().change_scene_to_file("res://scenes/story.tscn")
 
 
-## Starts a run; the first time ever, the intro story plays first.
+## Goes to the descent preparation (deck + relics); the very first time the intro plays first.
 func start_run() -> void:
 	if not seen_intro:
 		seen_intro = true
 		save_game()
-		play_story("intro", "res://scenes/run.tscn")
+		play_story("intro", "res://scenes/prepare.tscn")
 	else:
-		get_tree().change_scene_to_file("res://scenes/run.tscn")
+		get_tree().change_scene_to_file("res://scenes/prepare.tscn")
 
 
 ## Marks a combo as discovered. Returns true the first time.
@@ -115,9 +194,24 @@ func discover(id: String) -> bool:
 	return true
 
 
-## Called when a run ends with the final bones payout.
-func record_run(days: int, kills: int, earned: int, win: bool) -> void:
-	bones += earned
+## A random relic the player does not own yet, excluding `also_skip`. "" if none left.
+func random_unowned_relic(rng: RandomNumberGenerator, also_skip: Array) -> String:
+	var pool: Array = []
+	for id in D.RELICS:
+		if not relics.has(id) and not also_skip.has(id):
+			pool.append(id)
+	if pool.is_empty():
+		return ""
+	return pool[rng.randi() % pool.size()]
+
+
+## Called once when a run ends. `payout` is already scaled by the outcome.
+func record_run(days: int, kills: int, payout: Dictionary, new_relics: Array, win: bool) -> void:
+	for k in payout:
+		res[k] = int(res.get(k, 0)) + int(payout[k])
+	for r in new_relics:
+		if not relics.has(r):
+			relics.append(r)
 	runs += 1
 	total_kills += kills
 	if win:
@@ -130,15 +224,26 @@ func record_run(days: int, kills: int, earned: int, win: bool) -> void:
 
 func save_game() -> void:
 	var data := {
-		"version": 1, "bones": bones, "buildings": buildings, "runs": runs,
-		"wins": wins, "best_day": best_day, "total_kills": total_kills,
-		"discovered": discovered, "seen_intro": seen_intro, "acts_cleared": acts_cleared,
+		"version": SAVE_VERSION, "res": res, "buildings": buildings, "relics": relics,
+		"deck": deck, "loadout": loadout, "runs": runs, "wins": wins, "best_day": best_day,
+		"total_kills": total_kills, "discovered": discovered, "seen_intro": seen_intro,
+		"acts_cleared": acts_cleared,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
 		push_warning("Cannot write save: %s" % FileAccess.get_open_error())
 		return
 	f.store_string(JSON.stringify(data, "\t"))
+
+
+func _str_list(v, valid: Dictionary) -> Array:
+	var out: Array = []
+	if v is Array:
+		for x in v:
+			var id := str(x)
+			if valid.has(id) and not out.has(id):
+				out.append(id)
+	return out
 
 
 func load_game() -> void:
@@ -149,7 +254,12 @@ func load_game() -> void:
 		push_warning("Save file is corrupt, starting fresh.")
 		return
 	var d: Dictionary = parsed
-	bones = int(d.get("bones", 0))
+	var r = d.get("res", {})
+	if r is Dictionary:
+		for k in res:
+			res[k] = int(r.get(k, 0))
+	elif d.has("bones"):  # save v1
+		res["bones"] = int(d["bones"])
 	runs = int(d.get("runs", 0))
 	wins = int(d.get("wins", 0))
 	best_day = int(d.get("best_day", 0))
@@ -160,23 +270,24 @@ func load_game() -> void:
 	if ac is Array:
 		for a in ac:
 			acts_cleared.append(int(a))
-	discovered = []
-	var disc = d.get("discovered", [])
-	if disc is Array:
-		for c in disc:
-			if D.COMBOS.has(c):
-				discovered.append(str(c))
+	discovered = _str_list(d.get("discovered", []), D.COMBOS)
+	relics = _str_list(d.get("relics", []), D.RELICS)
+	loadout = _str_list(d.get("loadout", []), D.RELICS)
+	deck = _str_list(d.get("deck", []), D.CARDS)
 	buildings = {}
 	var b = d.get("buildings", {})
 	if b is Dictionary:
 		for k in b:
 			if D.BUILDINGS.has(k):
-				buildings[k] = int(b[k])
+				buildings[k] = mini(int(b[k]), max_level(k))
 
 
 func reset_save() -> void:
-	bones = 0
+	res = {"bones": 0, "blood": 0, "gold": 0}
 	buildings = {}
+	relics = []
+	deck = []
+	loadout = []
 	runs = 0
 	wins = 0
 	best_day = 0
@@ -184,4 +295,5 @@ func reset_save() -> void:
 	discovered = []
 	seen_intro = false
 	acts_cleared = []
+	_sanitize_loadout()
 	save_game()

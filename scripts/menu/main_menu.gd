@@ -1,6 +1,7 @@
 extends Control
 ## Title screen.
 
+const D = preload("res://scripts/data/game_data.gd")
 const UI = preload("res://scripts/ui/ui_style.gd")
 
 
@@ -42,7 +43,8 @@ func _ready() -> void:
 	buttons.add_child(quit)
 
 	v.add_child(Control.new())
-	var stats := UI.label("Bones: %d    Runs: %d    Wins: %d    Best day: %d    Heroes slain: %d" % [
-		Meta.bones, Meta.runs, Meta.wins, Meta.best_day, Meta.total_kills], 14, Color(1, 1, 1, 0.55))
+	var stats := UI.label("Bones %d  ·  Blood %d  ·  Gold %d  ·  Relics %d/%d  ·  Runs %d  ·  Heroes slain %d" % [
+		int(Meta.res["bones"]), int(Meta.res["blood"]), int(Meta.res["gold"]), Meta.relics.size(), D.RELICS.size(),
+		Meta.runs, Meta.total_kills], 14, Color(1, 1, 1, 0.55))
 	stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(stats)

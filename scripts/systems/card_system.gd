@@ -38,26 +38,6 @@ func _random_card(exclude: Array = []) -> String:
 	return ""
 
 
-## Start of day: offer DRAFT_SIZE different memories, the game waits for a pick.
-func start_draft() -> void:
-	var offer: Array = []
-	for i in D.DRAFT_SIZE:
-		var id := _random_card(offer)
-		if id == "":
-			break
-		offer.append(id)
-	s.draft = offer
-	s.hand_changed.emit()
-
-
-func pick_draft(i: int) -> void:
-	if i < 0 or i >= s.draft.size():
-		return
-	_add_to_hand(s.draft[i])
-	s.draft = []
-	s.hand_changed.emit()
-
-
 ## Click on a card in hand: instants resolve, others toggle selection.
 func use_card(i: int) -> void:
 	if s.game_over or not s.pending_souls.is_empty() or i < 0 or i >= s.hand.size():
@@ -118,7 +98,7 @@ func place_selected(cell: Vector2i) -> void:
 	else:
 		s.scenery[cell] = id
 		_check_scenery_combos(cell, id)
-	s.threat += 8.0
+	s.add_threat(8.0)
 	s.hand.remove_at(s.selected)
 	s.selected = -1
 	s.hand_changed.emit()
@@ -159,8 +139,10 @@ func respawn_rooms() -> void:
 		elif card == "mimic" and s.count_units(i, "Mimic") == 0:
 			_spawn(i, "mimic")
 		elif card == "spider" or card == "queen":
-			if s.count_units(i, "Spider") < 4:
-				_spawn(i, "spider")
+			var hatch := 2 if s.has_relic("brood_eye") else 1
+			for k in hatch:
+				if s.count_units(i, "Spider") < 4 + hatch:
+					_spawn(i, "spider")
 
 
 # ---------------------------------------------------------- combos
@@ -204,7 +186,7 @@ func _check_path_combos(t: int, id: String) -> void:
 			if m >= 0:
 				s.tiles[m]["card"] = "queen"
 				_spawn(m, "queen")
-				s.threat += 10.0
+				s.add_threat(10.0)
 				_found("queen")
 		"spikes":
 			var m := _line3(t, "spikes")
@@ -240,7 +222,7 @@ func _try_necropolis(t: int) -> void:
 		s.tiles[t]["card"] = "necropolis"
 		_fill_skeletons(t)
 		_spawn(t, "golem")
-		s.threat += 10.0
+		s.add_threat(10.0)
 		_found("necropolis")
 
 

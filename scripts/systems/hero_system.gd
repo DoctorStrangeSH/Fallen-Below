@@ -171,9 +171,15 @@ func _on_lap(h: Dictionary) -> void:
 		h["loot"] += 1
 		s.add_log("%s stole gold (%d/%d)." % [s.hero_name(h), h["loot"], D.FLEE_LOOT])
 	if s.heart_hp <= 0:
-		s.heart_hp = 0
-		run.end_game(false)
-		return
+		if s.has_relic("second_heartbeat") and not s.heartbeat_used:
+			s.heartbeat_used = true
+			s.heart_hp = 5
+			s.add_log("Second Heartbeat! Your Heart beats again.")
+			s.combo_found.emit("SECOND HEARTBEAT")
+		else:
+			s.heart_hp = 0
+			run.end_game(false)
+			return
 	if not h["boss"] and h["loot"] >= D.FLEE_LOOT:
 		remove(h)
 		s.add_log("%s escaped with your gold!" % s.hero_name(h))
@@ -184,6 +190,8 @@ func _on_enter_tile(h: Dictionary, t: int) -> void:
 	if not D.TRAP_DMG.has(card):
 		return
 	var dmg: float = D.TRAP_DMG[card]
+	if (card == "spikes" or card == "grinder") and s.has_relic("thorned_halls"):
+		dmg += 3.0
 	if card == "spikes":
 		for nb in s.path_neighbors(t):
 			var c := s.card_at(nb)
@@ -191,17 +199,19 @@ func _on_enter_tile(h: Dictionary, t: int) -> void:
 				dmg += 2.0
 	elif card == "chest":
 		h["stun"] = D.CHEST_STUN
-	damage(h, dmg)
+		if s.has_relic("gilded_bait"):
+			s.heart_hp = mini(s.heart_max, s.heart_hp + 1)
+	damage(h, dmg, true)
 
 
 # ---------------------------------------------------------- health
 
-func damage(h: Dictionary, amount: float) -> void:
+func damage(h: Dictionary, amount: float, by_trap: bool = false) -> void:
 	if h["gone"]:
 		return
 	h["hp"] -= amount
 	if h["hp"] <= 0.0:
-		_kill(h)
+		_kill(h, by_trap)
 	elif h["trait"] == "coward" and not h["boss"] and h["hp"] < h["max_hp"] * 0.3:
 		remove(h)
 		s.add_log("%s the Coward runs for their life!" % h["name"])
@@ -211,12 +221,24 @@ func heal(h: Dictionary, amount: float) -> void:
 	h["hp"] = minf(h["max_hp"], h["hp"] + amount)
 
 
-func _kill(h: Dictionary) -> void:
+func _kill(h: Dictionary, by_trap: bool) -> void:
 	h["death_tile"] = h["cur"]
 	remove(h)
 	s.kills += 1
 	s.essence += 2
-	s.threat += 5.0
+	s.add_threat(5.0)
+	# harvest: bones from every body, blood from trap kills, stolen gold comes back
+	s.gain("bones", D.BONES_PER_KILL)
+	if by_trap:
+		s.gain("blood", D.BLOOD_PER_TRAP_KILL)
+	var loot: int = h["loot"]
+	if loot > 0:
+		s.gain("gold", loot * D.GOLD_PER_LOOT)
+		s.heart_hp = mini(s.heart_max, s.heart_hp + loot)  # the gold returns to the Heart
+	if h["boss"]:
+		s.gain("gold", D.BOSS_GOLD)
+	if h["boss"] or (h["trait"] == "veteran" and s.rng.randf() < D.VETERAN_RELIC_CHANCE):
+		_find_relic(h)
 	run.cards.draw_card()
 	if h["trait"] == "veteran":
 		run.cards.draw_card()
@@ -233,6 +255,16 @@ func _kill(h: Dictionary) -> void:
 		return
 	s.pending_souls.append(h)
 	s.souls_changed.emit()
+
+
+func _find_relic(h: Dictionary) -> void:
+	var id: String = Meta.random_unowned_relic(s.rng, s.found_relics)
+	if id == "":
+		return
+	s.found_relics.append(id)
+	var relic_name: String = D.RELICS[id]["name"]
+	s.add_log("%s carried a relic: %s! Survive to keep it." % [h["name"], relic_name])
+	s.combo_found.emit("RELIC FOUND: %s" % relic_name)
 
 
 func remove(h: Dictionary) -> void:

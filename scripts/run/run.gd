@@ -23,7 +23,7 @@ var hud: RunHud
 
 func _ready() -> void:
 	state = RunState.new()
-	state.setup(Meta.heart_max(), Meta.start_jars(), Meta.start_essence(), Meta.card_weights())
+	state.setup(Meta.heart_max(), Meta.start_jars(), Meta.start_essence(), Meta.card_weights(), Meta.loadout)
 
 	heroes_sys = HeroSystem.new()
 	_add_system(heroes_sys, "Heroes")
@@ -78,9 +78,14 @@ func _process(delta: float) -> void:
 
 func _new_day() -> void:
 	state.day += 1
+	state.gain("bones", D.BONES_PER_DAY)
+	cards.draw_card()
 	cards.respawn_rooms()
 	heroes_sys.spawn_party()
-	cards.start_draft()
+	if state.day % D.SEAL_EVERY == 0:
+		state.add_log("End of the week: seal now to keep everything.")
+		hud.show_banner("WEEK'S END: SEAL FOR 100%")
+	state.hand_changed.emit()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -150,11 +155,27 @@ func _finish(outcome: String, pct: float) -> void:
 		return
 	state.game_over = true
 	var win := outcome == "victory"
-	var earned := int(round(state.bones_value() * pct)) + (D.VICTORY_BONUS if win else 0)
-	Meta.record_run(state.day, state.kills, earned, win)
+	# a full seal may turn up one more relic
+	if outcome == "sealed" and pct >= 1.0 and state.rng.randf() < D.SEAL_RELIC_CHANCE:
+		var r: String = Meta.random_unowned_relic(state.rng, state.found_relics)
+		if r != "":
+			state.found_relics.append(r)
+	var payout := {}
+	for k in state.pouch:
+		payout[k] = int(round(int(state.pouch[k]) * pct))
+	if win:
+		payout["bones"] = int(payout["bones"]) + D.VICTORY_BONUS
+	var kept: Array = []
+	var lost: Array = []
+	for r in state.found_relics:
+		if outcome != "defeat" or state.rng.randf() < D.DEFEAT_RELIC_KEEP:
+			kept.append(r)
+		else:
+			lost.append(r)
+	Meta.record_run(state.day, state.kills, payout, kept, win)
 	if win:
 		Meta.clear_act(state.act)
-	hud.show_end(outcome, earned, pct)
+	hud.show_end(outcome, payout, pct, kept, lost)
 
 
 ## After the act boss dies, play the act's ending, then go to the Lair.

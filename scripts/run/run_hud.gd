@@ -18,6 +18,7 @@ var heart_label: Label
 var heart_bar: ProgressBar
 var attention_bar: ProgressBar
 var res_label: Label
+var relic_label: Label
 var pause_btn: Button
 var speed_btn: Button
 var heal_btn: Button
@@ -31,8 +32,6 @@ var hand_box: HBoxContainer
 var soul_panel: PanelContainer
 var soul_label: Label
 var raise_btn: Button
-var draft_panel: PanelContainer
-var draft_box: HBoxContainer
 var end_panel: PanelContainer
 var end_label: Label
 var end_buttons: VBoxContainer
@@ -48,7 +47,6 @@ func _ready() -> void:
 	hand_box.add_theme_constant_override("separation", 6)
 	add_child(hand_box)
 	_build_soul_panel()
-	_build_draft_panel()
 	_build_end_panel()
 	_build_overlays()
 
@@ -112,6 +110,10 @@ func _build_panel() -> void:
 
 	res_label = UI.label("", 13, Color(1, 1, 1, 0.85))
 	v.add_child(res_label)
+	relic_label = UI.label("", 12, Color(0.8, 0.7, 1.0))
+	relic_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	relic_label.custom_minimum_size = Vector2(300, 0)
+	v.add_child(relic_label)
 
 	var grid := GridContainer.new()
 	grid.columns = 2
@@ -179,23 +181,6 @@ func _build_soul_panel() -> void:
 	v.add_child(inter)
 
 
-func _build_draft_panel() -> void:
-	draft_panel = _modal(600, Color(0.85, 0.75, 0.4))
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
-	draft_panel.add_child(v)
-	var title := UI.label("A new day. A memory returns...", 20, Color(1, 0.9, 0.6))
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(title)
-	var sub := UI.label("Choose one card", 13, Color(1, 1, 1, 0.6))
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(sub)
-	draft_box = HBoxContainer.new()
-	draft_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	draft_box.add_theme_constant_override("separation", 12)
-	v.add_child(draft_box)
-
-
 func _build_end_panel() -> void:
 	end_panel = _modal(440, Color(0.9, 0.8, 0.4))
 	var v := VBoxContainer.new()
@@ -249,7 +234,6 @@ func _card_button(id: String, highlighted: bool, min_size: Vector2) -> Button:
 
 func _on_hand_changed() -> void:
 	rebuild_hand()
-	_show_draft()
 
 
 func rebuild_hand() -> void:
@@ -260,21 +244,6 @@ func rebuild_hand() -> void:
 		var btn := _card_button(s.hand[i], i == s.selected, Vector2(126, 140))
 		btn.pressed.connect(func(): run.cards.use_card(i))
 		hand_box.add_child(btn)
-
-
-func _show_draft() -> void:
-	var s = run.state
-	for c in draft_box.get_children():
-		c.queue_free()
-	if s.draft.is_empty() or s.game_over:
-		draft_panel.visible = false
-		return
-	for i in s.draft.size():
-		var btn := _card_button(s.draft[i], false, Vector2(170, 190))
-		btn.add_theme_font_size_override("font_size", 14)
-		btn.pressed.connect(func(): run.cards.pick_draft(i))
-		draft_box.add_child(btn)
-	draft_panel.visible = true
 
 
 # ============================================================ update
@@ -288,8 +257,9 @@ func refresh() -> void:
 	heart_bar.value = s.heart_hp
 	attention_bar.value = s.threat
 	var pct: float = s.seal_pct()
-	res_label.text = "Essence %d    Undead %d/%d\nBones %d  (seal now: %d%%)" % [
-		s.essence, s.undead_count(), s.jar_cap, s.bones_value(), int(pct * 100.0)]
+	res_label.text = "Essence %d    Undead %d/%d\nHarvest: %d Bones  %d Blood  %d Gold\nSeal now keeps %d%%" % [
+		s.essence, s.undead_count(), s.jar_cap, s.pouch["bones"], s.pouch["blood"], s.pouch["gold"], int(pct * 100.0)]
+	relic_label.text = _relic_text(s)
 	heal_btn.disabled = s.essence < D.RESTORE_COST or s.heart_hp >= s.heart_max or s.game_over
 	pause_btn.text = "Play" if s.paused else "Pause"
 	speed_btn.text = "Speed x%d" % int(s.time_scale)
@@ -311,9 +281,21 @@ func show_souls() -> void:
 	soul_panel.visible = true
 
 
-func show_end(outcome: String, bones: int, pct: float) -> void:
+func _relic_text(s) -> String:
+	var names: Array = []
+	for r in s.relics:
+		names.append(D.RELICS[r]["name"])
+	var line := "Relics: %s" % (", ".join(names) if not names.is_empty() else "none")
+	if not s.found_relics.is_empty():
+		var found: Array = []
+		for r in s.found_relics:
+			found.append(D.RELICS[r]["name"])
+		line += "\nFound (keep by surviving): %s" % ", ".join(found)
+	return line
+
+
+func show_end(outcome: String, payout: Dictionary, pct: float, kept: Array, lost: Array) -> void:
 	soul_panel.visible = false
-	draft_panel.visible = false
 	tooltip.visible = false
 	var s = run.state
 	var head := ""
@@ -323,8 +305,16 @@ func show_end(outcome: String, bones: int, pct: float) -> void:
 		"sealed":
 			head = "DUNGEON SEALED\nYou keep %d%% of the spoils." % int(pct * 100.0)
 		_:
-			head = "THE HEART FALLS\nOnly %d%% of the bones remain." % int(pct * 100.0)
-	end_label.text = "%s\n\nDays: %d   Heroes slain: %d\n+%d Bones" % [head, s.day, s.kills, bones]
+			head = "THE HEART FALLS\nOnly %d%% of the harvest remains." % int(pct * 100.0)
+	var gains: Array = []
+	for k in payout:
+		gains.append("+%d %s" % [int(payout[k]), D.RESOURCES[k]["name"]])
+	var text := "%s\n\nDays: %d   Heroes slain: %d\n%s" % [head, s.day, s.kills, "   ".join(gains)]
+	for r in kept:
+		text += "\nNew relic: %s" % D.RELICS[r]["name"]
+	for r in lost:
+		text += "\nLost in the dark: %s" % D.RELICS[r]["name"]
+	end_label.text = text
 	for c in end_buttons.get_children():
 		c.queue_free()
 	if outcome == "victory":
@@ -335,7 +325,7 @@ func show_end(outcome: String, bones: int, pct: float) -> void:
 	lair.pressed.connect(func(): run.go_to("res://scenes/lair.tscn"))
 	end_buttons.add_child(lair)
 	var again := UI.button("New run")
-	again.pressed.connect(func(): run.go_to("res://scenes/run.tscn"))
+	again.pressed.connect(func(): run.go_to("res://scenes/prepare.tscn"))
 	end_buttons.add_child(again)
 	end_panel.visible = true
 
@@ -385,7 +375,7 @@ func _on_log() -> void:
 
 func _update_tooltip() -> void:
 	var s = run.state
-	if s.game_over or soul_panel.visible or draft_panel.visible:
+	if s.game_over or soul_panel.visible:
 		tooltip.visible = false
 		return
 	var cell: Vector2i = run.view.mouse_cell()

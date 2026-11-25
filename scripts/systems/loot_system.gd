@@ -9,7 +9,7 @@ var s: RunState
 
 
 func drop_from(h: Dictionary) -> void:
-	var sure: bool = h["boss"] or h["trait"] == "veteran"
+	var sure: bool = h["boss"] or h["trait"] == "veteran" or s.has_relic("grave_robber")
 	if not sure and s.rng.randf() >= D.ITEM_DROP_CHANCE:
 		return
 	var item := make_item(h)

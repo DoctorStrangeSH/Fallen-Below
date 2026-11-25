@@ -35,7 +35,6 @@ var selected := -1
 var card_weights := {}
 var inventory := []
 var selected_item := -1
-var draft := []            # card ids offered at the start of a day
 
 # resources & flow
 var act := 1
@@ -53,11 +52,18 @@ var game_over := false
 var paused := false
 var time_scale := 1.0
 
+# economy & relics
+var pouch := {"bones": 0, "blood": 0, "gold": 0}  # harvested this run, paid out at the end
+var relics := []           # equipped for this run
+var found_relics := []     # discovered during this run
+var heartbeat_used := false
+
 var log_lines := []
 
 
-func setup(heart: int, jars: int, start_essence: int, weights: Dictionary) -> void:
+func setup(heart: int, jars: int, start_essence: int, weights: Dictionary, equipped: Array) -> void:
 	rng.randomize()
+	relics = equipped.duplicate()
 	heart_max = heart
 	heart_hp = heart
 	jar_cap = jars
@@ -343,8 +349,16 @@ func hero_name(h: Dictionary) -> String:
 	return n if title == "" else "%s %s" % [n, title]
 
 
-func bones_value() -> int:
-	return day * 3 + kills
+func has_relic(id: String) -> bool:
+	return relics.has(id)
+
+
+func gain(resource: String, amount: int) -> void:
+	pouch[resource] = int(pouch.get(resource, 0)) + amount
+
+
+func add_threat(amount: float) -> void:
+	threat += amount * (0.75 if has_relic("slow_dawn") else 1.0)
 
 
 func seal_pct() -> float:
@@ -352,7 +366,7 @@ func seal_pct() -> float:
 
 
 func is_blocked() -> bool:
-	return game_over or paused or not pending_souls.is_empty() or not draft.is_empty()
+	return game_over or paused or not pending_souls.is_empty()
 
 
 func in_grid(c: Vector2i) -> bool:

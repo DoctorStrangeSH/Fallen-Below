@@ -30,7 +30,25 @@ const SEAL_WEEK_PCT := 1.0
 const SEAL_EARLY_PCT := 0.6
 const DEFEAT_PCT := 0.3
 const VICTORY_BONUS := 25
-const DRAFT_SIZE := 3
+
+# --- economy: resources harvested from heroes, paid out when the run ends ---
+const RESOURCES := {
+	"bones": {"name": "Bones", "color": Color(0.92, 0.88, 0.78), "desc": "From every hero you kill."},
+	"blood": {"name": "Blood", "color": Color(0.85, 0.15, 0.2), "desc": "From absorbed souls and trap kills."},
+	"gold": {"name": "Gold", "color": Color(1.0, 0.8, 0.25), "desc": "Stolen gold, taken back from dead thieves."},
+}
+const BONES_PER_KILL := 2
+const BONES_PER_DAY := 2
+const BLOOD_PER_ABSORB := 3
+const BLOOD_PER_TRAP_KILL := 1
+const GOLD_PER_LOOT := 3        # per theft the dead hero was carrying
+const BOSS_GOLD := 20
+
+# --- relics ---
+const BASE_RELIC_SLOTS := 1
+const VETERAN_RELIC_CHANCE := 0.12
+const SEAL_RELIC_CHANCE := 0.5  # on a full (end of week) seal
+const DEFEAT_RELIC_KEEP := 0.5  # each relic found in a lost run survives with this chance
 const RADIANCE_DMG := 4.0       # Aurelia burns undead nearby each combat tick
 
 const CARDS := {
@@ -54,7 +72,11 @@ const SKELETON_CAP := {"crypt": 2, "catacomb": 3, "necropolis": 4}
 const TRAP_DMG := {"spikes": 5.0, "grinder": 14.0, "chest": 6.0}
 const BAIT_CARDS := ["chest", "mimic"]
 
-## Cards that can be drawn. Locked cards are removed by Meta.
+## Deck building: cards known from the start; the rest are unlocked in the Lair.
+const START_CARDS := ["crypt", "spider", "spikes", "altar", "jar"]
+const BASE_DECK_SLOTS := 5
+
+## Draw weights for cards in the deck.
 const CARD_WEIGHTS := {"crypt": 3, "spider": 3, "spikes": 3, "altar": 2, "graveyard": 2, "chest": 2, "jar": 1}
 
 const HERO_CLASSES := {
@@ -114,13 +136,39 @@ const FIRST_NAMES := ["Alric", "Brann", "Cedric", "Dara", "Elowen", "Finn", "Gre
 	"Isolde", "Jorah", "Kael", "Lyra", "Mira", "Nolan", "Orin", "Petra", "Quinn", "Rowan",
 	"Sable", "Tamsin", "Ulric", "Vera", "Wren", "Yorick"]
 
-## Lair buildings bought with Bones between runs. `cost` has one entry per level.
+## Lair buildings. `cost` has one Dictionary of resources per level.
+## `unlock` (optional) adds a card to the collection when built.
 const BUILDINGS := {
-	"heart": {"name": "Blood Vault", "desc": "+5 max Heart HP per level.", "cost": [20, 45, 80]},
-	"jars": {"name": "Trophy Hall", "desc": "+1 starting soul jar per level.", "cost": [30, 70]},
-	"crypt": {"name": "Ancestral Crypt", "desc": "+1 starting card per level.", "cost": [25, 60]},
-	"well": {"name": "Soul Well", "desc": "+5 starting essence per level.", "cost": [15, 35, 60]},
-	"library": {"name": "Forbidden Library", "desc": "Unlocks the Graveyard card.", "cost": [40]},
+	"heart": {"name": "Blood Vault", "desc": "+5 max Heart HP per level.",
+		"cost": [{"bones": 20}, {"bones": 40, "blood": 10}, {"bones": 70, "blood": 25}]},
+	"archive": {"name": "Memory Archive", "desc": "+1 card type in your deck per level.",
+		"cost": [{"bones": 30}, {"bones": 60, "gold": 20}]},
+	"reliquary": {"name": "Reliquary", "desc": "+1 relic slot per level.",
+		"cost": [{"gold": 25, "blood": 10}, {"gold": 60, "blood": 30}]},
+	"treasury": {"name": "False Treasury", "desc": "Unlocks the Cursed Chest card.", "unlock": "chest",
+		"cost": [{"gold": 15, "bones": 10}]},
+	"library": {"name": "Forbidden Library", "desc": "Unlocks the Graveyard card.", "unlock": "graveyard",
+		"cost": [{"bones": 25, "blood": 15}]},
+	"jars": {"name": "Trophy Hall", "desc": "+1 starting soul jar per level.",
+		"cost": [{"bones": 25, "blood": 5}, {"bones": 55, "blood": 20}]},
+	"well": {"name": "Soul Well", "desc": "+5 starting essence per level.",
+		"cost": [{"blood": 8}, {"blood": 20}, {"blood": 40}]},
+}
+
+## Relics change the rules of a run. Earned in runs, equipped before descending.
+const RELICS := {
+	"brittle_bones": {"name": "Brittle Bones", "desc": "Skeletons explode when they die: 4 dmg to heroes on their tile."},
+	"gilded_bait": {"name": "Gilded Bait", "desc": "Cursed Chests heal your Heart by 1 when they catch a hero."},
+	"iron_chains": {"name": "Iron Chains", "desc": "Your undead never betray you, but deal 20% less damage."},
+	"hungry_dark": {"name": "Hungry Dark", "desc": "Absorbing a soul gives +3 essence and +2 Blood more."},
+	"mass_grave": {"name": "Mass Grave", "desc": "+1 soul jar."},
+	"second_heartbeat": {"name": "Second Heartbeat", "desc": "Once per run, when your Heart would fall, it beats again with 5 HP."},
+	"thorned_halls": {"name": "Thorned Halls", "desc": "Spikes and Meat Grinders deal +3 damage."},
+	"brood_eye": {"name": "Broodmother's Eye", "desc": "Spider Nests hatch 2 spiders a day instead of 1."},
+	"whispering_skull": {"name": "Whispering Skull", "desc": "Interrogation gives 1 more card."},
+	"blood_price": {"name": "Blood Price", "desc": "Start with +15 essence, but your Heart has 5 less HP."},
+	"slow_dawn": {"name": "Slow Dawn", "desc": "The Order's attention grows 25% slower."},
+	"grave_robber": {"name": "Grave Robber", "desc": "Heroes always drop a trophy."},
 }
 
 

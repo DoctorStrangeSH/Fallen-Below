@@ -42,10 +42,14 @@ func resolve(choice: String) -> void:
 		"raise":
 			_raise(h)
 		"absorb":
-			s.essence += 5
+			var hungry := s.has_relic("hungry_dark")
+			s.essence += 8 if hungry else 5
+			s.gain("blood", D.BLOOD_PER_ABSORB + (2 if hungry else 0))
 		"interrogate":
 			run.cards.draw_card()
 			run.cards.draw_card()
+			if s.has_relic("whispering_skull"):
+				run.cards.draw_card()
 			s.add_log("%s talks: tomorrow brings %d heroes." % [h["name"], HeroSystem.party_size(s.day + 1)])
 	s.hand_changed.emit()
 	s.souls_changed.emit()

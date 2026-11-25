@@ -35,6 +35,11 @@ func tick() -> void:
 				u["hp"] = minf(u["max_hp"], u["hp"] + r)
 
 		_heroes_strike(hs, units)
+		if s.has_relic("brittle_bones"):
+			for u in units:
+				if u["hp"] <= 0.0 and u["name"] == "Skeleton":
+					for h in hs:
+						run.heroes_sys.damage(h, 4.0)
 		units = s.alive_units(t)
 		s.tiles[t]["units"] = units
 		_dungeon_strikes(t, hs, units)
@@ -66,8 +71,11 @@ func _dungeon_strikes(t: int, hs: Array, units: Array) -> void:
 			return
 		var target: Dictionary = alive_h[s.rng.randi() % alive_h.size()]
 		var dmg: float = u["dmg"] + bonus
+		var chained := _has_affix(u, "chains") or s.has_relic("iron_chains")
+		if u["undead"] and s.has_relic("iron_chains"):
+			dmg *= 0.8
 		if u["undead"] and u["party"] == target["party"]:
-			if not _has_affix(u, "chains") and s.rng.randf() < D.BETRAY_CHANCE:
+			if not chained and s.rng.randf() < D.BETRAY_CHANCE:
 				u["hp"] = 0.0
 				run.heroes_sys.heal(target, 10.0)
 				s.add_log("%s remembers %s... and abandons you!" % [u["name"], target["name"]])
