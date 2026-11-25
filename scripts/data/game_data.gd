@@ -3,9 +3,11 @@ extends RefCounted
 
 # --- layout ---
 const CELL := 48
-const MAP_OFFSET := Vector2(40, 70)
-const LOOP_MIN := Vector2i(1, 0)
-const LOOP_MAX := Vector2i(23, 9)
+const MAP_OFFSET := Vector2(16, 16)
+const GRID_W := 19
+const GRID_H := 11
+const PANEL_X := 945.0            # right-hand panel starts here
+const HAND_Y := 556.0
 
 # --- tuning ---
 const DAY_LENGTH := 18.0
@@ -28,6 +30,8 @@ const SEAL_WEEK_PCT := 1.0
 const SEAL_EARLY_PCT := 0.6
 const DEFEAT_PCT := 0.3
 const VICTORY_BONUS := 25
+const DRAFT_SIZE := 3
+const RADIANCE_DMG := 4.0       # Aurelia burns undead nearby each combat tick
 
 const CARDS := {
 	"crypt": {"name": "Crypt", "kind": "path", "color": Color(0.55, 0.5, 0.7), "desc": "Room. 2 Skeletons, respawn daily."},
@@ -117,4 +121,52 @@ const BUILDINGS := {
 	"crypt": {"name": "Ancestral Crypt", "desc": "+1 starting card per level.", "cost": [25, 60]},
 	"well": {"name": "Soul Well", "desc": "+5 starting essence per level.", "cost": [15, 35, 60]},
 	"library": {"name": "Forbidden Library", "desc": "Unlocks the Graveyard card.", "cost": [40]},
+}
+
+
+# --- acts & story ---
+const ACTS := {
+	1: {"name": "Act I: The Crypts", "boss": "Aurelia", "boss_title": "the Lightbringer",
+		"boss_intro": "\"Your light was stolen long ago. I have come to return it to the sun.\"",
+		"end_story": "act1_end"},
+}
+
+const STORY := {
+	"intro": [
+		"Once, the world below was alive. Halls of bone and crystal, rivers of black water, and a heart that beat beneath the mountains.",
+		"Then the Order of Dawn came down with fire and hymns. They burned the deep places clean, and called it salvation.",
+		"You are what remains. A single heart in the dark. You remember almost nothing. Only fragments: a hall, a trap, the things that once lived here.",
+		"And they are coming again. Heroes of the Dawn, sent down to finish the work.",
+		"Rebuild yourself from memory. Let them walk your halls. Let none of them leave.\n\nAnd those who fall... will be yours.",
+	],
+	"act1_end": [
+		"Aurelia falls. Her light gutters and dies on your stones.",
+		"As her soul sinks into you, a memory surfaces. Not yours. Hers.\n\nA little girl, kneeling in these very halls. Long before the Order. Long before the fire.",
+		"She was born down here. She was one of yours.",
+		"Far above, the bells are ringing. The Order knows its champion is gone.\n\nNext time, they will send the miners to dig you out.\n\n(Act II is coming soon.)",
+	],
+}
+
+## Raised heroes whisper fragments of the truth.
+const WHISPERS := {
+	"warrior": [
+		"They paid us in gold to come here. Nobody asked what you were.",
+		"My captain said the Abyss eats children. I see no children here.",
+		"The Order keeps the gold. We keep the scars.",
+	],
+	"mage": [
+		"The Dawn's light is not theirs. They draw it from below... from you.",
+		"Every spell I cast up there burned with your colour.",
+		"The archives were sealed. Now I understand why.",
+	],
+	"rogue": [
+		"I came for treasure. Turns out the treasure was you.",
+		"The Order pays double for heart-shards. Funny, that.",
+		"Picked the wrong lock this time.",
+	],
+	"paladin": [
+		"I swore to burn you. I never asked why you still beat.",
+		"The hymns speak of a first saint who came from the dark.",
+		"Aurelia prays alone at night. She weeps toward the deep.",
+	],
 }

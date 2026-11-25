@@ -9,6 +9,7 @@ var s: RunState
 
 
 func tick() -> void:
+	_radiance()
 	var by_tile := {}
 	for h in s.heroes:
 		if h["gone"] or h["delay"] > 0.0:
@@ -75,6 +76,20 @@ func _dungeon_strikes(t: int, hs: Array, units: Array) -> void:
 		run.heroes_sys.damage(target, dmg)
 		if _has_affix(u, "lifesteal"):
 			u["hp"] = minf(u["max_hp"], u["hp"] + dmg * 0.25)
+
+
+## Act I boss: burns undead on her tile and the tiles next to it.
+func _radiance() -> void:
+	for h in s.heroes:
+		if not h["boss"] or h["gone"] or h["delay"] > 0.0:
+			continue
+		var t: int = h["cur"]
+		var area: Array = [t]
+		area.append_array(s.path_neighbors(t))
+		for a in area:
+			for u in s.undead_at(a):
+				u["hp"] -= D.RADIANCE_DMG
+			s.tiles[a]["units"] = s.alive_units(a)
 
 
 func _has_affix(u: Dictionary, affix: String) -> bool:

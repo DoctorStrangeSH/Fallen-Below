@@ -35,7 +35,7 @@ func _ready() -> void:
 	row.add_theme_constant_override("separation", 12)
 	v.add_child(row)
 	var run_btn := UI.button("Descend (New Run)")
-	run_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/run.tscn"))
+	run_btn.pressed.connect(func(): Meta.start_run())
 	row.add_child(run_btn)
 	var grim := UI.button("Grimoire")
 	grim.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/grimoire.tscn"))

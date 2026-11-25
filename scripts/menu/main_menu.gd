@@ -29,7 +29,7 @@ func _ready() -> void:
 	buttons.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	v.add_child(buttons)
 	var play := UI.button("New Run", Vector2(260, 48))
-	play.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/run.tscn"))
+	play.pressed.connect(func(): Meta.start_run())
 	buttons.add_child(play)
 	var lair := UI.button("The Lair", Vector2(260, 48))
 	lair.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/lair.tscn"))

@@ -68,5 +68,7 @@ func _raise(h: Dictionary) -> void:
 			x["revenge"] = true
 			avengers += 1
 	s.add_log("%s rises to serve you." % unit["name"])
+	var lines: Array = D.WHISPERS[h["cls"]]
+	s.add_log("\"%s\"" % lines[s.rng.randi() % lines.size()])
 	if avengers > 0:
 		s.add_log("Their friends swear revenge!")

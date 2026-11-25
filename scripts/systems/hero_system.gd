@@ -56,17 +56,20 @@ func spawn_party() -> void:
 
 func spawn_boss() -> void:
 	s.boss_spawned = true
-	var h := make_hero("paladin", "Aurelia", 1.0, s.next_party_id, 0)
+	var act: Dictionary = D.ACTS[s.act]
+	var h := make_hero("paladin", act["boss"], 1.0, s.next_party_id, 0)
 	s.next_party_id += 1
 	h["trait"] = ""
 	h["boss"] = true
-	h["title"] = "the Lightbringer"
+	h["title"] = act["boss_title"]
 	h["hp"] = 120.0 + s.day * 10.0
 	h["max_hp"] = h["hp"]
 	h["dmg"] = 6.0 + s.day * 0.5
 	h["speed"] = 1.2
 	h["color"] = Color(1, 1, 1)
-	s.add_log("THE LIGHTBRINGER COMES. Kill her to win.")
+	s.add_log("%s descends: %s" % [s.hero_name(h), act["boss_intro"]])
+	s.add_log("Her radiance burns undead nearby. Guard her path with the living.")
+	s.combo_found.emit("%s DESCENDS" % s.hero_name(h).to_upper())
 
 
 # ---------------------------------------------------------- movement

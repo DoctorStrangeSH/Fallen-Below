@@ -78,10 +78,9 @@ func _process(delta: float) -> void:
 
 func _new_day() -> void:
 	state.day += 1
-	cards.draw_card()
 	cards.respawn_rooms()
 	heroes_sys.spawn_party()
-	state.hand_changed.emit()
+	cards.start_draft()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -106,7 +105,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		state.hand_changed.emit()
 		state.inventory_changed.emit()
 	elif mb.button_index == MOUSE_BUTTON_LEFT:
-		if state.game_over or not state.pending_souls.is_empty():
+		if state.is_blocked():
 			return
 		if state.selected_item >= 0:
 			loot.equip_at(view.mouse_cell())
@@ -153,7 +152,15 @@ func _finish(outcome: String, pct: float) -> void:
 	var win := outcome == "victory"
 	var earned := int(round(state.bones_value() * pct)) + (D.VICTORY_BONUS if win else 0)
 	Meta.record_run(state.day, state.kills, earned, win)
+	if win:
+		Meta.clear_act(state.act)
 	hud.show_end(outcome, earned, pct)
+
+
+## After the act boss dies, play the act's ending, then go to the Lair.
+func continue_after_victory() -> void:
+	var act: Dictionary = D.ACTS[state.act]
+	Meta.play_story(act["end_story"], "res://scenes/lair.tscn")
 
 
 func go_to(scene_path: String) -> void:

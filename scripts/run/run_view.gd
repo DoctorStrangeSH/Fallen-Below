@@ -37,7 +37,7 @@ func _draw() -> void:
 	var s = run.state
 	var font := ThemeDB.fallback_font
 	draw_rect(get_viewport_rect(), Color(0.06, 0.05, 0.08))
-	_draw_floor()
+	_draw_floor(s)
 	_draw_path(s, font)
 	_draw_scenery(s, font)
 	_draw_heart(s, font)
@@ -46,14 +46,21 @@ func _draw() -> void:
 	_draw_heroes(s, font)
 	if s.paused and not s.game_over:
 		var vr := get_viewport_rect()
-		draw_string(font, Vector2(0, vr.size.y * 0.42), "PAUSED", HORIZONTAL_ALIGNMENT_CENTER, vr.size.x, 40, Color(1, 1, 1, 0.8))
+		draw_string(font, Vector2(D.MAP_OFFSET.x, vr.size.y * 0.42), "PAUSED", HORIZONTAL_ALIGNMENT_CENTER, D.GRID_W * D.CELL, 40, Color(1, 1, 1, 0.8))
 
 
-func _draw_floor() -> void:
-	for x in range(0, D.LOOP_MAX.x + 2):
-		for y in range(0, D.LOOP_MAX.y + 1):
-			var r := cell_rect(Vector2i(x, y))
-			draw_rect(r, Color(0.1, 0.09, 0.12))
+func _draw_floor(s) -> void:
+	for x in D.GRID_W:
+		for y in D.GRID_H:
+			var c := Vector2i(x, y)
+			var r := cell_rect(c)
+			# cells where scenery may go are a bit lighter
+			var near_path := false
+			for nb in s.neighbors(c):
+				if s.path_lookup.has(nb):
+					near_path = true
+					break
+			draw_rect(r, Color(0.11, 0.1, 0.13) if near_path else Color(0.08, 0.07, 0.1))
 			draw_rect(r, Color(0.13, 0.12, 0.16), false, 1.0)
 
 
@@ -93,12 +100,13 @@ func _draw_scenery(s, font: Font) -> void:
 
 
 func _draw_heart(s, font: Font) -> void:
-	var center := (cell_center(D.LOOP_MIN) + cell_center(D.LOOP_MAX)) * 0.5 + Vector2(0, 40)
-	var pulse := 1.0 + 0.06 * sin(Time.get_ticks_msec() / 250.0)
-	draw_circle(center, 34.0 * pulse, Color(0.5, 0.05, 0.12))
-	draw_circle(center, 24.0 * pulse, Color(0.85, 0.15, 0.25))
-	var txt := "HEART %d/%d" % [s.heart_hp, s.heart_max]
-	draw_string(font, center + Vector2(-60, 58), txt, HORIZONTAL_ALIGNMENT_CENTER, 120, 14)
+	var center := cell_center(s.heart_cell)
+	var beat := 250.0 * clampf(float(s.heart_hp) / float(s.heart_max), 0.3, 1.0)
+	var pulse := 1.0 + 0.08 * sin(Time.get_ticks_msec() / beat)
+	draw_circle(center, 22.0 * pulse, Color(0.5, 0.05, 0.12))
+	draw_circle(center, 15.0 * pulse, Color(0.85, 0.15, 0.25))
+	var txt := "%d/%d" % [s.heart_hp, s.heart_max]
+	draw_string(font, center + Vector2(-40, 38), txt, HORIZONTAL_ALIGNMENT_CENTER, 80, 12)
 
 
 func _draw_preview(s) -> void:

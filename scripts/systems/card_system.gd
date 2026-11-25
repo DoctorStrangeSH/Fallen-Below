@@ -9,20 +9,53 @@ var s: RunState
 
 
 func draw_card() -> void:
+	_add_to_hand(_random_card())
+
+
+func _add_to_hand(id: String) -> void:
+	if id == "":
+		return
 	if s.hand.size() >= D.HAND_MAX:
 		s.essence += 1  # overflow burns into essence
 		return
+	s.hand.append(id)
+
+
+func _random_card(exclude: Array = []) -> String:
 	var total := 0
 	for k in s.card_weights:
-		total += int(s.card_weights[k])
+		if not exclude.has(k):
+			total += int(s.card_weights[k])
 	if total <= 0:
-		return
+		return ""
 	var roll := s.rng.randi() % total
 	for k in s.card_weights:
+		if exclude.has(k):
+			continue
 		roll -= int(s.card_weights[k])
 		if roll < 0:
-			s.hand.append(k)
-			return
+			return k
+	return ""
+
+
+## Start of day: offer DRAFT_SIZE different memories, the game waits for a pick.
+func start_draft() -> void:
+	var offer: Array = []
+	for i in D.DRAFT_SIZE:
+		var id := _random_card(offer)
+		if id == "":
+			break
+		offer.append(id)
+	s.draft = offer
+	s.hand_changed.emit()
+
+
+func pick_draft(i: int) -> void:
+	if i < 0 or i >= s.draft.size():
+		return
+	_add_to_hand(s.draft[i])
+	s.draft = []
+	s.hand_changed.emit()
 
 
 ## Click on a card in hand: instants resolve, others toggle selection.
@@ -61,7 +94,7 @@ func can_place(id: String, cell: Vector2i) -> bool:
 	if kind == "scenery":
 		if s.path_lookup.has(cell) or s.scenery.has(cell):
 			return false
-		if cell.x < 0 or cell.y < 0 or cell.x > D.LOOP_MAX.x + 1 or cell.y > D.LOOP_MAX.y:
+		if not s.in_grid(cell) or cell == s.heart_cell:
 			return false
 		for nb in s.neighbors(cell):
 			if s.path_lookup.has(nb):

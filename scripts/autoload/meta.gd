@@ -11,6 +11,12 @@ var wins := 0
 var best_day := 0
 var total_kills := 0
 var discovered := []  # combo ids
+var seen_intro := false
+var acts_cleared := []
+
+# story scene hand-off (not saved)
+var pending_story := ""
+var story_next := ""
 
 
 func _ready() -> void:
@@ -77,6 +83,29 @@ static func bones_value(days: int, kills: int) -> int:
 	return days * 3 + kills
 
 
+func clear_act(act: int) -> void:
+	if not acts_cleared.has(act):
+		acts_cleared.append(act)
+		save_game()
+
+
+## Shows a story scene, then loads `next_scene`.
+func play_story(id: String, next_scene: String) -> void:
+	pending_story = id
+	story_next = next_scene
+	get_tree().change_scene_to_file("res://scenes/story.tscn")
+
+
+## Starts a run; the first time ever, the intro story plays first.
+func start_run() -> void:
+	if not seen_intro:
+		seen_intro = true
+		save_game()
+		play_story("intro", "res://scenes/run.tscn")
+	else:
+		get_tree().change_scene_to_file("res://scenes/run.tscn")
+
+
 ## Marks a combo as discovered. Returns true the first time.
 func discover(id: String) -> bool:
 	if discovered.has(id):
@@ -103,7 +132,7 @@ func save_game() -> void:
 	var data := {
 		"version": 1, "bones": bones, "buildings": buildings, "runs": runs,
 		"wins": wins, "best_day": best_day, "total_kills": total_kills,
-		"discovered": discovered,
+		"discovered": discovered, "seen_intro": seen_intro, "acts_cleared": acts_cleared,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -125,6 +154,12 @@ func load_game() -> void:
 	wins = int(d.get("wins", 0))
 	best_day = int(d.get("best_day", 0))
 	total_kills = int(d.get("total_kills", 0))
+	seen_intro = bool(d.get("seen_intro", false))
+	acts_cleared = []
+	var ac = d.get("acts_cleared", [])
+	if ac is Array:
+		for a in ac:
+			acts_cleared.append(int(a))
 	discovered = []
 	var disc = d.get("discovered", [])
 	if disc is Array:
@@ -147,4 +182,6 @@ func reset_save() -> void:
 	best_day = 0
 	total_kills = 0
 	discovered = []
+	seen_intro = false
+	acts_cleared = []
 	save_game()

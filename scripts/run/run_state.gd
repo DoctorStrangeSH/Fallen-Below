@@ -21,6 +21,7 @@ var loop_size := 0
 var path_lookup := {}      # Vector2i -> tile id
 var scenery := {}          # Vector2i -> card id
 var forks := {}            # tile id -> {next id -> Array of tile ids}
+var heart_cell := Vector2i.ZERO
 
 # actors
 var heroes := []
@@ -34,8 +35,10 @@ var selected := -1
 var card_weights := {}
 var inventory := []
 var selected_item := -1
+var draft := []            # card ids offered at the start of a day
 
 # resources & flow
+var act := 1
 var day := 1
 var day_timer := 0.0
 var combat_timer := 0.0
@@ -78,28 +81,166 @@ func _link(a: int, b: int) -> void:
 
 
 func _build_map() -> void:
-	var a := D.LOOP_MIN
-	var b := D.LOOP_MAX
-	var cells: Array[Vector2i] = []
-	for x in range(a.x, b.x + 1):
-		cells.append(Vector2i(x, a.y))
-	for y in range(a.y + 1, b.y + 1):
-		cells.append(Vector2i(b.x, y))
-	for x in range(b.x - 1, a.x - 1, -1):
-		cells.append(Vector2i(x, b.y))
-	for y in range(b.y - 1, a.y, -1):
-		cells.append(Vector2i(a.x, y))
-	for c in cells:
-		_add_tile(c)
+	for attempt in 300:
+		var region := _random_region()
+		var ring := _trace_ring(region)
+		if ring.size() < 30 or ring.size() > 62:
+			continue
+		var interior := {}
+		for c in region:
+			if not ring.has(c):
+				interior[c] = true
+		if interior.size() < 10:
+			continue
+		_commit_loop(ring, interior)
+		return
+	push_warning("Map generation failed, using a rectangle.")
+	var rect := {}
+	for x in range(2, 17):
+		for y in range(1, 10):
+			rect[Vector2i(x, y)] = true
+	var ring := _trace_ring(rect)
+	var interior := {}
+	for c in rect:
+		if not ring.has(c):
+			interior[c] = true
+	_commit_loop(ring, interior)
+
+
+## A rectangle with 2-4 notches carved from its sides. Different every run.
+func _random_region() -> Dictionary:
+	var w := rng.randi_range(11, D.GRID_W - 2)
+	var h := rng.randi_range(8, D.GRID_H)
+	var x0 := rng.randi_range(1, D.GRID_W - 1 - w)
+	var y0 := rng.randi_range(0, D.GRID_H - h)
+	var region := {}
+	for x in range(x0, x0 + w):
+		for y in range(y0, y0 + h):
+			region[Vector2i(x, y)] = true
+	for n in rng.randi_range(2, 4):
+		var side := rng.randi() % 4
+		var depth := rng.randi_range(2, 3)
+		var length := rng.randi_range(3, 5)
+		var rect := Rect2i()
+		if side < 2:  # top / bottom
+			var sx := rng.randi_range(x0 + 2, x0 + w - 2 - length)
+			var sy := y0 if side == 0 else y0 + h - depth
+			rect = Rect2i(sx, sy, length, depth)
+		else:  # left / right
+			length = mini(length, h - 5)
+			var sy2 := rng.randi_range(y0 + 2, y0 + h - 2 - length)
+			var sx2 := x0 if side == 2 else x0 + w - depth
+			rect = Rect2i(sx2, sy2, depth, length)
+		for x in range(rect.position.x, rect.end.x):
+			for y in range(rect.position.y, rect.end.y):
+				region.erase(Vector2i(x, y))
+	return region
+
+
+## Border cells of the region as an ordered cycle, or [] if it is not a clean loop.
+func _trace_ring(region: Dictionary) -> Array:
+	var ring := {}
+	for c in region:
+		for nb in neighbors(c):
+			if not region.has(nb):
+				ring[c] = true
+				break
+	if ring.is_empty():
+		return []
+	var dirs := [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]
+	for c in ring:
+		var deg := 0
+		for d in dirs:
+			if ring.has(c + d):
+				deg += 1
+		if deg != 2:
+			return []
+	var start: Vector2i = ring.keys()[0]
+	var order: Array = [start]
+	var prev := start
+	var cur := start
+	for d in dirs:
+		if ring.has(start + d):
+			cur = start + d
+			break
+	while cur != start:
+		order.append(cur)
+		if order.size() > ring.size():
+			return []
+		var nxt := cur
+		for d in dirs:
+			var c2: Vector2i = cur + d
+			if c2 != prev and ring.has(c2):
+				nxt = c2
+				break
+		prev = cur
+		cur = nxt
+	if order.size() != ring.size():
+		return []  # more than one loop
+	return order
+
+
+func _commit_loop(ring: Array, interior: Dictionary) -> void:
+	# rotate so the Gate is a random tile
+	var off := rng.randi() % ring.size()
+	for i in ring.size():
+		_add_tile(ring[(i + off) % ring.size()])
 	loop_size = tiles.size()
 	for i in loop_size:
 		_link(i, (i + 1) % loop_size)
 
-	# two detours: one along the top edge, one along the bottom
-	var xt := rng.randi_range(3, 6)
-	_add_detour(path_lookup[Vector2i(xt, a.y)], path_lookup[Vector2i(xt + 6, a.y)], Vector2i(0, 1))
-	var xb := rng.randi_range(11, 15)
-	_add_detour(path_lookup[Vector2i(xb + 6, b.y)], path_lookup[Vector2i(xb, b.y)], Vector2i(0, -1))
+	# heart: the interior cell farthest from the path
+	var best_d := -1
+	for c in interior:
+		var dmin := 999
+		for r in ring:
+			var rc: Vector2i = r
+			dmin = mini(dmin, absi(rc.x - c.x) + absi(rc.y - c.y))
+		if dmin > best_d:
+			best_d = dmin
+			heart_cell = c
+	interior.erase(heart_cell)
+
+	# up to two side passages along straight stretches
+	var used := {}
+	var starts: Array = range(1, loop_size - 7)
+	starts.shuffle()
+	var made := 0
+	for i in starts:
+		if made >= 2:
+			break
+		if _try_detour(i, interior, used):
+			made += 1
+
+
+func _try_detour(l: int, interior: Dictionary, used: Dictionary) -> bool:
+	var r := l + 6
+	var d := cell_of(l + 1) - cell_of(l)
+	for k in range(l, r):
+		if cell_of(k + 1) - cell_of(k) != d:
+			return false  # not straight
+	for p in [Vector2i(d.y, -d.x), Vector2i(-d.y, d.x)]:
+		var inward: Vector2i = p
+		var cells: Array = [cell_of(l) + inward]
+		for k in range(l, r + 1):
+			cells.append(cell_of(k) + inward * 2)
+		cells.append(cell_of(r) + inward)
+		var ok := true
+		for c in cells:
+			if not interior.has(c) or used.has(c):
+				ok = false
+				break
+			for nb in neighbors(c):
+				if used.has(nb):
+					ok = false
+		if not ok:
+			continue
+		for c in cells:
+			used[c] = true
+			interior.erase(c)
+		_add_detour(l, r, inward)
+		return true
+	return false
 
 
 ## A side passage that leaves loop tile `l`, runs two cells inward and rejoins at loop tile `r`.
@@ -211,4 +352,8 @@ func seal_pct() -> float:
 
 
 func is_blocked() -> bool:
-	return game_over or paused or not pending_souls.is_empty()
+	return game_over or paused or not pending_souls.is_empty() or not draft.is_empty()
+
+
+func in_grid(c: Vector2i) -> bool:
+	return c.x >= 0 and c.y >= 0 and c.x < D.GRID_W and c.y < D.GRID_H

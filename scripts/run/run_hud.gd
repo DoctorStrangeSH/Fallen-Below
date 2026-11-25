@@ -1,116 +1,166 @@
 extends CanvasLayer
-## Run HUD: top bar, log, hand of cards, soul choice and end-of-run panel.
+## Run HUD in the Loop Hero layout: map on the left, info panel on the right,
+## hand of cards at the bottom, modal choices centred over the map.
 
 const D = preload("res://scripts/data/game_data.gd")
 const UI = preload("res://scripts/ui/ui_style.gd")
 const LootSystem = preload("res://scripts/systems/loot_system.gd")
 
+const MAP_CENTER := Vector2(16 + 19 * 48 / 2.0, 16 + 11 * 48 / 2.0)
+
 var run  # run.gd
 
-var info_label: Label
+# right panel
+var act_label: Label
+var day_label: Label
 var day_bar: ProgressBar
-var threat_bar: ProgressBar
-var restore_btn: Button
+var heart_label: Label
+var heart_bar: ProgressBar
+var attention_bar: ProgressBar
+var res_label: Label
 var pause_btn: Button
 var speed_btn: Button
+var heal_btn: Button
 var seal_btn: Button
 var trophy_title: Label
 var trophy_box: VBoxContainer
-var tooltip: PanelContainer
-var tooltip_label: Label
-var banner: Label
 var log_label: Label
+
+# bottom & overlays
 var hand_box: HBoxContainer
 var soul_panel: PanelContainer
 var soul_label: Label
 var raise_btn: Button
+var draft_panel: PanelContainer
+var draft_box: HBoxContainer
 var end_panel: PanelContainer
 var end_label: Label
+var end_buttons: VBoxContainer
+var tooltip: PanelContainer
+var tooltip_label: Label
+var banner: Label
 
 
 func _ready() -> void:
-	_build_top_bar()
-	_build_log_and_hand()
+	_build_panel()
+	hand_box = HBoxContainer.new()
+	hand_box.position = Vector2(16, D.HAND_Y)
+	hand_box.add_theme_constant_override("separation", 6)
+	add_child(hand_box)
 	_build_soul_panel()
-	_build_trophies()
-	_build_overlays()
+	_build_draft_panel()
 	_build_end_panel()
+	_build_overlays()
+
 	var s = run.state
 	s.log_added.connect(_on_log)
-	s.hand_changed.connect(rebuild_hand)
+	s.hand_changed.connect(_on_hand_changed)
 	s.souls_changed.connect(show_souls)
 	s.inventory_changed.connect(rebuild_trophies)
 	s.combo_found.connect(show_banner)
-	rebuild_hand()
+	act_label.text = D.ACTS[s.act]["name"]
+	_on_hand_changed()
 	rebuild_trophies()
+	_on_log()
 	refresh()
 
 
-# ---------------------------------------------------------- build
+# ============================================================ build
 
-func _build_top_bar() -> void:
-	var top := HBoxContainer.new()
-	top.position = Vector2(40, 16)
-	top.add_theme_constant_override("separation", 12)
-	add_child(top)
+func _bar(max_value: float, color: Color) -> ProgressBar:
+	var b := ProgressBar.new()
+	b.max_value = max_value
+	b.show_percentage = false
+	b.custom_minimum_size = Vector2(0, 14)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var bg := UI.box(Color(0.12, 0.1, 0.15), Color(0, 0, 0, 0), 3)
+	bg.set_content_margin_all(0)
+	b.add_theme_stylebox_override("background", bg)
+	var fill := UI.box(color, Color(0, 0, 0, 0), 3)
+	fill.set_content_margin_all(0)
+	b.add_theme_stylebox_override("fill", fill)
+	return b
 
-	info_label = Label.new()
-	top.add_child(info_label)
 
-	top.add_child(UI.label("Day"))
-	day_bar = ProgressBar.new()
-	day_bar.custom_minimum_size = Vector2(110, 20)
-	day_bar.max_value = D.DAY_LENGTH
-	day_bar.show_percentage = false
-	top.add_child(day_bar)
+func _build_panel() -> void:
+	var panel := PanelContainer.new()
+	panel.position = Vector2(D.PANEL_X, 8)
+	panel.custom_minimum_size = Vector2(1272 - D.PANEL_X, 704)
+	panel.add_theme_stylebox_override("panel", UI.box(Color(0.08, 0.06, 0.11), Color(0.3, 0.22, 0.4)))
+	add_child(panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	panel.add_child(v)
 
-	top.add_child(UI.label("Threat"))
-	threat_bar = ProgressBar.new()
-	threat_bar.custom_minimum_size = Vector2(140, 20)
-	threat_bar.max_value = D.BOSS_THREAT
-	threat_bar.show_percentage = false
-	top.add_child(threat_bar)
+	act_label = UI.label("", 17, Color(0.75, 0.55, 1.0))
+	v.add_child(act_label)
 
-	restore_btn = UI.button("Heal Heart (%d ess.)" % D.RESTORE_COST, Vector2(0, 30))
-	restore_btn.pressed.connect(func(): run.heal_heart())
-	top.add_child(restore_btn)
-	pause_btn = UI.button("Pause", Vector2(70, 30))
+	day_label = UI.label("", 14)
+	v.add_child(day_label)
+	day_bar = _bar(D.DAY_LENGTH, Color(0.85, 0.75, 0.4))
+	v.add_child(day_bar)
+
+	heart_label = UI.label("", 14)
+	v.add_child(heart_label)
+	heart_bar = _bar(100, Color(0.85, 0.15, 0.25))
+	v.add_child(heart_bar)
+
+	var att := UI.label("Order's attention (champion at 100%)", 13, Color(1, 0.9, 0.6))
+	v.add_child(att)
+	attention_bar = _bar(D.BOSS_THREAT, Color(1.0, 0.85, 0.5))
+	v.add_child(attention_bar)
+
+	res_label = UI.label("", 13, Color(1, 1, 1, 0.85))
+	v.add_child(res_label)
+
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	v.add_child(grid)
+	pause_btn = UI.button("Pause", Vector2(150, 30))
 	pause_btn.pressed.connect(func(): run.toggle_pause())
-	top.add_child(pause_btn)
-	speed_btn = UI.button("x1", Vector2(50, 30))
+	grid.add_child(pause_btn)
+	speed_btn = UI.button("x1", Vector2(150, 30))
 	speed_btn.pressed.connect(func(): run.cycle_speed())
-	top.add_child(speed_btn)
-	seal_btn = UI.button("Seal", Vector2(0, 30))
+	grid.add_child(speed_btn)
+	heal_btn = UI.button("Heal Heart (%d ess)" % D.RESTORE_COST, Vector2(150, 30))
+	heal_btn.pressed.connect(func(): run.heal_heart())
+	grid.add_child(heal_btn)
+	seal_btn = UI.button("Seal", Vector2(150, 30))
 	seal_btn.pressed.connect(func(): run.seal())
-	top.add_child(seal_btn)
+	grid.add_child(seal_btn)
 
+	trophy_title = UI.label("", 12, Color(1, 0.85, 0.5))
+	trophy_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	trophy_title.custom_minimum_size = Vector2(300, 0)
+	v.add_child(trophy_title)
+	trophy_box = VBoxContainer.new()
+	trophy_box.add_theme_constant_override("separation", 2)
+	trophy_box.custom_minimum_size = Vector2(0, 8 * 22)
+	v.add_child(trophy_box)
 
-func _build_log_and_hand() -> void:
-	log_label = UI.label("", 13, Color(1, 1, 1, 0.8))
-	log_label.position = D.MAP_OFFSET + Vector2(2.3 * D.CELL, 4.4 * D.CELL)
-	log_label.size = Vector2(8.3 * D.CELL, 2.5 * D.CELL)
+	log_label = UI.label("", 12, Color(1, 1, 1, 0.8))
 	log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	log_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	log_label.clip_text = true
-	add_child(log_label)
+	log_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	log_label.custom_minimum_size = Vector2(300, 0)
+	v.add_child(log_label)
 
-	var hint := UI.label("Card or trophy, then a tile. Right-click: cancel. Space: pause. 1/2/3: speed. Yellow dots are forks: heroes choose by personality.", 13, Color(1, 1, 1, 0.6))
-	hint.position = Vector2(40, 556)
-	add_child(hint)
 
-	hand_box = HBoxContainer.new()
-	hand_box.position = Vector2(40, 584)
-	hand_box.add_theme_constant_override("separation", 8)
-	add_child(hand_box)
+func _modal(width: float, border: Color) -> PanelContainer:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UI.box(Color(0.07, 0.04, 0.11, 0.97), border))
+	p.custom_minimum_size = Vector2(width, 0)
+	p.position = Vector2(MAP_CENTER.x - width / 2.0, 120)
+	p.visible = false
+	add_child(p)
+	return p
 
 
 func _build_soul_panel() -> void:
-	soul_panel = PanelContainer.new()
-	soul_panel.add_theme_stylebox_override("panel", UI.box(Color(0.08, 0.05, 0.12, 0.96), Color(0.6, 0.4, 0.9)))
-	soul_panel.position = Vector2(390, 200)
-	soul_panel.custom_minimum_size = Vector2(500, 0)
-	soul_panel.visible = false
-	add_child(soul_panel)
+	soul_panel = _modal(480, Color(0.6, 0.4, 0.9))
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	soul_panel.add_child(v)
@@ -129,16 +179,35 @@ func _build_soul_panel() -> void:
 	v.add_child(inter)
 
 
-func _build_trophies() -> void:
+func _build_draft_panel() -> void:
+	draft_panel = _modal(600, Color(0.85, 0.75, 0.4))
 	var v := VBoxContainer.new()
-	v.position = D.MAP_OFFSET + Vector2(15.2 * D.CELL, 1.2 * D.CELL)
-	v.add_theme_constant_override("separation", 3)
-	add_child(v)
-	trophy_title = UI.label("", 13, Color(1, 0.85, 0.5))
-	v.add_child(trophy_title)
-	trophy_box = VBoxContainer.new()
-	trophy_box.add_theme_constant_override("separation", 3)
-	v.add_child(trophy_box)
+	v.add_theme_constant_override("separation", 10)
+	draft_panel.add_child(v)
+	var title := UI.label("A new day. A memory returns...", 20, Color(1, 0.9, 0.6))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(title)
+	var sub := UI.label("Choose one card", 13, Color(1, 1, 1, 0.6))
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(sub)
+	draft_box = HBoxContainer.new()
+	draft_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	draft_box.add_theme_constant_override("separation", 12)
+	v.add_child(draft_box)
+
+
+func _build_end_panel() -> void:
+	end_panel = _modal(440, Color(0.9, 0.8, 0.4))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 12)
+	end_panel.add_child(v)
+	end_label = UI.label("", 20)
+	end_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	end_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(end_label)
+	end_buttons = VBoxContainer.new()
+	end_buttons.add_theme_constant_override("separation", 8)
+	v.add_child(end_buttons)
 
 
 func _build_overlays() -> void:
@@ -152,54 +221,35 @@ func _build_overlays() -> void:
 
 	banner = UI.label("", 30, Color(1, 0.8, 0.3))
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	banner.position = Vector2(0, 150)
-	banner.size = Vector2(1280, 50)
+	banner.position = Vector2(D.MAP_OFFSET.x, 60)
+	banner.size = Vector2(D.GRID_W * D.CELL, 50)
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner.modulate.a = 0.0
 	add_child(banner)
 
 
-func _build_end_panel() -> void:
-	end_panel = PanelContainer.new()
-	end_panel.add_theme_stylebox_override("panel", UI.box(Color(0.05, 0.03, 0.08, 0.97), Color(0.9, 0.8, 0.4)))
-	end_panel.position = Vector2(440, 200)
-	end_panel.custom_minimum_size = Vector2(400, 0)
-	end_panel.visible = false
-	add_child(end_panel)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 12)
-	end_panel.add_child(v)
-	end_label = UI.label("", 20)
-	end_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	end_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(end_label)
-	var lair := UI.button("Return to the Lair")
-	lair.pressed.connect(func(): run.go_to("res://scenes/lair.tscn"))
-	v.add_child(lair)
-	var again := UI.button("New run")
-	again.pressed.connect(func(): run.go_to("res://scenes/run.tscn"))
-	v.add_child(again)
-	var menu := UI.button("Main menu")
-	menu.pressed.connect(func(): run.go_to("res://scenes/main_menu.tscn"))
-	v.add_child(menu)
+# ============================================================ cards
+
+func _card_button(id: String, highlighted: bool, min_size: Vector2) -> Button:
+	var def: Dictionary = D.CARDS[id]
+	var btn := Button.new()
+	btn.text = "%s\n\n%s" % [def["name"], def["desc"]]
+	btn.custom_minimum_size = min_size
+	btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.add_theme_font_size_override("font_size", 12)
+	var base: Color = def["color"]
+	var col := base.darkened(0.45)
+	var border := Color(1, 1, 1) if highlighted else col.lightened(0.3)
+	btn.add_theme_stylebox_override("normal", UI.box(col, border))
+	btn.add_theme_stylebox_override("hover", UI.box(col.lightened(0.15), Color(1, 1, 1, 0.8)))
+	btn.add_theme_stylebox_override("pressed", UI.box(col.lightened(0.25), Color(1, 1, 1)))
+	return btn
 
 
-# ---------------------------------------------------------- update
-
-func refresh() -> void:
-	var s = run.state
-	info_label.text = "Day %d  Heart %d/%d  Ess %d  Undead %d/%d  Bones %d" % [
-		s.day, s.heart_hp, s.heart_max, s.essence, s.undead_count(), s.jar_cap, s.bones_value()]
-	day_bar.value = s.day_timer
-	threat_bar.value = s.threat
-	restore_btn.disabled = s.essence < D.RESTORE_COST or s.heart_hp >= s.heart_max or s.game_over
-	pause_btn.text = "Play" if s.paused else "Pause"
-	speed_btn.text = "x%d" % int(s.time_scale)
-	var pct: float = s.seal_pct()
-	seal_btn.text = "Seal %d%%" % int(pct * 100.0)
-	seal_btn.disabled = s.game_over
-	seal_btn.modulate = Color(1, 0.9, 0.4) if pct >= 1.0 else Color(1, 1, 1)
-	_update_tooltip()
+func _on_hand_changed() -> void:
+	rebuild_hand()
+	_show_draft()
 
 
 func rebuild_hand() -> void:
@@ -207,22 +257,46 @@ func rebuild_hand() -> void:
 	for c in hand_box.get_children():
 		c.queue_free()
 	for i in s.hand.size():
-		var id: String = s.hand[i]
-		var def: Dictionary = D.CARDS[id]
-		var btn := Button.new()
-		btn.text = "%s\n\n%s" % [def["name"], def["desc"]]
-		btn.custom_minimum_size = Vector2(160, 110)
-		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		btn.focus_mode = Control.FOCUS_NONE
-		btn.add_theme_font_size_override("font_size", 13)
-		var base: Color = def["color"]
-		var col := base.darkened(0.45)
-		var border := Color(1, 1, 1) if i == s.selected else col.lightened(0.3)
-		btn.add_theme_stylebox_override("normal", UI.box(col, border))
-		btn.add_theme_stylebox_override("hover", UI.box(col.lightened(0.15), border))
-		btn.add_theme_stylebox_override("pressed", UI.box(col.lightened(0.25), Color(1, 1, 1)))
+		var btn := _card_button(s.hand[i], i == s.selected, Vector2(126, 140))
 		btn.pressed.connect(func(): run.cards.use_card(i))
 		hand_box.add_child(btn)
+
+
+func _show_draft() -> void:
+	var s = run.state
+	for c in draft_box.get_children():
+		c.queue_free()
+	if s.draft.is_empty() or s.game_over:
+		draft_panel.visible = false
+		return
+	for i in s.draft.size():
+		var btn := _card_button(s.draft[i], false, Vector2(170, 190))
+		btn.add_theme_font_size_override("font_size", 14)
+		btn.pressed.connect(func(): run.cards.pick_draft(i))
+		draft_box.add_child(btn)
+	draft_panel.visible = true
+
+
+# ============================================================ update
+
+func refresh() -> void:
+	var s = run.state
+	day_label.text = "Day %d" % s.day
+	day_bar.value = s.day_timer
+	heart_label.text = "Heart %d/%d" % [s.heart_hp, s.heart_max]
+	heart_bar.max_value = s.heart_max
+	heart_bar.value = s.heart_hp
+	attention_bar.value = s.threat
+	var pct: float = s.seal_pct()
+	res_label.text = "Essence %d    Undead %d/%d\nBones %d  (seal now: %d%%)" % [
+		s.essence, s.undead_count(), s.jar_cap, s.bones_value(), int(pct * 100.0)]
+	heal_btn.disabled = s.essence < D.RESTORE_COST or s.heart_hp >= s.heart_max or s.game_over
+	pause_btn.text = "Play" if s.paused else "Pause"
+	speed_btn.text = "Speed x%d" % int(s.time_scale)
+	seal_btn.text = "Seal %d%%" % int(pct * 100.0)
+	seal_btn.disabled = s.game_over
+	seal_btn.modulate = Color(1, 0.9, 0.4) if pct >= 1.0 else Color(1, 1, 1)
+	_update_tooltip()
 
 
 func show_souls() -> void:
@@ -239,23 +313,36 @@ func show_souls() -> void:
 
 func show_end(outcome: String, bones: int, pct: float) -> void:
 	soul_panel.visible = false
+	draft_panel.visible = false
 	tooltip.visible = false
 	var s = run.state
 	var head := ""
 	match outcome:
 		"victory":
-			head = "VICTORY\nThe Lightbringer is dead."
+			head = "ACT CLEARED\n%s has fallen." % D.ACTS[s.act]["boss"]
 		"sealed":
 			head = "DUNGEON SEALED\nYou keep %d%% of the spoils." % int(pct * 100.0)
 		_:
-			head = "DEFEAT\nYour treasury is empty. Only %d%% of the bones remain." % int(pct * 100.0)
-	end_label.text = "%s\nDays survived: %d   Heroes slain: %d\n+%d Bones" % [head, s.day, s.kills, bones]
+			head = "THE HEART FALLS\nOnly %d%% of the bones remain." % int(pct * 100.0)
+	end_label.text = "%s\n\nDays: %d   Heroes slain: %d\n+%d Bones" % [head, s.day, s.kills, bones]
+	for c in end_buttons.get_children():
+		c.queue_free()
+	if outcome == "victory":
+		var cont := UI.button("Continue")
+		cont.pressed.connect(func(): run.continue_after_victory())
+		end_buttons.add_child(cont)
+	var lair := UI.button("Return to the Lair")
+	lair.pressed.connect(func(): run.go_to("res://scenes/lair.tscn"))
+	end_buttons.add_child(lair)
+	var again := UI.button("New run")
+	again.pressed.connect(func(): run.go_to("res://scenes/run.tscn"))
+	end_buttons.add_child(again)
 	end_panel.visible = true
 
 
 func rebuild_trophies() -> void:
 	var s = run.state
-	trophy_title.text = "Trophies %d/%d  (right-click: melt)" % [s.inventory.size(), D.INVENTORY_MAX]
+	trophy_title.text = "Trophies %d/%d   (click, then your undead · RMB: melt)" % [s.inventory.size(), D.INVENTORY_MAX]
 	for c in trophy_box.get_children():
 		c.queue_free()
 	for i in s.inventory.size():
@@ -264,9 +351,10 @@ func rebuild_trophies() -> void:
 		var col: Color = rar["color"]
 		var btn := Button.new()
 		btn.text = "%s  (%s)" % [item["name"], LootSystem.describe(item)]
+		btn.tooltip_text = btn.text
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		btn.custom_minimum_size = Vector2(330, 22)
+		btn.custom_minimum_size = Vector2(300, 20)
 		btn.clip_text = true
 		btn.add_theme_font_size_override("font_size", 11)
 		btn.add_theme_color_override("font_color", col)
@@ -291,9 +379,13 @@ func show_banner(text: String) -> void:
 	tw.tween_property(banner, "modulate:a", 0.0, 1.2)
 
 
+func _on_log() -> void:
+	log_label.text = "\n".join(run.state.log_lines)
+
+
 func _update_tooltip() -> void:
 	var s = run.state
-	if s.game_over or soul_panel.visible:
+	if s.game_over or soul_panel.visible or draft_panel.visible:
 		tooltip.visible = false
 		return
 	var cell: Vector2i = run.view.mouse_cell()
@@ -302,13 +394,13 @@ func _update_tooltip() -> void:
 		var t: int = s.path_lookup[cell]
 		var card: String = s.card_at(t)
 		if t == 0:
-			lines.append("Gate: heroes enter here. Each lap they steal gold.")
+			lines.append("Gate: heroes enter here. Each lap they steal from your Heart.")
 		elif card != "":
 			lines.append("%s: %s" % [D.CARDS[card]["name"], D.CARDS[card]["desc"]])
 		elif t >= s.loop_size:
 			lines.append("Side passage")
 		if s.forks.has(t):
-			lines.append("Fork: heroes pick a branch by personality.")
+			lines.append("Fork: each hero picks a branch by personality.")
 		for u in s.alive_units(t):
 			var line := "%s  %d/%d HP  %.1f dmg" % [u["name"], int(u["hp"]), int(u["max_hp"]), u["dmg"]]
 			var gear: Dictionary = u.get("gear", {})
@@ -323,6 +415,8 @@ func _update_tooltip() -> void:
 	elif s.scenery.has(cell):
 		var id: String = s.scenery[cell]
 		lines.append("%s: %s" % [D.CARDS[id]["name"], D.CARDS[id]["desc"]])
+	elif cell == s.heart_cell:
+		lines.append("Your Heart. If it falls, the run is over.")
 	if lines.is_empty():
 		tooltip.visible = false
 		return
@@ -334,7 +428,3 @@ func _update_tooltip() -> void:
 	mp.x = minf(mp.x, vp.x - tooltip.size.x - 4)
 	mp.y = minf(mp.y, vp.y - tooltip.size.y - 4)
 	tooltip.position = mp
-
-
-func _on_log() -> void:
-	log_label.text = "\n".join(run.state.log_lines)
