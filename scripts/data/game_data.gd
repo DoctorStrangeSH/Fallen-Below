@@ -216,46 +216,100 @@ const RELICS := {
 # --- acts & story ---
 const ACTS := {
 	1: {"name": "Act I: The Crypts", "boss": "Aurelia", "boss_title": "the Lightbringer",
-		"boss_intro": "\"Too many have vanished down here. I have come to end your hunger.\"",
 		"end_story": "act1_end"},
 }
 
+## The Warden remembers its name after Act I.
+const WARDEN_TRUE_NAME := "Ren, the Bone Warden"
+
 const STORY := {
 	"intro": [
-		"There is a door in the mountain that was not there yesterday.\n\nBehind it, stairs. Below the stairs, a glimmer of gold. A whisper of treasure. A rumour of a beast worth hunting.",
-		"Travelers always go down. Treasure seekers. Pilgrims. Monster hunters. Scholars of forbidden things.\n\nNone of them come back up.",
-		"The dungeon is alive, and it is hungry. You are its will: you shape its halls, its traps, its crawling things.",
-		"And you are its Warden. Bones bound around an old, starving heart. You walk the halls and finish what the traps begin.",
-		"But every traveler who finds the way out tells the tale. And far above, the Order of Dawn is listening.\n\nLure them in. Let none of them leave.",
+		"There is a door in the mountain that was not there yesterday.\n\nThere never is.",
+		"Behind it, stairs. At the bottom, a glimmer of gold, a whisper of treasure, a rumour of a beast worth killing.\n\nTravelers always go down. None of them come back up.",
+		"The dungeon is alive. It does not hate them. It is simply, endlessly hungry.\n\nYou are its will. You shape its halls, its traps, the crawling things in its walls.",
+		"And you are its Warden: old bones knitted around a hollow where a heart should be.\n\nYou do not remember who you were. You only know that you must not let them leave.",
+		"Far above, in white towers, the Order of Dawn counts the missing. They call you a monster.\n\nThey keep sending people anyway.",
+	],
+	"memory_sword": [
+		"Among the bones of the Lair, the Warden finds a small thing. A child's wooden sword, worn smooth by a small hand.",
+		"It does not know why it keeps it. It does not know why holding it hurts.",
+		"Somewhere very far away, a girl's voice:\n\n\"Ren, wait for me! Don't go in without me!\"",
+	],
+	"memory_feast": [
+		"At night the raised dead murmur to each other in the dark. Each of them knew a little. Together they know a lot.",
+		"The Order draws the treasure maps. The Order lights the holy fire at the door. The Order pays the hunters half up front, and never the rest.",
+		"They are not trying to kill the dungeon.\n\nThey are feeding it.",
+		"And an old scholar among the dead says what none of them wants to hear:\n\nevery time the dungeon eats, the sun above burns a little brighter.",
 	],
 	"act1_end": [
-		"Aurelia falls. Her light gutters and dies on your stones.",
-		"As the Warden devours her, a memory surfaces. Not yours. Hers.\n\nA little girl, lost in these very halls. A door that should not have opened for her... and did.",
-		"The dungeon let her go, once. The only one it ever let go.\n\nNow she has come home.",
-		"Far above, the bells are ringing. The Order knows its champion is gone.\n\nNext time, they will send the miners to dig you out.\n\n(Act II is coming soon.)",
+		"Aurelia falls. Her light gutters on the stones.\n\nThe Warden kneels over her, and for the first time, it does not want to eat.",
+		"\"Ren,\" she whispers. \"It's me. It's Lia.\"\n\nAnd the bones remember.",
+		"Two children, lost in the dark, thirty years ago. A door that should not have opened. A dungeon that wanted one of them.",
+		"The boy said: take me. Let her go.\n\nAnd the dungeon, which had never let anyone go, did.",
+		"She grew up in the white towers. They made her a saint. They told her the monster ate her brother.\n\nThey never told her what he became.",
+		"Her last breath rises through the rock like a small, warm light. Far above, for one morning, the sun shines a little brighter.\n\nRen does not understand why. Not yet.\n\n(Act II: The Drowned Mines is coming soon.)",
 	],
 }
 
-## Raised travelers whisper fragments of the truth.
-const WHISPERS := {
-	"seeker": [
-		"The map said treasure. The map was drawn by the Order.",
-		"I came for gold. Turns out the gold was bait. Turns out I was too.",
-		"Someone up there sells these maps. Ask who.",
+## Lair memories unlock as the Book of the Fallen fills up.
+const MEMORIES := [
+	{"id": "memory_sword", "pages": 4},
+	{"id": "memory_feast", "pages": 10},
+]
+
+## One-time story moments during runs, shown as narration over the map.
+const BEATS := {
+	"first_kill": "The first one falls. Something in the dark goes quiet, almost content. Almost.",
+	"first_raise": "The dead traveler stands, and looks at the Warden for a long moment, as if trying to remember where it has seen that face before.",
+	"first_escape": "One got away. Tonight a tavern will hear the story. By morning, so will the Order.",
+	"first_level": "The Warden's bones crack and grow. For a moment a name almost rises to the surface. Then it is gone.",
+	"attention_half": "Bells ring in the white towers. The Order has noticed you. Something bright is being prepared.",
+	"first_sleep": "The door in the mountain closes. The dungeon curls around its full belly and dreams of the next door.",
+}
+
+## What the act champion says, and when.
+const BOSS_LINES := {
+	"arrive": [
+		"A light comes down the stairs, and the whole dungeon flinches.",
+		"Aurelia: \"I know these halls. I swore I would never come back.\"",
+		"Aurelia: \"Warden! I have come for what you took from me.\"",
 	],
-	"pilgrim": [
-		"The priests said a saint was born down here. They did not say she escaped.",
-		"Holy fire... they lit it at the door themselves. Why?",
-		"We were sent as an offering, I think. Not as a cure.",
+	"half": ["Aurelia: \"Your eyes... No. It can't be. ...Ren?\""],
+	"death": ["Aurelia: \"I'm sorry I left you down here...\""],
+}
+
+## The Book of the Fallen: raised travelers give these pages in order, 4 per kind.
+const FRAGMENTS := {
+	"seeker": [
+		"The map said treasure. I bought it from a priest. Why would a priest sell a treasure map?",
+		"Every map has a mark in the corner. A little sun. I thought it was the mapmaker's sign.",
+		"The priest asked my name and wrote it in a book. Like a ledger. Like a bill of sale.",
+		"We weren't seeking treasure. We were the treasure. Somebody up there is paid in us.",
 	],
 	"hunter": [
-		"They paid us to kill a beast. Nobody said the beast was the dungeon.",
-		"The Order counts the missing. It never comes to look.",
-		"My captain never came down. He only sends the next ones.",
+		"They paid us to kill a beast. Half up front. They never expected to pay the other half.",
+		"My captain has sent eleven companies down here. He has never once come down himself.",
+		"Every Order blade bears the same rune. It glows when it's near you. Like it's homesick.",
+		"If they wanted you dead they would send an army. They send us. A few at a time. Like rationing.",
+	],
+	"pilgrim": [
+		"The priests lit the holy fire at the door themselves. They said it would guide us. It guided us here.",
+		"The hymns say Saint Aurelia came out of the dark as a child. They never say what she left behind.",
+		"At dawn mass the priests face the mountain, not the sun. I always wondered why.",
+		"We were not sent to cleanse the dark. We were sent to feed it. A pilgrimage is just a longer word for a meal.",
 	],
 	"mage": [
-		"Your hunger feeds something above. Their light flickers when you starve.",
-		"The archives were sealed. Now I understand why.",
-		"The Order needs you hungry. They just need you a little less hungry.",
+		"The Dawn's light is not theirs. My instruments say it rises through the rock. From below.",
+		"Each time a traveler dies down here, the sun above flickers brighter. Forty years of measurements.",
+		"The archives were sealed after the Founding. I broke the seal. One word was written there: FED.",
+		"Long ago there was no morning. They buried something beneath this mountain and made it hungry, so the sun would rise. You are what they buried.",
 	],
+}
+
+## Once a kind's pages are all collected, raised travelers mutter one of these.
+const WHISPERS := {
+	"seeker": ["Someone up there sells these maps. Ask who.", "I picked the wrong door."],
+	"pilgrim": ["We were an offering, not a cure.", "The fire was lit for us, not for you."],
+	"hunter": ["The Order counts the missing. It never comes to look.", "The other half was never coming."],
+	"mage": ["Their light flickers when you starve.", "The archives were sealed for a reason."],
 }

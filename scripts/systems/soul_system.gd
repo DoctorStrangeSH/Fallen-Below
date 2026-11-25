@@ -43,7 +43,13 @@ func _raise(h: Dictionary) -> void:
 			x["revenge"] = true
 			avengers += 1
 	s.add_log("%s rises to serve you." % unit["name"])
-	var lines: Array = D.WHISPERS[h["cls"]]
-	s.add_log("\"%s\"" % lines[s.rng.randi() % lines.size()])
+	run.beat("first_raise")
+	var page: String = Meta.next_fragment(h["cls"])
+	if page != "":
+		s.narrate.emit("%s whispers: \"%s\"" % [h["name"], page])
+		s.add_log("New page in the Book of the Fallen (%d/%d)." % [Meta.fragment_count(), Meta.fragment_total()])
+	else:
+		var lines: Array = D.WHISPERS[h["cls"]]
+		s.add_log("\"%s\"" % lines[s.rng.randi() % lines.size()])
 	if avengers > 0:
 		s.add_log("Their companions swear revenge!")

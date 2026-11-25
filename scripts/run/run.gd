@@ -77,6 +77,8 @@ func _process(delta: float) -> void:
 	if state.combat_timer >= D.COMBAT_TICK:
 		state.combat_timer -= D.COMBAT_TICK
 		combat.tick()
+	if state.threat >= D.BOSS_THREAT * 0.5:
+		beat("attention_half")
 	if state.threat >= D.BOSS_THREAT and not state.boss_spawned and not state.game_over:
 		heroes_sys.spawn_boss()
 	hud.refresh()
@@ -120,6 +122,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		cards.place_selected(view.mouse_cell())
 
 
+## One-time story moment (saved across runs).
+func beat(id: String) -> void:
+	if D.BEATS.has(id) and Meta.first_time(id):
+		state.narrate.emit(D.BEATS[id])
+
+
 func toggle_pause() -> void:
 	if state.game_over:
 		return
@@ -150,6 +158,7 @@ func end_game(win: bool) -> void:
 func sleep() -> void:
 	if state.game_over:
 		return
+	beat("first_sleep")
 	_finish("sleep", state.seal_pct())
 
 

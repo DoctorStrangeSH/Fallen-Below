@@ -19,6 +19,8 @@ var total_kills := 0
 var discovered := []     # combo ids
 var seen_intro := false
 var acts_cleared := []
+var fragments := {}      # traveler kind -> pages of the Book of the Fallen unlocked
+var seen := []           # one-time story beats and memories already shown
 
 # story scene hand-off (not saved)
 var pending_story := ""
@@ -206,6 +208,55 @@ func start_run() -> void:
 		get_tree().change_scene_to_file("res://scenes/prepare.tscn")
 
 
+# ---------------------------------------------------------- story
+
+## True only the first time `id` is asked for (beats, memories). Saved.
+func first_time(id: String) -> bool:
+	if seen.has(id):
+		return false
+	seen.append(id)
+	save_game()
+	return true
+
+
+## Next unread page of the Book of the Fallen for this traveler kind, or "" if all read.
+func next_fragment(kind: String) -> String:
+	var pages: Array = D.FRAGMENTS.get(kind, [])
+	var n := int(fragments.get(kind, 0))
+	if n >= pages.size():
+		return ""
+	fragments[kind] = n + 1
+	save_game()
+	return pages[n]
+
+
+func fragment_count() -> int:
+	var total := 0
+	for k in fragments:
+		total += int(fragments[k])
+	return total
+
+
+func fragment_total() -> int:
+	var total := 0
+	for k in D.FRAGMENTS:
+		total += D.FRAGMENTS[k].size()
+	return total
+
+
+## A Lair memory that has just become available (not yet seen), or "".
+func pending_memory() -> String:
+	for m in D.MEMORIES:
+		var id: String = m["id"]
+		if fragment_count() >= int(m["pages"]) and not seen.has(id):
+			return id
+	return ""
+
+
+func warden_name() -> String:
+	return D.WARDEN_TRUE_NAME if acts_cleared.has(1) else str(D.WARDEN["name"])
+
+
 ## Marks a combo as discovered. Returns true the first time.
 func discover(id: String) -> bool:
 	if discovered.has(id):
@@ -248,7 +299,7 @@ func save_game() -> void:
 		"version": SAVE_VERSION, "res": res, "buildings": buildings, "relics": relics,
 		"deck": deck, "loadout": loadout, "runs": runs, "wins": wins, "best_day": best_day,
 		"total_kills": total_kills, "discovered": discovered, "seen_intro": seen_intro,
-		"acts_cleared": acts_cleared, "lure": lure,
+		"acts_cleared": acts_cleared, "lure": lure, "fragments": fragments, "seen": seen,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -296,6 +347,17 @@ func load_game() -> void:
 	loadout = _str_list(d.get("loadout", []), D.RELICS)
 	deck = _str_list(d.get("deck", []), D.CARDS)
 	lure = str(d.get("lure", "gold"))
+	fragments = {}
+	var fr = d.get("fragments", {})
+	if fr is Dictionary:
+		for k in fr:
+			if D.FRAGMENTS.has(k):
+				fragments[k] = clampi(int(fr[k]), 0, D.FRAGMENTS[k].size())
+	seen = []
+	var sn = d.get("seen", [])
+	if sn is Array:
+		for x in sn:
+			seen.append(str(x))
 	buildings = {}
 	var b = d.get("buildings", {})
 	if b is Dictionary:
@@ -317,5 +379,7 @@ func reset_save() -> void:
 	discovered = []
 	seen_intro = false
 	acts_cleared = []
+	fragments = {}
+	seen = []
 	_sanitize_loadout()
 	save_game()

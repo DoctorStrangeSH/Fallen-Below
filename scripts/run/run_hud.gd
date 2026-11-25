@@ -40,6 +40,10 @@ var end_buttons: VBoxContainer
 var tooltip: PanelContainer
 var tooltip_label: Label
 var banner: Label
+var narration: PanelContainer
+var narration_label: Label
+var narration_queue: Array = []
+var narration_time := 0.0
 
 
 func _ready() -> void:
@@ -58,6 +62,7 @@ func _ready() -> void:
 	s.inventory_changed.connect(rebuild_trophies)
 	s.combo_found.connect(show_banner)
 	s.level_up.connect(show_level_up)
+	s.narrate.connect(_on_narrate)
 	act_label.text = D.ACTS[s.act]["name"]
 	rebuild_hand()
 	rebuild_trophies()
@@ -221,6 +226,47 @@ func _build_overlays() -> void:
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner.modulate.a = 0.0
 	add_child(banner)
+
+	# story narration over the bottom of the map
+	narration = PanelContainer.new()
+	narration.add_theme_stylebox_override("panel", UI.box(Color(0.02, 0.01, 0.04, 0.88), Color(0.55, 0.45, 0.7, 0.6), 4))
+	narration.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	narration.position = Vector2(D.MAP_OFFSET.x + 60, 452)
+	narration.custom_minimum_size = Vector2(D.GRID_W * D.CELL - 120, 0)
+	narration.modulate.a = 0.0
+	add_child(narration)
+	narration_label = UI.label("", 15, Color(0.92, 0.88, 1.0))
+	narration_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	narration_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	narration_label.custom_minimum_size = Vector2(D.GRID_W * D.CELL - 140, 0)
+	narration.add_child(narration_label)
+
+
+func _on_narrate(text: String) -> void:
+	narration_queue.append(text)
+	if narration_time <= 0.0:
+		_next_narration()
+
+
+func _next_narration() -> void:
+	if narration_queue.is_empty():
+		narration_time = 0.0
+		create_tween().tween_property(narration, "modulate:a", 0.0, 0.6)
+		return
+	var text: String = narration_queue.pop_front()
+	narration_label.text = text
+	narration.reset_size()
+	narration.position.y = D.MAP_OFFSET.y + D.GRID_H * D.CELL - narration.size.y - 8
+	narration.modulate.a = 1.0
+	narration_time = 3.0 + text.length() / 25.0
+
+
+## Narration runs on real time, so it also reads fine while the game is paused.
+func _process(delta: float) -> void:
+	if narration_time > 0.0:
+		narration_time -= delta
+		if narration_time <= 0.0:
+			_next_narration()
 
 
 # ============================================================ cards & choices

@@ -13,6 +13,7 @@ signal souls_changed
 signal inventory_changed
 signal combo_found(combo_name: String)
 signal level_up
+signal narrate(text: String)
 
 var rng := RandomNumberGenerator.new()
 

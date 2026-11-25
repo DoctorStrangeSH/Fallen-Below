@@ -13,7 +13,7 @@ var pending_levels := 0
 
 func setup(base_hp: float, base_dmg: float) -> void:
 	s.warden = {
-		"name": D.WARDEN["name"], "hp": base_hp, "max_hp": base_hp,
+		"name": Meta.warden_name(), "hp": base_hp, "max_hp": base_hp,
 		"base_hp": base_hp, "base_dmg": base_dmg, "dmg": base_dmg,
 		"speed": D.WARDEN["speed"], "color": D.WARDEN["color"],
 		"level": 1, "xp": 0, "abilities": [], "gear": {}, "affixes": [],
@@ -155,6 +155,7 @@ func gain_xp(amount: int) -> void:
 		w["level"] += 1
 		heal_by(w["max_hp"] * D.LEVEL_UP_HEAL)
 		s.add_log("The Warden grows stronger: level %d." % w["level"])
+		run.beat("first_level")
 		pending_levels += 1
 	if s.level_choices.is_empty():
 		_offer_ability()

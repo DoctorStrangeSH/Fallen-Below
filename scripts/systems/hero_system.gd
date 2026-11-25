@@ -19,7 +19,7 @@ func make_hero(cls: String, hero_name: String, mult: float, party: int, idx: int
 		"speed": base["speed"], "color": base["color"],
 		"party": party, "cur": 0, "nxt": 0, "prog": 0.0, "delay": idx * 0.8, "stun": 0.0,
 		"laps": 0, "revenge": false, "boss": false, "gone": false, "death_tile": 0,
-		"trait": "", "baited": false,
+		"trait": "", "baited": false, "half_said": false,
 	}
 	if s.rng.randf() < D.TRAIT_CHANCE:
 		set_trait(h, D.TRAITS.keys()[s.rng.randi() % D.TRAITS.size()])
@@ -73,8 +73,9 @@ func spawn_boss() -> void:
 	h["dmg"] = 7.0 + s.day * 0.5
 	h["speed"] = 1.3
 	h["color"] = Color(1, 1, 1)
-	s.add_log("%s descends: %s" % [s.hero_name(h), act["boss_intro"]])
-	s.add_log("Her radiance burns undead nearby. Meet her with the Warden and the living.")
+	for line in D.BOSS_LINES["arrive"]:
+		s.narrate.emit(line)
+	s.add_log("%s descends. Her radiance burns undead nearby: meet her with the Warden and the living." % s.hero_name(h))
 	s.combo_found.emit("%s DESCENDS" % s.hero_name(h).to_upper())
 
 
@@ -192,6 +193,7 @@ func escape(h: Dictionary, how: String) -> void:
 	var t := D.THREAT_PER_ESCAPE * (0.5 if s.has_relic("whispering_skull") else 1.0)
 	s.add_threat(t)
 	s.add_log("%s %s and will tell the Order!" % [s.hero_name(h), how])
+	run.beat("first_escape")
 
 
 func _on_enter_tile(h: Dictionary, t: int) -> void:
@@ -218,6 +220,10 @@ func damage(h: Dictionary, amount: float) -> void:
 	if h["gone"]:
 		return
 	h["hp"] -= amount
+	if h["boss"] and not h["half_said"] and h["hp"] > 0.0 and h["hp"] < h["max_hp"] * 0.5:
+		h["half_said"] = true
+		for line in D.BOSS_LINES["half"]:
+			s.narrate.emit(line)
 	if h["hp"] <= 0.0:
 		_kill(h)
 	elif h["trait"] == "coward" and not h["boss"] and h["hp"] < h["max_hp"] * 0.3:
@@ -243,7 +249,10 @@ func _kill(h: Dictionary) -> void:
 			s.add_log("%s the Loyal swears to avenge %s!" % [x["name"], h["name"]])
 	s.hand_changed.emit()
 	run.souls.on_death(h)
+	run.beat("first_kill")
 	if h["boss"]:
+		for line in D.BOSS_LINES["death"]:
+			s.narrate.emit(line)
 		s.add_log("%s has fallen!" % s.hero_name(h))
 		run.end_game(true)
 

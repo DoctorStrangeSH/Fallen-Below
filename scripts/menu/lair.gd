@@ -9,6 +9,11 @@ var list: VBoxContainer
 
 
 func _ready() -> void:
+	# a new memory surfaces when enough pages of the Book of the Fallen are collected
+	var memory: String = Meta.pending_memory()
+	if memory != "" and Meta.first_time(memory):
+		Meta.play_story.call_deferred(memory, "res://scenes/lair.tscn")
+		return
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	UI.background(self)
 
@@ -37,6 +42,9 @@ func _ready() -> void:
 	var run_btn := UI.button("Prepare descent")
 	run_btn.pressed.connect(func(): Meta.start_run())
 	row.add_child(run_btn)
+	var book := UI.button("Book of the Fallen")
+	book.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/book.tscn"))
+	row.add_child(book)
 	var grim := UI.button("Grimoire")
 	grim.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/grimoire.tscn"))
 	row.add_child(grim)
