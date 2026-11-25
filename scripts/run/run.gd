@@ -4,6 +4,7 @@ extends Node
 const D = preload("res://scripts/data/game_data.gd")
 const RunState = preload("res://scripts/run/run_state.gd")
 const HeroSystem = preload("res://scripts/systems/hero_system.gd")
+const WardenSystem = preload("res://scripts/systems/warden_system.gd")
 const CombatSystem = preload("res://scripts/systems/combat_system.gd")
 const CardSystem = preload("res://scripts/systems/card_system.gd")
 const SoulSystem = preload("res://scripts/systems/soul_system.gd")
@@ -13,6 +14,7 @@ const RunHud = preload("res://scripts/run/run_hud.gd")
 
 var state: RunState
 var heroes_sys: HeroSystem
+var warden: WardenSystem
 var combat: CombatSystem
 var cards: CardSystem
 var souls: SoulSystem
@@ -23,10 +25,12 @@ var hud: RunHud
 
 func _ready() -> void:
 	state = RunState.new()
-	state.setup(Meta.heart_max(), Meta.start_jars(), Meta.start_essence(), Meta.card_weights(), Meta.loadout)
+	state.setup(Meta.start_jars(), Meta.card_weights(), Meta.loadout, Meta.lure)
 
 	heroes_sys = HeroSystem.new()
-	_add_system(heroes_sys, "Heroes")
+	_add_system(heroes_sys, "Travelers")
+	warden = WardenSystem.new()
+	_add_system(warden, "Warden")
 	combat = CombatSystem.new()
 	_add_system(combat, "Combat")
 	cards = CardSystem.new()
@@ -35,6 +39,7 @@ func _ready() -> void:
 	_add_system(souls, "Souls")
 	loot = LootSystem.new()
 	_add_system(loot, "Loot")
+	warden.setup(Meta.warden_hp(), Meta.warden_dmg())
 
 	view = RunView.new()
 	view.run = self
@@ -45,7 +50,7 @@ func _ready() -> void:
 
 	for i in Meta.start_cards():
 		cards.draw_card()
-	state.add_log("Heroes approach. Build your dungeon.")
+	state.add_log("The door in the mountain opens. Someone is coming down.")
 	heroes_sys.spawn_party()
 	state.hand_changed.emit()
 
@@ -67,6 +72,7 @@ func _process(delta: float) -> void:
 		state.day_timer -= D.DAY_LENGTH
 		_new_day()
 	heroes_sys.move(delta)
+	warden.move(delta)
 	state.combat_timer += delta
 	if state.combat_timer >= D.COMBAT_TICK:
 		state.combat_timer -= D.COMBAT_TICK
@@ -78,13 +84,12 @@ func _process(delta: float) -> void:
 
 func _new_day() -> void:
 	state.day += 1
-	state.gain("bones", D.BONES_PER_DAY)
 	cards.draw_card()
 	cards.respawn_rooms()
 	heroes_sys.spawn_party()
 	if state.day % D.SEAL_EVERY == 0:
-		state.add_log("End of the week: seal now to keep everything.")
-		hud.show_banner("WEEK'S END: SEAL FOR 100%")
+		state.add_log("The week ends: the dungeon may sleep now and keep everything.")
+		hud.show_banner("WEEK'S END: SLEEP TO KEEP 100%")
 	state.hand_changed.emit()
 
 
@@ -100,22 +105,19 @@ func _unhandled_input(event: InputEvent) -> void:
 				set_speed(2.0)
 			KEY_3:
 				set_speed(3.0)
+			KEY_R:
+				souls.toggle_stance()
 		return
 	var mb := event as InputEventMouseButton
 	if mb == null or not mb.pressed:
 		return
 	if mb.button_index == MOUSE_BUTTON_RIGHT:
 		state.selected = -1
-		state.selected_item = -1
 		state.hand_changed.emit()
-		state.inventory_changed.emit()
 	elif mb.button_index == MOUSE_BUTTON_LEFT:
 		if state.is_blocked():
 			return
-		if state.selected_item >= 0:
-			loot.equip_at(view.mouse_cell())
-		else:
-			cards.place_selected(view.mouse_cell())
+		cards.place_selected(view.mouse_cell())
 
 
 func toggle_pause() -> void:
@@ -132,22 +134,23 @@ func cycle_speed() -> void:
 	set_speed(1.0 if state.time_scale >= 3.0 else state.time_scale + 1.0)
 
 
-func heal_heart() -> void:
-	if state.essence >= D.RESTORE_COST and state.heart_hp < state.heart_max and not state.game_over:
-		state.essence -= D.RESTORE_COST
-		state.heart_hp = mini(state.heart_max, state.heart_hp + 5)
+func set_lure(id: String) -> void:
+	if Meta.available_lures().has(id):
+		state.lure = id
+		Meta.set_lure(id)
+		state.add_log("New lure: %s. Tomorrow's travelers will follow it." % D.LURES[id]["name"])
 
 
-## Heart destroyed (win = false) or boss slain (win = true).
+## Warden slain (win = false) or champion slain (win = true).
 func end_game(win: bool) -> void:
 	_finish("victory" if win else "defeat", 1.0 if win else D.DEFEAT_PCT)
 
 
-## Retreat like in Loop Hero: full payout at the end of a week, partial otherwise.
-func seal() -> void:
-	if state.game_over or not state.pending_souls.is_empty():
+## Retreat like in Loop Hero: the dungeon falls asleep. Full payout at the end of a week.
+func sleep() -> void:
+	if state.game_over:
 		return
-	_finish("sealed", state.seal_pct())
+	_finish("sleep", state.seal_pct())
 
 
 func _finish(outcome: String, pct: float) -> void:
@@ -155,8 +158,8 @@ func _finish(outcome: String, pct: float) -> void:
 		return
 	state.game_over = true
 	var win := outcome == "victory"
-	# a full seal may turn up one more relic
-	if outcome == "sealed" and pct >= 1.0 and state.rng.randf() < D.SEAL_RELIC_CHANCE:
+	# a full sleep may turn up one more relic
+	if outcome == "sleep" and pct >= 1.0 and state.rng.randf() < D.SEAL_RELIC_CHANCE:
 		var r: String = Meta.random_unowned_relic(state.rng, state.found_relics)
 		if r != "":
 			state.found_relics.append(r)
@@ -178,7 +181,7 @@ func _finish(outcome: String, pct: float) -> void:
 	hud.show_end(outcome, payout, pct, kept, lost)
 
 
-## After the act boss dies, play the act's ending, then go to the Lair.
+## After the act's champion dies, play the act's ending, then go to the Lair.
 func continue_after_victory() -> void:
 	var act: Dictionary = D.ACTS[state.act]
 	Meta.play_story(act["end_story"], "res://scenes/lair.tscn")

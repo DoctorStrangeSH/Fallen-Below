@@ -1,6 +1,7 @@
 extends Node
-## Hero spawning, movement along the path graph, fork decisions (bait AI),
-## traits, damage, death and fleeing.
+## Travelers lured into the dungeon: spawning, movement, fork decisions (bait AI),
+## traits, damage, death, harvest and escape.
+## (Called "heroes" internally; in the game they are travelers.)
 
 const D = preload("res://scripts/data/game_data.gd")
 const RunState = preload("res://scripts/run/run_state.gd")
@@ -15,10 +16,10 @@ func make_hero(cls: String, hero_name: String, mult: float, party: int, idx: int
 	var h := {
 		"id": s.next_hero_id, "name": hero_name, "cls": cls, "title": "",
 		"hp": hp, "max_hp": hp, "dmg": base["dmg"] * mult,
-		"speed": base["speed"], "greed": base["greed"], "color": base["color"],
+		"speed": base["speed"], "color": base["color"],
 		"party": party, "cur": 0, "nxt": 0, "prog": 0.0, "delay": idx * 0.8, "stun": 0.0,
-		"loot": 0, "revenge": false, "boss": false, "gone": false, "death_tile": 0,
-		"trait": "",
+		"laps": 0, "revenge": false, "boss": false, "gone": false, "death_tile": 0,
+		"trait": "", "baited": false,
 	}
 	if s.rng.randf() < D.TRAIT_CHANCE:
 		set_trait(h, D.TRAITS.keys()[s.rng.randi() % D.TRAITS.size()])
@@ -31,7 +32,6 @@ func make_hero(cls: String, hero_name: String, mult: float, party: int, idx: int
 func set_trait(h: Dictionary, trait_id: String) -> void:
 	h["trait"] = trait_id
 	if trait_id == "greedy":
-		h["greed"] += 1
 		h["speed"] *= 1.2
 	elif trait_id == "veteran":
 		h["max_hp"] = round(h["max_hp"] * 1.3)
@@ -42,37 +42,47 @@ static func party_size(day: int) -> int:
 	return clampi(1 + day / 3, 1, 4)
 
 
+## Most of each party answers your lure; the rest are random wanderers.
 func spawn_party() -> void:
 	var pid := s.next_party_id
 	s.next_party_id += 1
 	var size := party_size(s.day)
 	var mult := 1.0 + 0.12 * (s.day - 1)
+	var lured: String = D.LURES[s.lure]["traveler"]
+	var names: Array = []
 	for i in size:
-		var cls: String = D.HERO_CLASSES.keys()[s.rng.randi() % D.HERO_CLASSES.size()]
+		var cls := lured
+		if s.rng.randf() >= D.LURE_SHARE:
+			cls = D.HERO_CLASSES.keys()[s.rng.randi() % D.HERO_CLASSES.size()]
 		var hero_name: String = D.FIRST_NAMES[s.rng.randi() % D.FIRST_NAMES.size()]
 		make_hero(cls, hero_name, mult, pid, i)
-	s.add_log("Day %d: a party of %d enters." % [s.day, size])
+		names.append(D.HERO_CLASSES[cls]["name"])
+	s.add_log("Day %d: lured below: %s." % [s.day, ", ".join(names)])
 
 
 func spawn_boss() -> void:
 	s.boss_spawned = true
 	var act: Dictionary = D.ACTS[s.act]
-	var h := make_hero("paladin", act["boss"], 1.0, s.next_party_id, 0)
+	var h := make_hero("pilgrim", act["boss"], 1.0, s.next_party_id, 0)
 	s.next_party_id += 1
 	h["trait"] = ""
 	h["boss"] = true
 	h["title"] = act["boss_title"]
-	h["hp"] = 120.0 + s.day * 10.0
+	h["hp"] = 140.0 + s.day * 10.0
 	h["max_hp"] = h["hp"]
-	h["dmg"] = 6.0 + s.day * 0.5
-	h["speed"] = 1.2
+	h["dmg"] = 7.0 + s.day * 0.5
+	h["speed"] = 1.3
 	h["color"] = Color(1, 1, 1)
 	s.add_log("%s descends: %s" % [s.hero_name(h), act["boss_intro"]])
-	s.add_log("Her radiance burns undead nearby. Guard her path with the living.")
+	s.add_log("Her radiance burns undead nearby. Meet her with the Warden and the living.")
 	s.combo_found.emit("%s DESCENDS" % s.hero_name(h).to_upper())
 
 
 # ---------------------------------------------------------- movement
+
+func _blocked(t: int) -> bool:
+	return not s.alive_units(t).is_empty() or s.warden_at(t)
+
 
 func move(delta: float) -> void:
 	for h in s.heroes.duplicate():
@@ -84,7 +94,7 @@ func move(delta: float) -> void:
 		if h["stun"] > 0.0:
 			h["stun"] -= delta
 			continue
-		if not s.alive_units(h["cur"]).is_empty():
+		if _blocked(h["cur"]):
 			continue  # fighting
 		h["prog"] += h["speed"] * delta
 		while h["prog"] >= 1.0 and not h["gone"] and not s.game_over:
@@ -99,12 +109,12 @@ func move(delta: float) -> void:
 			if h["gone"]:
 				break
 			h["nxt"] = choose_next(h, t)
-			if h["stun"] > 0.0 or not s.alive_units(t).is_empty():
+			if h["stun"] > 0.0 or _blocked(t):
 				h["prog"] = 0.0  # stop on this tile
 				break
 
 
-## Picks the next tile. At forks each hero scores both branches by personality.
+## Picks the next tile. At forks each traveler scores both branches by personality.
 func choose_next(h: Dictionary, t: int) -> int:
 	var opts: Array = s.tiles[t]["next"]
 	if opts.size() == 1 or not s.forks.has(t):
@@ -125,12 +135,18 @@ func choose_next(h: Dictionary, t: int) -> int:
 	return best
 
 
+func _is_greedy(h: Dictionary) -> bool:
+	return h["trait"] == "greedy" or h["cls"] == "seeker"
+
+
+func _is_holy(h: Dictionary) -> bool:
+	return h["trait"] == "zealot" or h["cls"] == "pilgrim"
+
+
 func _score_segment(h: Dictionary, seg: Array) -> float:
-	var cls: String = h["cls"]
-	var tr_id: String = h["trait"]
-	var greedy := tr_id == "greedy" or cls == "rogue"
-	var holy := tr_id == "zealot" or cls == "paladin"
-	var coward := tr_id == "coward"
+	var greedy := _is_greedy(h)
+	var holy := _is_holy(h)
+	var coward: bool = h["trait"] == "coward"
 	var sc := 0.0
 	for id in seg:
 		var card := s.card_at(id)
@@ -151,38 +167,31 @@ func _score_segment(h: Dictionary, seg: Array) -> float:
 
 
 func _lure_reason(h: Dictionary, seg: Array) -> String:
-	var cls: String = h["cls"]
-	var tr_id: String = h["trait"]
 	for id in seg:
 		var card := s.card_at(id)
-		if D.BAIT_CARDS.has(card) and (tr_id == "greedy" or cls == "rogue"):
+		if D.BAIT_CARDS.has(card) and _is_greedy(h):
 			return "can't resist the chest..."
-		if (tr_id == "zealot" or cls == "paladin") and (s.scenery_near(id, "altar") + s.scenery_near(id, "spire") > 0 or not s.undead_at(id).is_empty()):
+		if _is_holy(h) and (s.scenery_near(id, "altar") + s.scenery_near(id, "spire") > 0 or not s.undead_at(id).is_empty()):
 			return "goes to purge the darkness."
 	return ""
 
 
+## Each lap brings a traveler closer to the way out.
 func _on_lap(h: Dictionary) -> void:
 	if h["boss"]:
-		s.heart_hp -= 5
-		s.add_log("%s strikes your Heart!" % s.hero_name(h))
+		return  # the champion hunts the Warden, she does not leave
+	h["laps"] += 1
+	if h["laps"] >= D.ESCAPE_LAPS:
+		escape(h, "found the way out")
 	else:
-		s.heart_hp -= int(h["greed"])
-		h["loot"] += 1
-		s.add_log("%s stole gold (%d/%d)." % [s.hero_name(h), h["loot"], D.FLEE_LOOT])
-	if s.heart_hp <= 0:
-		if s.has_relic("second_heartbeat") and not s.heartbeat_used:
-			s.heartbeat_used = true
-			s.heart_hp = 5
-			s.add_log("Second Heartbeat! Your Heart beats again.")
-			s.combo_found.emit("SECOND HEARTBEAT")
-		else:
-			s.heart_hp = 0
-			run.end_game(false)
-			return
-	if not h["boss"] and h["loot"] >= D.FLEE_LOOT:
-		remove(h)
-		s.add_log("%s escaped with your gold!" % s.hero_name(h))
+		s.add_log("%s is getting closer to the exit (%d/%d)." % [s.hero_name(h), h["laps"], D.ESCAPE_LAPS])
+
+
+func escape(h: Dictionary, how: String) -> void:
+	remove(h)
+	var t := D.THREAT_PER_ESCAPE * (0.5 if s.has_relic("whispering_skull") else 1.0)
+	s.add_threat(t)
+	s.add_log("%s %s and will tell the Order!" % [s.hero_name(h), how])
 
 
 func _on_enter_tile(h: Dictionary, t: int) -> void:
@@ -199,49 +208,33 @@ func _on_enter_tile(h: Dictionary, t: int) -> void:
 				dmg += 2.0
 	elif card == "chest":
 		h["stun"] = D.CHEST_STUN
-		if s.has_relic("gilded_bait"):
-			s.heart_hp = mini(s.heart_max, s.heart_hp + 1)
-	damage(h, dmg, true)
+		h["baited"] = true
+	damage(h, dmg)
 
 
 # ---------------------------------------------------------- health
 
-func damage(h: Dictionary, amount: float, by_trap: bool = false) -> void:
+func damage(h: Dictionary, amount: float) -> void:
 	if h["gone"]:
 		return
 	h["hp"] -= amount
 	if h["hp"] <= 0.0:
-		_kill(h, by_trap)
+		_kill(h)
 	elif h["trait"] == "coward" and not h["boss"] and h["hp"] < h["max_hp"] * 0.3:
-		remove(h)
-		s.add_log("%s the Coward runs for their life!" % h["name"])
+		escape(h, "panics and flees for the surface")
 
 
 func heal(h: Dictionary, amount: float) -> void:
 	h["hp"] = minf(h["max_hp"], h["hp"] + amount)
 
 
-func _kill(h: Dictionary, by_trap: bool) -> void:
+func _kill(h: Dictionary) -> void:
 	h["death_tile"] = h["cur"]
 	remove(h)
 	s.kills += 1
-	s.essence += 2
-	s.add_threat(5.0)
-	# harvest: bones from every body, blood from trap kills, stolen gold comes back
-	s.gain("bones", D.BONES_PER_KILL)
-	if by_trap:
-		s.gain("blood", D.BLOOD_PER_TRAP_KILL)
-	var loot: int = h["loot"]
-	if loot > 0:
-		s.gain("gold", loot * D.GOLD_PER_LOOT)
-		s.heart_hp = mini(s.heart_max, s.heart_hp + loot)  # the gold returns to the Heart
-	if h["boss"]:
-		s.gain("gold", D.BOSS_GOLD)
-	if h["boss"] or (h["trait"] == "veteran" and s.rng.randf() < D.VETERAN_RELIC_CHANCE):
-		_find_relic(h)
+	s.add_threat(D.THREAT_PER_KILL)
+	_harvest(h)
 	run.cards.draw_card()
-	if h["trait"] == "veteran":
-		run.cards.draw_card()
 	run.loot.drop_from(h)
 	for x in s.heroes:
 		if x["party"] == h["party"] and x["trait"] == "loyal":
@@ -249,12 +242,29 @@ func _kill(h: Dictionary, by_trap: bool) -> void:
 			x["revenge"] = true
 			s.add_log("%s the Loyal swears to avenge %s!" % [x["name"], h["name"]])
 	s.hand_changed.emit()
+	run.souls.on_death(h)
 	if h["boss"]:
 		s.add_log("%s has fallen!" % s.hero_name(h))
 		run.end_game(true)
-		return
-	s.pending_souls.append(h)
-	s.souls_changed.emit()
+
+
+## Every body is harvested according to who it was.
+func _harvest(h: Dictionary) -> void:
+	var drop: Dictionary = D.HERO_CLASSES[h["cls"]]["drop"]
+	for k in drop:
+		s.gain(k, int(drop[k]))
+	if h["baited"] and s.has_relic("gilded_bait"):
+		s.gain("gold", 2)
+	if h["boss"]:
+		for k in D.BOSS_DROP:
+			s.gain(k, int(D.BOSS_DROP[k]))
+	var relic_chance := 0.0
+	if h["trait"] == "veteran":
+		relic_chance = D.VETERAN_RELIC_CHANCE
+	elif h["cls"] == "mage":
+		relic_chance = D.MAGE_RELIC_CHANCE
+	if h["boss"] or s.rng.randf() < relic_chance:
+		_find_relic(h)
 
 
 func _find_relic(h: Dictionary) -> void:

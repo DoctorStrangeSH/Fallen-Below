@@ -12,6 +12,7 @@ signal hand_changed
 signal souls_changed
 signal inventory_changed
 signal combo_found(combo_name: String)
+signal level_up
 
 var rng := RandomNumberGenerator.new()
 
@@ -21,11 +22,11 @@ var loop_size := 0
 var path_lookup := {}      # Vector2i -> tile id
 var scenery := {}          # Vector2i -> card id
 var forks := {}            # tile id -> {next id -> Array of tile ids}
-var heart_cell := Vector2i.ZERO
+var heart_cell := Vector2i.ZERO  # decorative: the dungeon's heart inside the loop
 
 # actors
-var heroes := []
-var pending_souls := []
+var heroes := []           # travelers
+var warden := {}           # your monster, see warden_system.gd
 var next_hero_id := 0
 var next_party_id := 0
 
@@ -41,10 +42,10 @@ var act := 1
 var day := 1
 var day_timer := 0.0
 var combat_timer := 0.0
-var heart_max := D.HEART_BASE
-var heart_hp := D.HEART_BASE
-var essence := 0
-var jar_cap := 2
+var jar_cap := 2           # undead servant slots
+var lure := "gold"
+var raise_souls := false   # soul stance: false = Warden devours, true = raise as servant
+var level_choices := []    # ability ids offered on level up (game waits while non-empty)
 var threat := 0.0
 var boss_spawned := false
 var kills := 0
@@ -56,19 +57,16 @@ var time_scale := 1.0
 var pouch := {"bones": 0, "blood": 0, "gold": 0}  # harvested this run, paid out at the end
 var relics := []           # equipped for this run
 var found_relics := []     # discovered during this run
-var heartbeat_used := false
 
 var log_lines := []
 
 
-func setup(heart: int, jars: int, start_essence: int, weights: Dictionary, equipped: Array) -> void:
+func setup(jars: int, weights: Dictionary, equipped: Array, start_lure: String) -> void:
 	rng.randomize()
 	relics = equipped.duplicate()
-	heart_max = heart
-	heart_hp = heart
 	jar_cap = jars
-	essence = start_essence
 	card_weights = weights
+	lure = start_lure
 	_build_map()
 
 
@@ -288,6 +286,15 @@ func tile_of(h: Dictionary) -> int:
 	return h["cur"]
 
 
+## Travelers standing on tile `t` (spawned and alive).
+func travelers_at(t: int) -> Array:
+	return heroes.filter(func(h): return h["cur"] == t and not h["gone"] and h["delay"] <= 0.0)
+
+
+func warden_at(t: int) -> bool:
+	return not warden.is_empty() and warden["hp"] > 0.0 and warden["cur"] == t
+
+
 ## Tiles directly before and after `t` along the path graph.
 func path_neighbors(t: int) -> Array:
 	var out: Array = []
@@ -366,7 +373,7 @@ func seal_pct() -> float:
 
 
 func is_blocked() -> bool:
-	return game_over or paused or not pending_souls.is_empty()
+	return game_over or paused or not level_choices.is_empty()
 
 
 func in_grid(c: Vector2i) -> bool:

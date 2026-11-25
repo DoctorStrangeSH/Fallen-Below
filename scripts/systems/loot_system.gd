@@ -1,5 +1,5 @@
 extends Node
-## Trophies: fallen heroes drop gear that only your undead can wear.
+## Trophies: fallen travelers drop gear for the Warden.
 
 const D = preload("res://scripts/data/game_data.gd")
 const RunState = preload("res://scripts/run/run_state.gd")
@@ -14,8 +14,8 @@ func drop_from(h: Dictionary) -> void:
 		return
 	var item := make_item(h)
 	if s.inventory.size() >= D.INVENTORY_MAX:
-		s.essence += D.MELT_ESSENCE
-		s.add_log("No room for %s, melted into essence." % item["name"])
+		s.gain("bones", 1)
+		s.add_log("No room for %s, ground into bones." % item["name"])
 		return
 	s.inventory.append(item)
 	s.add_log("%s dropped %s." % [h["name"], item["name"]])
@@ -38,11 +38,16 @@ func make_item(h: Dictionary) -> Dictionary:
 		"weapon":
 			item["dmg"] = snappedf(2.0 * mult, 0.5)
 		"armor":
-			item["hp"] = round(8.0 * mult)
+			item["hp"] = round(10.0 * mult)
 		"amulet":
-			item["hp"] = round(3.0 * mult)
+			item["hp"] = round(4.0 * mult)
 			item["affix"] = _random_affix()
-	if slot != "amulet" and r >= 2:
+		"ring":
+			item["dmg"] = snappedf(1.0 * mult, 0.5)
+			item["hp"] = round(3.0 * mult)
+	if (slot == "weapon" or slot == "armor") and r >= 2:
+		item["affix"] = _random_affix()
+	if slot == "ring" and r >= 1:
 		item["affix"] = _random_affix()
 	return item
 
@@ -85,72 +90,23 @@ static func describe(item: Dictionary) -> String:
 
 # ---------------------------------------------------------- inventory actions
 
-func select_item(i: int) -> void:
+## Click a trophy: the Warden puts it on. Whatever it wore in that slot goes back to the bag.
+func equip(i: int) -> void:
 	if s.game_over or i < 0 or i >= s.inventory.size():
 		return
-	s.selected_item = -1 if s.selected_item == i else i
-	s.selected = -1
+	var item: Dictionary = s.inventory[i]
+	s.inventory.remove_at(i)
+	var old: Dictionary = run.warden.equip(item)
+	if not old.is_empty():
+		s.inventory.append(old)
+	s.add_log("The Warden takes %s." % item["name"])
 	s.inventory_changed.emit()
-	s.hand_changed.emit()
 
 
+## Right-click a trophy: grind it into bones.
 func melt(i: int) -> void:
 	if i < 0 or i >= s.inventory.size():
 		return
 	s.inventory.remove_at(i)
-	s.essence += D.MELT_ESSENCE
-	s.selected_item = -1
+	s.gain("bones", 1)
 	s.inventory_changed.emit()
-
-
-func can_equip_at(cell: Vector2i) -> bool:
-	if not s.path_lookup.has(cell):
-		return false
-	var t: int = s.path_lookup[cell]
-	return not s.undead_at(t).is_empty()
-
-
-func equip_at(cell: Vector2i) -> void:
-	if s.selected_item < 0 or s.selected_item >= s.inventory.size():
-		return
-	if not can_equip_at(cell):
-		s.add_log("Only your undead can wear trophies.")
-		return
-	var t: int = s.path_lookup[cell]
-	var item: Dictionary = s.inventory[s.selected_item]
-	var slot: String = item["slot"]
-	var undead := s.undead_at(t)
-	var target: Dictionary = undead[0]
-	for u in undead:
-		var g: Dictionary = u["gear"]
-		if not g.has(slot):
-			target = u
-			break
-	var gear: Dictionary = target["gear"]
-	var old = gear.get(slot)
-	gear[slot] = item
-	s.inventory.remove_at(s.selected_item)
-	if old != null:
-		s.inventory.append(old)
-	_recompute(target)
-	s.selected_item = -1
-	s.add_log("%s equips %s." % [target["name"], item["name"]])
-	s.inventory_changed.emit()
-
-
-func _recompute(u: Dictionary) -> void:
-	var dmg: float = u["base_dmg"]
-	var max_hp: float = u["base_hp"]
-	var affixes: Array = []
-	var gear: Dictionary = u["gear"]
-	for slot in gear:
-		var it: Dictionary = gear[slot]
-		dmg += it["dmg"]
-		max_hp += it["hp"]
-		if it["affix"] != "":
-			affixes.append(it["affix"])
-	var gain: float = max_hp - u["max_hp"]
-	u["max_hp"] = max_hp
-	u["hp"] = clampf(u["hp"] + maxf(gain, 0.0), 0.0, max_hp)
-	u["dmg"] = dmg
-	u["affixes"] = affixes

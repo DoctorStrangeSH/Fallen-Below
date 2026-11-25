@@ -11,6 +11,7 @@ var buildings := {}      # building id -> level
 var relics := []         # owned relic ids
 var deck := []           # card ids chosen for the next run
 var loadout := []        # relic ids equipped for the next run
+var lure := "gold"       # last chosen lure
 var runs := 0
 var wins := 0
 var best_day := 0
@@ -127,6 +128,8 @@ func _sanitize_loadout() -> void:
 	while deck.size() > deck_slots():
 		deck.pop_back()
 	loadout = loadout.filter(func(r): return relics.has(r))
+	if not available_lures().has(lure):
+		lure = "gold"
 	while loadout.size() > relic_slots():
 		loadout.pop_back()
 
@@ -141,11 +144,18 @@ func card_weights() -> Dictionary:
 
 # ---------------------------------------------------------- run modifiers
 
-func heart_max() -> int:
-	var hp: int = D.HEART_BASE + 5 * level("heart")
+func warden_hp() -> float:
+	var hp: float = D.WARDEN["hp"] + 10.0 * level("den")
 	if loadout.has("blood_price"):
-		hp -= 5
+		hp -= 15.0
 	return hp
+
+
+func warden_dmg() -> float:
+	var dmg: float = D.WARDEN["dmg"] + level("forge")
+	if loadout.has("blood_price"):
+		dmg += 3.0
+	return dmg
 
 
 func start_jars() -> int:
@@ -156,8 +166,19 @@ func start_cards() -> int:
 	return 4
 
 
-func start_essence() -> int:
-	return 5 * level("well") + (15 if loadout.has("blood_price") else 0)
+func available_lures() -> Array:
+	var out: Array = []
+	for id in D.LURES:
+		var b: String = D.LURES[id].get("building", "")
+		if b == "" or level(b) > 0:
+			out.append(id)
+	return out
+
+
+func set_lure(id: String) -> void:
+	if available_lures().has(id):
+		lure = id
+		save_game()
 
 
 # ---------------------------------------------------------- flow
@@ -227,7 +248,7 @@ func save_game() -> void:
 		"version": SAVE_VERSION, "res": res, "buildings": buildings, "relics": relics,
 		"deck": deck, "loadout": loadout, "runs": runs, "wins": wins, "best_day": best_day,
 		"total_kills": total_kills, "discovered": discovered, "seen_intro": seen_intro,
-		"acts_cleared": acts_cleared,
+		"acts_cleared": acts_cleared, "lure": lure,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -274,6 +295,7 @@ func load_game() -> void:
 	relics = _str_list(d.get("relics", []), D.RELICS)
 	loadout = _str_list(d.get("loadout", []), D.RELICS)
 	deck = _str_list(d.get("deck", []), D.CARDS)
+	lure = str(d.get("lure", "gold"))
 	buildings = {}
 	var b = d.get("buildings", {})
 	if b is Dictionary:

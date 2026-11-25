@@ -44,6 +44,7 @@ func _draw() -> void:
 	_draw_preview(s)
 	_draw_units(s)
 	_draw_heroes(s, font)
+	_draw_warden(s, font)
 	if s.paused and not s.game_over:
 		var vr := get_viewport_rect()
 		draw_string(font, Vector2(D.MAP_OFFSET.x, vr.size.y * 0.42), "PAUSED", HORIZONTAL_ALIGNMENT_CENTER, D.GRID_W * D.CELL, 40, Color(1, 1, 1, 0.8))
@@ -99,31 +100,50 @@ func _draw_scenery(s, font: Font) -> void:
 		draw_string(font, r.position + Vector2(0, 24), label.substr(0, 5).to_upper(), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 10)
 
 
+## The dungeon's hungry heart (decorative). Beats faster the more travelers are inside.
 func _draw_heart(s, font: Font) -> void:
 	var center := cell_center(s.heart_cell)
-	var beat := 250.0 * clampf(float(s.heart_hp) / float(s.heart_max), 0.3, 1.0)
+	var beat := 300.0 / (1.0 + 0.25 * s.heroes.size())
 	var pulse := 1.0 + 0.08 * sin(Time.get_ticks_msec() / beat)
-	draw_circle(center, 22.0 * pulse, Color(0.5, 0.05, 0.12))
-	draw_circle(center, 15.0 * pulse, Color(0.85, 0.15, 0.25))
-	var txt := "%d/%d" % [s.heart_hp, s.heart_max]
-	draw_string(font, center + Vector2(-40, 38), txt, HORIZONTAL_ALIGNMENT_CENTER, 80, 12)
+	draw_circle(center, 20.0 * pulse, Color(0.45, 0.05, 0.12))
+	draw_circle(center, 13.0 * pulse, Color(0.8, 0.15, 0.25))
+	draw_string(font, center + Vector2(-40, 36), "HUNGER", HORIZONTAL_ALIGNMENT_CENTER, 80, 10, Color(1, 0.5, 0.5, 0.6))
+
+
+func warden_world_pos(s) -> Vector2:
+	var w: Dictionary = s.warden
+	var a := cell_center(s.cell_of(w["cur"]))
+	var b := cell_center(s.cell_of(run.warden.next_tile()))
+	var p: float = w["prog"]
+	return a.lerp(b, p)
+
+
+func _draw_warden(s, font: Font) -> void:
+	if s.warden.is_empty() or s.warden["hp"] <= 0.0:
+		return
+	var w: Dictionary = s.warden
+	var p := warden_world_pos(s) + Vector2(0, -2)
+	var glow := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 200.0)
+	draw_circle(p, 19.0, Color(0.3, 0.7, 1.0, 0.25 + 0.2 * glow))
+	var body := PackedVector2Array([p + Vector2(0, -15), p + Vector2(13, 0), p + Vector2(0, 15), p + Vector2(-13, 0)])
+	draw_colored_polygon(body, Color(0.12, 0.2, 0.3))
+	draw_polyline(body + PackedVector2Array([body[0]]), w["color"], 2.0)
+	draw_circle(p + Vector2(-4, -2), 2.2, Color(0.6, 1, 1))
+	draw_circle(p + Vector2(4, -2), 2.2, Color(0.6, 1, 1))
+	var frac: float = clampf(w["hp"] / w["max_hp"], 0.0, 1.0)
+	draw_rect(Rect2(p + Vector2(-18, -24), Vector2(36, 4)), Color(0.1, 0.1, 0.15))
+	draw_rect(Rect2(p + Vector2(-18, -24), Vector2(36 * frac, 4)), Color(0.4, 0.85, 1.0))
+	draw_string(font, p + Vector2(-20, 28), "Lv %d" % w["level"], HORIZONTAL_ALIGNMENT_CENTER, 40, 10, Color(0.6, 0.9, 1.0))
 
 
 func _draw_preview(s) -> void:
-	if s.game_over or not s.pending_souls.is_empty():
+	if s.is_blocked():
 		return
 	var mc := mouse_cell()
-	var ok := false
-	if s.selected_item >= 0:
-		ok = run.loot.can_equip_at(mc)
-		for t in s.tiles.size():
-			if not s.undead_at(t).is_empty():
-				draw_rect(cell_rect(s.cell_of(t)), Color(0.5, 0.9, 1.0), false, 2.0)
-	else:
-		var id: String = run.cards.selected_id()
-		if id == "":
-			return
-		ok = run.cards.can_place(id, mc)
+	var id: String = run.cards.selected_id()
+	if id == "":
+		return
+	var ok: bool = run.cards.can_place(id, mc)
 	var r := cell_rect(mc)
 	draw_rect(r, Color(0.3, 1, 0.4, 0.25) if ok else Color(1, 0.2, 0.2, 0.2))
 	draw_rect(r, Color(0.3, 1, 0.4) if ok else Color(1, 0.3, 0.3), false, 2.0)
@@ -147,8 +167,6 @@ func _draw_units(s) -> void:
 			draw_rect(Rect2(p, Vector2(sz, sz)), col)
 			var frac: float = clampf(u["hp"] / u["max_hp"], 0.0, 1.0)
 			draw_rect(Rect2(p + Vector2(0, sz), Vector2(sz * frac, 2)), Color(0.4, 0.9, 1.0))
-			if u.get("gear", {}).size() > 0:
-				draw_rect(Rect2(p + Vector2(sz - 3, -2), Vector2(4, 4)), Color(1, 0.75, 0.2))
 			k += 1
 
 
@@ -174,6 +192,9 @@ func _draw_heroes(s, font: Font) -> void:
 		draw_rect(Rect2(p + Vector2(-rad, -rad - 6), Vector2(rad * 2 * frac, 3)), Color(1, 0.3, 0.3))
 		if h["stun"] > 0.0:
 			draw_string(font, p + Vector2(-rad, -rad - 8), "zz", HORIZONTAL_ALIGNMENT_CENTER, rad * 2, 11, Color(1, 0.85, 0.3))
+		var laps: int = h["laps"]
+		for k in laps:
+			draw_circle(p + Vector2(-rad + 3 + k * 5, rad + 4), 1.8, Color(1, 0.4, 0.3))
 		if h["revenge"]:
 			draw_string(font, p + Vector2(rad, -rad), "!", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 0.3, 0.2))
 		var trait_id: String = h["trait"]

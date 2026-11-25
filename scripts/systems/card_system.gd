@@ -16,8 +16,7 @@ func _add_to_hand(id: String) -> void:
 	if id == "":
 		return
 	if s.hand.size() >= D.HAND_MAX:
-		s.essence += 1  # overflow burns into essence
-		return
+		return  # hand full: the memory is lost
 	s.hand.append(id)
 
 
@@ -40,20 +39,18 @@ func _random_card(exclude: Array = []) -> String:
 
 ## Click on a card in hand: instants resolve, others toggle selection.
 func use_card(i: int) -> void:
-	if s.game_over or not s.pending_souls.is_empty() or i < 0 or i >= s.hand.size():
+	if s.is_blocked() or i < 0 or i >= s.hand.size():
 		return
 	var id: String = s.hand[i]
 	if D.CARDS[id]["kind"] == "instant":
 		if id == "jar":
 			s.jar_cap += 1
-			s.add_log("Soul capacity: %d." % s.jar_cap)
+			s.add_log("Undead servant slots: %d." % s.jar_cap)
 		s.hand.remove_at(i)
 		s.selected = -1
 	else:
 		s.selected = -1 if s.selected == i else i
-	s.selected_item = -1
 	s.hand_changed.emit()
-	s.inventory_changed.emit()
 
 
 func selected_id() -> String:
@@ -98,7 +95,7 @@ func place_selected(cell: Vector2i) -> void:
 	else:
 		s.scenery[cell] = id
 		_check_scenery_combos(cell, id)
-	s.add_threat(8.0)
+	s.add_threat(D.THREAT_PER_CARD)
 	s.hand.remove_at(s.selected)
 	s.selected = -1
 	s.hand_changed.emit()
