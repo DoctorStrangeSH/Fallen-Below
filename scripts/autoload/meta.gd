@@ -23,6 +23,7 @@ var acts_cleared := []
 var fragments := {}      # traveler kind -> pages of the Book of the Fallen unlocked
 var seen := []           # one-time story beats and memories already shown
 
+var music_volume := 0.7
 var no_save := false     # set by the test bot so it never touches the real save
 
 # story scene hand-off (not saved)
@@ -353,7 +354,7 @@ func save_game() -> void:
 		"version": SAVE_VERSION, "res": res, "buildings": buildings, "relics": relics,
 		"deck": deck, "loadout": loadout, "runs": runs, "wins": wins, "best_day": best_day,
 		"total_kills": total_kills, "discovered": discovered, "seen_intro": seen_intro,
-		"acts_cleared": acts_cleared, "lure": lure, "warden": warden_id, "fragments": fragments, "seen": seen,
+		"acts_cleared": acts_cleared, "lure": lure, "warden": warden_id, "music_volume": music_volume, "fragments": fragments, "seen": seen,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -402,6 +403,7 @@ func load_game() -> void:
 	deck = _str_list(d.get("deck", []), D.CARDS)
 	lure = str(d.get("lure", "gold"))
 	warden_id = str(d.get("warden", "bone"))
+	music_volume = clampf(float(d.get("music_volume", 0.7)), 0.0, 1.0)
 	fragments = {}
 	var fr = d.get("fragments", {})
 	if fr is Dictionary:

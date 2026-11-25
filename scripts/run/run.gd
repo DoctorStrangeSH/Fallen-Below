@@ -55,6 +55,7 @@ func _ready() -> void:
 	state.hand_changed.emit()
 	beat("tut_start")
 	beat("tut_warden")
+	Music.play("run")
 
 
 func _add_system(sys: Node, sys_name: String) -> void:
@@ -84,7 +85,20 @@ func _process(delta: float) -> void:
 		beat("attention_half")
 	if state.threat >= D.BOSS_THREAT and not state.boss_spawned and not state.game_over:
 		heroes_sys.spawn_boss()
+		Music.play("boss")
+	Music.set_intensity(_fight_intensity())
 	hud.refresh()
+
+
+## 1 while blood is spilled somewhere, a low hum when travelers roam, 0 when the halls are empty.
+func _fight_intensity() -> float:
+	if state.heroes.is_empty():
+		return 0.0
+	for h in state.heroes:
+		var t: int = h["cur"]
+		if h["delay"] <= 0.0 and (state.warden_at(t) or not state.alive_units(t).is_empty()):
+			return 1.0
+	return 0.25
 
 
 func _new_day() -> void:
@@ -220,6 +234,13 @@ func _finish(outcome: String, pct: float) -> void:
 		else:
 			lost.append(r)
 	Meta.record_run(state.day, state.kills, payout, kept, win)
+	match outcome:
+		"victory":
+			Music.stinger("victory")
+		"defeat":
+			Music.stinger("defeat")
+		_:
+			Music.play("menu")
 	if win:
 		Meta.clear_act(state.act)
 	hud.show_end(outcome, payout, pct, kept, lost)

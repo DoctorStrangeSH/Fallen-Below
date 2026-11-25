@@ -9,6 +9,7 @@ var list: VBoxContainer
 
 
 func _ready() -> void:
+	Music.play("menu")
 	# a new memory surfaces when enough pages of the Book of the Fallen are collected
 	var memory: String = Meta.pending_memory()
 	if memory != "" and Meta.first_time(memory):

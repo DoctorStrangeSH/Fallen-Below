@@ -85,10 +85,10 @@ crisp pixels, no anti-aliasing, 1px dark outline, transparent background, single
 ### Стражи (48×48 или 64×64)
 | Файл | Промпт |
 |---|---|
-| `warden_bone.png` | hulking monster made of fused bones, hollow chest with faint blue light, glowing cyan eyes |
-| `warden_brood.png` | broodmother, huge spider-woman hybrid, egg sacs, green glow |
-| `warden_mimic.png` | mimic king, giant living treasure chest with crown, teeth, gold spilling |
-| `warden_saint.png` | hollow saint, tall undead nun with candle halo, empty eyes glowing white |
+| `warden_bone.png` (Марроугрейв) | hulking monster made of fused bones, hollow chest with faint blue light, glowing cyan eyes |
+| `warden_brood.png` (Веш'ка) | broodmother, huge spider-woman hybrid, egg sacs, green glow |
+| `warden_mimic.png` (Златозуб) | mimic king, giant living treasure chest with crown, teeth, gold spilling |
+| `warden_saint.png` (Сестра Эшен) | hollow saint, tall undead nun with candle halo, empty eyes glowing white |
 
 ## Порядок
 

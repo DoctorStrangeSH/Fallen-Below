@@ -12,6 +12,7 @@ var relic_box: VBoxContainer
 
 
 func _ready() -> void:
+	Music.play("menu")
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	UI.background(self)
 

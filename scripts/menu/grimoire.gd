@@ -6,6 +6,7 @@ const UI = preload("res://scripts/ui/ui_style.gd")
 
 
 func _ready() -> void:
+	Music.play("menu")
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	UI.background(self)
 

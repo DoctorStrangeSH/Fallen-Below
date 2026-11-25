@@ -11,6 +11,7 @@ var hint: Label
 
 
 func _ready() -> void:
+	Music.play("story")
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	UI.background(self)
 	pages = D.STORY.get(Meta.pending_story, [])

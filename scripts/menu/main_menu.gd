@@ -6,6 +6,7 @@ const UI = preload("res://scripts/ui/ui_style.gd")
 
 
 func _ready() -> void:
+	Music.play("menu")
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	UI.background(self)
 
@@ -41,6 +42,16 @@ func _ready() -> void:
 	var grim := UI.button("Grimoire", Vector2(260, 48))
 	grim.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/grimoire.tscn"))
 	buttons.add_child(grim)
+	var music := UI.button("", Vector2(260, 48))
+	music.text = "Music: %d%%" % int(Meta.music_volume * 100.0)
+	music.pressed.connect(func():
+		var steps: Array = [0.0, 0.35, 0.7, 1.0]
+		var i := steps.find(snappedf(Meta.music_volume, 0.05))
+		Meta.music_volume = steps[(i + 1) % steps.size()] if i >= 0 else 0.7
+		Meta.save_game()
+		music.text = "Music: %d%%" % int(Meta.music_volume * 100.0)
+	)
+	buttons.add_child(music)
 	var quit := UI.button("Quit", Vector2(260, 48))
 	quit.pressed.connect(func(): get_tree().quit())
 	buttons.add_child(quit)
