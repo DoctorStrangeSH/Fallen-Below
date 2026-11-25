@@ -186,7 +186,7 @@ func set_warden(id: String) -> void:
 func warden_hp() -> float:
 	var hp: float = float(warden_def()["hp"]) + 10.0 * level("den")
 	if loadout.has("blood_price"):
-		hp -= 15.0
+		hp -= 25.0
 	return hp
 
 

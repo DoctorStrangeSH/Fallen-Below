@@ -69,9 +69,9 @@ func spawn_boss() -> void:
 	h["trait"] = ""
 	h["boss"] = true
 	h["title"] = act["boss_title"]
-	h["hp"] = 140.0 + s.loop * 15.0
+	h["hp"] = 200.0 + s.loop * 40.0
 	h["max_hp"] = h["hp"]
-	h["dmg"] = 7.0 + s.loop * 1.0
+	h["dmg"] = 8.0 + s.loop * 2.0
 	h["speed"] = 1.3
 	h["color"] = Color(1, 1, 1)
 	for line in D.BOSS_LINES["arrive"]:

@@ -117,6 +117,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				souls.toggle_stance()
 			KEY_Q:
 				warden.use_active()
+			KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5:
+				_debug_key(key.keycode)
 		return
 	var mb := event as InputEventMouseButton
 	if mb == null or not mb.pressed:
@@ -134,6 +136,31 @@ func _unhandled_input(event: InputEvent) -> void:
 func beat(id: String) -> void:
 	if D.BEATS.has(id) and Meta.first_time(id):
 		state.narrate.emit(D.BEATS[id])
+
+
+## Playtest shortcuts, only in debug builds (running from the editor).
+func _debug_key(code: Key) -> void:
+	if not OS.is_debug_build():
+		return
+	match code:
+		KEY_F1:
+			cards.draw_card()
+			state.hand_changed.emit()
+			state.add_log("[debug] +1 card")
+		KEY_F2:
+			state.threat = D.BOSS_THREAT
+			state.add_log("[debug] the champion is summoned")
+		KEY_F3:
+			for k in Meta.res:
+				Meta.res[k] = int(Meta.res[k]) + 50
+			Meta.save_game()
+			state.add_log("[debug] +50 of every resource (Lair)")
+		KEY_F4:
+			var fake := {"cls": D.HERO_CLASSES.keys()[state.rng.randi() % D.HERO_CLASSES.size()],
+				"boss": false, "trait": "veteran", "name": "Debug"}
+			loot.drop_from(fake)
+		KEY_F5:
+			warden._complete_loop()
 
 
 func toggle_pause() -> void:

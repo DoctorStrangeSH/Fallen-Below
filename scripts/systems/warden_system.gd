@@ -17,6 +17,7 @@ func setup(base_hp: float, base_dmg: float) -> void:
 		base[k] = 0.0
 	base["hp"] = base_hp
 	base["dmg"] = base_dmg
+	base["def"] = float(Meta.warden_def().get("def", 0.0))
 	var def: Dictionary = Meta.warden_def()
 	s.warden = {
 		"id": Meta.warden_id, "name": Meta.warden_name(), "color": def["color"], "speed": def["speed"],
