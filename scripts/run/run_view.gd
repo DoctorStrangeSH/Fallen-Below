@@ -144,7 +144,7 @@ func _draw_heroes(s, font: Font) -> void:
 		var p := hero_world_pos(h) + Vector2((n % 2) * 14 - 7, (n / 2) * 14 - 10)
 		var is_boss: bool = h["boss"]
 		var rad := 16.0 if is_boss else 10.0
-		if h["nemesis"] or is_boss:
+		if is_boss:
 			draw_circle(p, rad + 3, Color(1, 0.2, 0.2))
 		var col: Color = h["color"]
 		draw_circle(p, rad, col)

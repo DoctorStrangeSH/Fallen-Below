@@ -16,7 +16,7 @@ func make_hero(cls: String, hero_name: String, mult: float, party: int, idx: int
 		"hp": hp, "max_hp": hp, "dmg": base["dmg"] * mult,
 		"speed": base["speed"], "greed": base["greed"], "color": base["color"],
 		"party": party, "pos": 0.0, "delay": idx * 0.8, "loot": 0, "level": 0,
-		"revenge": false, "nemesis": false, "boss": false, "gone": false, "death_tile": 0,
+		"revenge": false, "boss": false, "gone": false, "death_tile": 0,
 		"trait": "",
 	}
 	if s.rng.randf() < D.TRAIT_CHANCE:
@@ -49,16 +49,6 @@ func spawn_party() -> void:
 		var cls: String = D.HERO_CLASSES.keys()[s.rng.randi() % D.HERO_CLASSES.size()]
 		var hero_name: String = D.FIRST_NAMES[s.rng.randi() % D.FIRST_NAMES.size()]
 		make_hero(cls, hero_name, mult, pid, i)
-	if not s.nemesis_pool.is_empty() and s.rng.randf() < 0.6:
-		var nem: Dictionary = s.nemesis_pool.pop_front()
-		var lvl: int = nem["level"]
-		var h := make_hero(nem["cls"], nem["name"], mult * (1.2 + 0.25 * lvl), pid, size)
-		h["nemesis"] = true
-		h["level"] = lvl
-		h["title"] = nem["title"]
-		if nem["trait"] != "" and h["trait"] == "":
-			set_trait(h, nem["trait"])
-		s.add_log("NEMESIS: %s has returned (lvl %d)!" % [s.hero_name(h), lvl])
 	s.add_log("Day %d: a party of %d enters." % [s.day, size])
 
 
@@ -116,8 +106,7 @@ func _on_lap(h: Dictionary) -> void:
 		return
 	if not h["boss"] and h["loot"] >= D.FLEE_LOOT:
 		remove(h)
-		add_nemesis(h, "the Vengeful")
-		s.add_log("%s escaped with your gold... They will return." % s.hero_name(h))
+		s.add_log("%s escaped with your gold!" % s.hero_name(h))
 
 
 func _on_enter_tile(h: Dictionary, t: int) -> void:
@@ -138,7 +127,6 @@ func damage(h: Dictionary, amount: float) -> void:
 		_kill(h)
 	elif h["trait"] == "coward" and not h["boss"] and h["hp"] < h["max_hp"] * 0.3:
 		remove(h)
-		add_nemesis(h, "the Survivor")
 		s.add_log("%s the Coward runs for their life!" % h["name"])
 
 
@@ -174,7 +162,3 @@ func remove(h: Dictionary) -> void:
 	var id: int = h["id"]
 	s.heroes = s.heroes.filter(func(x): return x["id"] != id)
 
-
-func add_nemesis(h: Dictionary, title: String) -> void:
-	s.nemesis_pool.append({"name": h["name"], "cls": h["cls"], "level": int(h["level"]) + 1,
-		"title": title, "trait": h["trait"]})

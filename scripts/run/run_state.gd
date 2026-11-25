@@ -17,7 +17,6 @@ var scenery := {}          # Vector2i -> card id
 
 # actors
 var heroes := []
-var nemesis_pool := []
 var pending_souls := []
 var next_hero_id := 0
 var next_party_id := 0

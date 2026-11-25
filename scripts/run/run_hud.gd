@@ -139,8 +139,8 @@ func _build_end_panel() -> void:
 
 func refresh() -> void:
 	var s = run.state
-	info_label.text = "Day %d   Heart %d/%d   Essence %d   Undead %d/%d   Nemeses %d" % [
-		s.day, s.heart_hp, s.heart_max, s.essence, s.undead_count(), s.jar_cap, s.nemesis_pool.size()]
+	info_label.text = "Day %d   Heart %d/%d   Essence %d   Undead %d/%d" % [
+		s.day, s.heart_hp, s.heart_max, s.essence, s.undead_count(), s.jar_cap]
 	day_bar.value = s.day_timer
 	threat_bar.value = s.threat
 	restore_btn.disabled = s.essence < D.RESTORE_COST or s.heart_hp >= s.heart_max or s.game_over
