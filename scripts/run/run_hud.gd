@@ -347,7 +347,7 @@ func rebuild_lures() -> void:
 	var s = run.state
 	for c in lure_box.get_children():
 		c.queue_free()
-	var available: Array = Meta.available_lures()
+	var available: Array = Meta.available_lures(s.act)
 	for id in D.LURES:
 		var def: Dictionary = D.LURES[id]
 		var btn := UI.button(Loc.t(def["name"]), Vector2(150, 26))

@@ -20,6 +20,7 @@ func make_hero(cls: String, hero_name: String, mult: float, party: int, idx: int
 		"party": party, "cur": 0, "nxt": 0, "prog": 0.0, "delay": idx * 0.8, "stun": 0.0,
 		"laps": 0, "revenge": false, "boss": false, "gone": false, "death_tile": 0,
 		"trait": "", "baited": false, "half_said": false, "poison": 0,
+		"armor": float(base.get("armor", 0.0)), "disarms": bool(base.get("disarms", false)),
 	}
 	if s.rng.randf() < D.TRAIT_CHANCE:
 		set_trait(h, D.TRAITS.keys()[s.rng.randi() % D.TRAITS.size()])
@@ -47,14 +48,15 @@ func spawn_party() -> void:
 	var pid := s.next_party_id
 	s.next_party_id += 1
 	var size := party_size(s.day)
-	var mult := 1.0 + D.LOOP_POWER * (s.loop - 1)
+	var mult: float = (1.0 + D.LOOP_POWER * (s.loop - 1)) * float(s.act_def()["power"])
+	var wanderers: Array = D.HERO_CLASSES.keys().filter(func(c): return int(D.HERO_CLASSES[c].get("act", 1)) <= s.act)
 	var lured: String = D.LURES[s.lure]["traveler"]
 	var names: Array = []
 	for i in size:
 		var cls := lured
 		var share := D.LURE_SHARE_LANTERN if s.has_relic("lantern_of_lies") else D.LURE_SHARE
 		if s.rng.randf() >= share:
-			cls = D.HERO_CLASSES.keys()[s.rng.randi() % D.HERO_CLASSES.size()]
+			cls = wanderers[s.rng.randi() % wanderers.size()]
 		var hero_name: String = Loc.t(D.FIRST_NAMES[s.rng.randi() % D.FIRST_NAMES.size()])
 		make_hero(cls, hero_name, mult, pid, i)
 		names.append(Loc.t(D.HERO_CLASSES[cls]["name"]))
@@ -64,19 +66,24 @@ func spawn_party() -> void:
 func spawn_boss() -> void:
 	s.boss_spawned = true
 	var act: Dictionary = D.ACTS[s.act]
-	var h := make_hero("pilgrim", Loc.t(act["boss"]), 1.0, s.next_party_id, 0)
+	var h := make_hero(act["boss_cls"], Loc.t(act["boss"]), 1.0, s.next_party_id, 0)
 	s.next_party_id += 1
 	h["trait"] = ""
 	h["boss"] = true
 	h["title"] = Loc.t(act["boss_title"])
-	h["hp"] = D.BOSS_HP + s.loop * D.BOSS_HP_PER_LOOP
+	var bm: float = act["boss_mult"]
+	h["hp"] = (D.BOSS_HP + s.loop * D.BOSS_HP_PER_LOOP) * bm
 	h["max_hp"] = h["hp"]
-	h["dmg"] = D.BOSS_DMG + s.loop * D.BOSS_DMG_PER_LOOP
+	h["dmg"] = (D.BOSS_DMG + s.loop * D.BOSS_DMG_PER_LOOP) * bm
+	h["disarms"] = false
 	h["speed"] = 1.3
 	h["color"] = Color(1, 1, 1)
-	for line in D.BOSS_LINES["arrive"]:
+	for line in boss_lines()["arrive"]:
 		s.narrate.emit(Loc.t(line))
-	s.add_log(Loc.t("%s descends. Her radiance burns undead nearby: meet her with the Warden and the living.") % s.hero_name(h))
+	if s.act == 1:
+		s.add_log(Loc.t("%s descends. Her radiance burns undead nearby: meet her with the Warden and the living.") % s.hero_name(h))
+	else:
+		s.add_log(Loc.t("%s descends. He plants charges on your halls: watch for the red marks and rebuild.") % s.hero_name(h))
 	s.combo_found.emit(Loc.t("%s DESCENDS") % s.hero_name(h).to_upper())
 	s.fx.emit("boss", h, 0.0)
 
@@ -212,6 +219,11 @@ func _on_enter_tile(h: Dictionary, t: int) -> void:
 	var card := s.card_at(t)
 	if not D.TRAP_DMG.has(card):
 		return
+	if h["disarms"] and s.rng.randf() < D.SAPPER_DISARM_CHANCE:
+		s.tiles[t]["card"] = ""
+		s.add_log(Loc.t("%s disarms your %s!") % [s.hero_name(h), Loc.t(D.CARDS[card]["name"])])
+		s.fx.emit("disarm", t, 0.0)
+		return
 	var dmg: float = D.TRAP_DMG[card] * Meta.trap_mult()
 	if (card == "spikes" or card == "grinder") and s.has_relic("thorned_halls"):
 		dmg += 3.0
@@ -223,6 +235,10 @@ func _on_enter_tile(h: Dictionary, t: int) -> void:
 	elif card == "chest":
 		h["stun"] = D.CHEST_STUN
 		h["baited"] = true
+	elif card == "cavein":
+		h["stun"] = D.CAVEIN_STUN
+		s.tiles[t]["card"] = ""  # the tunnel is spent
+		s.fx.emit("blast", t, 0.0)
 	if (card == "chest") and run.warden.has("golden_bait"):
 		dmg *= 2.0
 	damage(h, dmg)
@@ -233,11 +249,14 @@ func _on_enter_tile(h: Dictionary, t: int) -> void:
 func damage(h: Dictionary, amount: float) -> void:
 	if h["gone"]:
 		return
+	var armor: float = h.get("armor", 0.0)
+	if armor > 0.0:
+		amount = maxf(amount - armor, amount * 0.3)
 	h["hp"] -= amount
 	s.fx.emit("hit_hero", h, amount)
 	if h["boss"] and not h["half_said"] and h["hp"] > 0.0 and h["hp"] < h["max_hp"] * 0.5:
 		h["half_said"] = true
-		for line in D.BOSS_LINES["half"]:
+		for line in boss_lines()["half"]:
 			s.narrate.emit(Loc.t(line))
 	if h["hp"] <= 0.0:
 		_kill(h)
@@ -270,7 +289,7 @@ func _kill(h: Dictionary) -> void:
 	run.beat("first_kill")
 	run.beat("tut_souls")
 	if h["boss"]:
-		for line in D.BOSS_LINES["death"]:
+		for line in boss_lines()["death"]:
 			s.narrate.emit(Loc.t(line))
 		s.add_log(Loc.t("%s has fallen!") % s.hero_name(h))
 		run.end_game(true)
@@ -311,6 +330,59 @@ func _find_relic(h: Dictionary) -> void:
 	var relic_name: String = Loc.t(D.RELICS[id]["name"])
 	s.add_log(Loc.t("%s carried a relic: %s! Survive to keep it.") % [h["name"], relic_name])
 	s.combo_found.emit(Loc.t("RELIC FOUND: %s") % relic_name)
+
+
+func boss_lines() -> Dictionary:
+	return D.BRANN_LINES if s.act == 2 else D.BOSS_LINES
+
+
+## Act II champion: Brann plants charges on nearby halls; after a short fuse they blow up
+## the card, the monsters on it, and anyone standing there (the Warden too).
+func boss_tick(delta: float) -> void:
+	if s.act != 2:
+		return
+	var boss = null
+	for h in s.heroes:
+		if h["boss"] and not h["gone"] and h["delay"] <= 0.0:
+			boss = h
+	for c in s.charges:
+		c["fuse"] -= delta
+	for c in s.charges.duplicate():
+		if c["fuse"] <= 0.0:
+			s.charges.erase(c)
+			_detonate(c["tile"], boss)
+	if boss == null:
+		return
+	s.charge_timer += delta
+	if s.charge_timer < D.BRANN_CHARGE_EVERY:
+		return
+	s.charge_timer = 0.0
+	var here: int = boss["cur"]
+	var options: Array = []
+	for i in s.loop_size:
+		var dist: int = mini(absi(i - here), s.loop_size - absi(i - here))
+		if dist <= 4 and i != 0 and (s.card_at(i) != "" or s.warden_at(i)):
+			options.append(i)
+	if options.is_empty():
+		return
+	var t: int = options[s.rng.randi() % options.size()]
+	s.charges.append({"tile": t, "fuse": D.BRANN_FUSE})
+	s.add_log(Loc.t("Brann plants a charge!"))
+
+
+func _detonate(t: int, boss) -> void:
+	s.fx.emit("blast", t, D.BRANN_BLAST)
+	if s.card_at(t) != "":
+		s.add_log(Loc.t("BOOM! Your %s is blown apart.") % Loc.t(D.CARDS[s.card_at(t)]["name"]))
+		s.tiles[t]["card"] = ""
+	for u in s.alive_units(t):
+		u["hp"] -= D.BRANN_BLAST
+	s.tiles[t]["units"] = s.alive_units(t)
+	for h in s.travelers_at(t):
+		if not h["boss"]:
+			damage(h, D.BRANN_BLAST)
+	if s.warden_at(t):
+		run.warden.take_hit(D.BRANN_BLAST, boss if boss != null else {})
 
 
 func remove(h: Dictionary) -> void:

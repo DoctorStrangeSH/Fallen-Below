@@ -47,7 +47,9 @@ func _ready() -> void:
 			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			l.custom_minimum_size = Vector2(560, 0)
 			v.add_child(l)
-		if have == 0 and D.LURES.values().any(func(lu): return lu["traveler"] == kind and lu.has("building")):
+		if have == 0 and int(D.HERO_CLASSES[kind].get("act", 1)) > 1:
+			v.add_child(UI.label(Loc.t("They only come down in the Drowned Mines (Act II)."), 12, Color(1, 0.6, 0.4, 0.7)))
+		elif have == 0 and D.LURES.values().any(func(lu): return lu["traveler"] == kind and lu.has("building")):
 			v.add_child(UI.label(Loc.t("Lure them first: build their shrine in the Lair."), 12, Color(1, 0.6, 0.4, 0.7)))
 
 	var row := HBoxContainer.new()

@@ -362,14 +362,21 @@ func hero_name(h: Dictionary) -> String:
 	return n if title == "" else "%s %s" % [n, title]
 
 
+func act_def() -> Dictionary:
+	return D.ACTS[act]
+
+
 func has_relic(id: String) -> bool:
 	return relics.has(id)
 
 
 func gain(resource: String, amount: int) -> void:
-	pouch[resource] = int(pouch.get(resource, 0)) + amount
+	var mult: float = act_def()["harvest"]
+	pouch[resource] = int(pouch.get(resource, 0)) + int(round(amount * mult))
 
 
+var charges := []             # Brann's planted charges: {"tile": int, "fuse": float}
+var charge_timer := 0.0
 var threat_from := {}         # source -> attention gained (for balancing)
 var escapes := 0
 

@@ -165,6 +165,8 @@ const DIET := {
 	"seeker": {"stat": "evade", "amount": 1.0, "desc": "Seekers make it quicker (+1% evasion)"},
 	"pilgrim": {"stat": "regen", "amount": 0.1, "desc": "Pilgrims make it mend (+0.1 regen)"},
 	"mage": {"stat": "dmg", "amount": 0.3, "desc": "Arcanists make it crueler (+0.3 damage)"},
+	"miner": {"stat": "def", "amount": 0.15, "desc": "Miners make it harder (+0.15 defense)"},
+	"sapper": {"stat": "counter", "amount": 1.0, "desc": "Sappers make it quicker to strike back (+1% counter)"},
 }
 
 # --- loop scaling (like Loop Hero): every patrol loop the Warden completes
@@ -201,11 +203,15 @@ const CARDS := {
 	"necropolis": {"name": "Necropolis", "kind": "path", "color": Color(0.45, 0.8, 0.75), "desc": "Combo. 4 Skeletons + Bone Golem."},
 	"mimic": {"name": "Mimic", "kind": "path", "color": Color(0.95, 0.5, 0.15), "desc": "Combo. Bait with teeth."},
 	"spire": {"name": "Unholy Spire", "kind": "scenery", "color": Color(0.8, 0.15, 0.6), "desc": "Combo. Nearby monsters +5 dmg."},
+	# Act II cards (added to every deck in the Drowned Mines)
+	"cavein": {"name": "Cave-in", "kind": "path", "color": Color(0.55, 0.45, 0.35), "desc": "Trap. Collapses once: 15 dmg to the traveler and 2s stun. Then rubble."},
+	"drowned": {"name": "Drowned Crypt", "kind": "path", "color": Color(0.3, 0.55, 0.65), "desc": "Room. 2 Drowned, tougher than skeletons. Respawn daily."},
 	"jar": {"name": "Soul Jar", "kind": "instant", "color": Color(0.3, 0.55, 0.8), "desc": "Instant. +1 undead servant slot."},
 }
 ## Skeleton cap per room card (graveyards nearby add +1 each).
 const SKELETON_CAP := {"crypt": 2, "catacomb": 3, "necropolis": 4}
-const TRAP_DMG := {"spikes": 5.0, "grinder": 14.0, "chest": 6.0}
+const TRAP_DMG := {"spikes": 5.0, "grinder": 14.0, "chest": 6.0, "cavein": 15.0}
+const CAVEIN_STUN := 2.0
 const BAIT_CARDS := ["chest", "mimic"]
 const LURE_SHARE_LANTERN := 0.9
 
@@ -214,7 +220,8 @@ const START_CARDS := ["crypt", "spider", "spikes", "altar", "jar"]
 const BASE_DECK_SLOTS := 5
 
 ## Draw weights for cards in the deck.
-const CARD_WEIGHTS := {"crypt": 3, "spider": 3, "spikes": 3, "altar": 2, "graveyard": 2, "chest": 2, "jar": 1}
+const CARD_WEIGHTS := {"crypt": 3, "spider": 3, "spikes": 3, "altar": 2, "graveyard": 2, "chest": 2, "jar": 1,
+	"cavein": 2, "drowned": 2}
 
 ## Travelers the dungeon lures below. `drop` is what their bodies give you.
 const HERO_CLASSES := {
@@ -226,7 +233,13 @@ const HERO_CLASSES := {
 		"dark": "Death Knight", "drop": {"bones": 4}},
 	"mage": {"name": "Arcanist", "hp": 18, "dmg": 7.0, "speed": 1.8, "color": Color(0.4, 0.6, 1.0),
 		"dark": "Lich", "drop": {"gold": 2, "blood": 2, "bones": 1}},
+	# Act II
+	"miner": {"name": "Dwarf Miner", "hp": 40, "dmg": 5.0, "speed": 1.5, "color": Color(0.75, 0.6, 0.45),
+		"dark": "Drowned Miner", "drop": {"gold": 3, "bones": 3}, "armor": 2.0, "act": 2},
+	"sapper": {"name": "Sapper", "hp": 22, "dmg": 6.0, "speed": 2.2, "color": Color(0.95, 0.45, 0.25),
+		"dark": "Blast Wraith", "drop": {"blood": 2, "gold": 2}, "disarms": true, "act": 2},
 }
+const SAPPER_DISARM_CHANCE := 0.6
 
 ## Lures decide who answers the dungeon's call. Some are unlocked in the Lair.
 const LURES := {
@@ -234,6 +247,8 @@ const LURES := {
 	"rumors": {"name": "Monster Rumors", "traveler": "hunter", "desc": "Monster hunters: tough, carry bones and good gear."},
 	"holy": {"name": "Holy Fire", "traveler": "pilgrim", "desc": "Pilgrims: heal each other, burn undead, carry blood.", "building": "shrine"},
 	"arcane": {"name": "Arcane Signs", "traveler": "mage", "desc": "Arcanists: deadly, may carry relics.", "building": "stones"},
+	"vein": {"name": "Rich Vein", "traveler": "miner", "desc": "Dwarf miners: armoured and slow, carry gold and bones.", "act": 2},
+	"shaft": {"name": "Open Shaft", "traveler": "sapper", "desc": "Sappers: disarm your traps, carry blood and gold.", "act": 2},
 }
 
 const MONSTERS := {
@@ -242,6 +257,7 @@ const MONSTERS := {
 	"queen": {"name": "Spider Queen", "hp": 40, "dmg": 6.0, "color": Color(0.2, 0.9, 0.3)},
 	"golem": {"name": "Bone Golem", "hp": 50, "dmg": 5.0, "color": Color(0.75, 0.95, 0.9)},
 	"mimic": {"name": "Mimic", "hp": 30, "dmg": 8.0, "color": Color(0.95, 0.55, 0.15)},
+	"drowned": {"name": "Drowned", "hp": 22, "dmg": 4.5, "color": Color(0.35, 0.6, 0.7)},
 }
 
 # --- loot: gear for the Warden (Loop Hero style) ---
@@ -294,6 +310,8 @@ const ITEM_SLOTS := {
 	"pilgrim": ["amulet", "shield", "armor"],
 	"hunter": ["weapon", "shield", "armor"],
 	"mage": ["amulet", "ring", "weapon"],
+	"miner": ["armor", "shield", "weapon"],
+	"sapper": ["weapon", "ring", "amulet"],
 }
 const RARITIES := [
 	{"name": "Common", "mult": 1.0, "extras": 0, "weight": 60, "color": Color(0.8, 0.8, 0.8)},
@@ -402,10 +420,16 @@ const RELICS := {
 }
 
 # --- acts & story ---
+## power: traveler strength multiplier; harvest: resources multiplier; item_bonus: extra item levels.
 const ACTS := {
-	1: {"name": "Act I: The Crypts", "boss": "Aurelia", "boss_title": "the Lightbringer",
-		"end_story": "act1_end"},
+	1: {"name": "Act I: The Crypts", "boss": "Aurelia", "boss_title": "the Lightbringer", "boss_cls": "pilgrim",
+		"end_story": "act1_end", "power": 1.0, "boss_mult": 1.0, "harvest": 1.0, "item_bonus": 0},
+	2: {"name": "Act II: The Drowned Mines", "boss": "Brann", "boss_title": "the Delver King", "boss_cls": "miner",
+		"intro_story": "act2_intro", "end_story": "act2_end", "power": 1.45, "boss_mult": 1.3, "harvest": 1.6, "item_bonus": 2},
 }
+const BRANN_CHARGE_EVERY := 6.0   # seconds between Brann's charges
+const BRANN_FUSE := 2.0           # warning time before a charge goes off
+const BRANN_BLAST := 30.0         # damage to everything on the tile
 
 ## The Warden remembers its name after Act I.
 const WARDEN_TRUE_NAME := "Ren"
@@ -428,6 +452,18 @@ const STORY := {
 		"The Order draws the treasure maps. The Order lights the holy fire at the door. The Order pays the hunters half up front, and never the rest.",
 		"They are not trying to kill the dungeon.\n\nThey are feeding it.",
 		"And an old scholar among the dead says what none of them wants to hear:\n\nevery time the dungeon eats, the sun above burns a little brighter.",
+	],
+	"act2_intro": [
+		"The Order did not send another saint. It sent miners.\n\nDwarves with picks and powder, and a contract sealed with a little sun.",
+		"They are not here to kill you. They are here to dig. Somewhere beneath your halls lies dawnstone: pale crystal that glows like morning.",
+		"Ren remembers Lia's last breath rising through the rock as light. He begins to understand what the dawnstone is made of.",
+		"Lead them in. Let the water have them.",
+	],
+	"act2_end": [
+		"Brann the Delver King falls into the black water with his last charge still in his hand.",
+		"His pockets are full of dawnstone. In the dark it glows, and in the glow there are faces.\n\nPilgrims. Hunters. Children who followed a map with a little sun in the corner.",
+		"The sun of the world is not a star. It is a furnace. And every soul the dungeon swallows is fuel the Order mines and burns.",
+		"Far above, the Inquisitor Vael has read the ledgers. She does not want to stop the furnace.\n\nShe wants to feed it everything.\n\n(Act III: The Ash Cathedral is coming soon.)",
 	],
 	"act1_end": [
 		"Aurelia falls. Her light gutters on the stones.\n\nThe Warden kneels over her, and for the first time, it does not want to eat.",
@@ -475,6 +511,15 @@ const BOSS_LINES := {
 	"half": ["Aurelia: \"Your eyes... No. It can't be. ...Ren?\""],
 	"death": ["Aurelia: \"I'm sorry I left you down here...\""],
 }
+const BRANN_LINES := {
+	"arrive": [
+		"The walls shake. Somewhere above, powder kegs roll down the stairs.",
+		"Brann: \"Contract says dig till we hit the light. Nothing in it about a monster.\"",
+		"Brann: \"Lads! Charges on every hall. If it moves, blow it.\"",
+	],
+	"half": ["Brann: \"That stone... it's warm. Like it's breathing. What have we been selling?\""],
+	"death": ["Brann: \"Should've stayed... in the sunlight...\""],
+}
 
 ## The Book of the Fallen: raised travelers give these pages in order, 4 per kind.
 const FRAGMENTS := {
@@ -496,6 +541,18 @@ const FRAGMENTS := {
 		"At dawn mass the priests face the mountain, not the sun. I always wondered why.",
 		"We were not sent to cleanse the dark. We were sent to feed it. A pilgrimage is just a longer word for a meal.",
 	],
+	"miner": [
+		"Dawnstone sells by the ounce in the white towers. They told us it was crystal. Crystal does not scream when you cut it.",
+		"Brann's contract pays double for any stone that glows gold. Those are the fresh ones.",
+		"The deeper shafts are flooded on purpose. Water keeps the stone from going out.",
+		"Every cart we haul up, the Order weighs it and writes a number. Next to the number, a list of names.",
+	],
+	"sapper": [
+		"Blow the halls, leave the heart. Those were the orders. Never hurt the heart.",
+		"The Order needs you alive. Hungry, but alive. A dead furnace burns nothing.",
+		"I set a charge once near the heart by mistake. The captain beat me half to death.",
+		"They are not afraid of you. They are afraid of you being full.",
+	],
 	"mage": [
 		"The Dawn's light is not theirs. My instruments say it rises through the rock. From below.",
 		"Each time a traveler dies down here, the sun above flickers brighter. Forty years of measurements.",
@@ -510,4 +567,6 @@ const WHISPERS := {
 	"pilgrim": ["We were an offering, not a cure.", "The fire was lit for us, not for you."],
 	"hunter": ["The Order counts the missing. It never comes to look.", "The other half was never coming."],
 	"mage": ["Their light flickers when you starve.", "The archives were sealed for a reason."],
+	"miner": ["The stone was warm.", "We were digging up the dead."],
+	"sapper": ["Never hurt the heart.", "Blow everything but the heart."],
 }

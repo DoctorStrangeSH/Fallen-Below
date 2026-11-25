@@ -113,6 +113,8 @@ func _monsters_strike(t: int, hs: Array, units: Array, warden_here: bool) -> voi
 
 ## Act I champion: burns undead on her tile and the tiles next to it.
 func _radiance() -> void:
+	if s.act != 1:
+		return
 	for h in s.heroes:
 		if not h["boss"] or h["gone"] or h["delay"] > 0.0:
 			continue

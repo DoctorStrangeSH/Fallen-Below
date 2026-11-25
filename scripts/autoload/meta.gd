@@ -13,6 +13,7 @@ var deck := []           # card ids chosen for the next run
 var loadout := []        # relic ids equipped for the next run
 var lure := "gold"       # last chosen lure
 var warden_id := "bone"  # chosen Warden
+var selected_act := 1    # act chosen for the next descent
 var runs := 0
 var wins := 0
 var best_day := 0
@@ -155,6 +156,10 @@ func _sanitize_loadout() -> void:
 	loadout = loadout.filter(func(r): return relics.has(r))
 	if not available_lures().has(lure):
 		lure = "gold"
+	if not D.ACTS.has(selected_act) or selected_act > max_act():
+		selected_act = 1
+	if not available_lures().has(lure):
+		lure = "gold"
 	if not D.WARDENS.has(warden_id) or not warden_unlocked(warden_id):
 		warden_id = "bone"
 	while loadout.size() > relic_slots():
@@ -166,6 +171,9 @@ func card_weights() -> Dictionary:
 	var w := {}
 	for id in deck:
 		w[id] = D.CARD_WEIGHTS.get(id, 1)
+	if selected_act >= 2:  # the Drowned Mines add their own memories to every deck
+		w["cavein"] = D.CARD_WEIGHTS["cavein"]
+		w["drowned"] = D.CARD_WEIGHTS["drowned"]
 	if warden_id == "brood" and w.has("spider"):
 		w["spider"] = int(w["spider"]) * 2
 	if warden_id == "mimic" and w.has("chest"):
@@ -229,13 +237,36 @@ func start_cards() -> int:
 	return 4
 
 
-func available_lures() -> Array:
+## Lures usable in `act`: Lair-gated ones need their building, act lures need that act.
+func available_lures(act: int = 0) -> Array:
+	if act <= 0:
+		act = selected_act
 	var out: Array = []
 	for id in D.LURES:
-		var b: String = D.LURES[id].get("building", "")
-		if b == "" or level(b) > 0:
-			out.append(id)
+		var def: Dictionary = D.LURES[id]
+		var b: String = def.get("building", "")
+		if b != "" and level(b) <= 0:
+			continue
+		if int(def.get("act", 1)) > act:
+			continue
+		out.append(id)
 	return out
+
+
+func max_act() -> int:
+	var best := 1
+	for a in D.ACTS:
+		if acts_cleared.has(int(a) - 1):
+			best = maxi(best, int(a))
+	return best
+
+
+func set_act(a: int) -> void:
+	if D.ACTS.has(a) and a <= max_act():
+		selected_act = a
+		if not available_lures(a).has(lure):
+			lure = "gold"
+		save_game()
 
 
 func set_lure(id: String) -> void:
@@ -395,7 +426,7 @@ func save_game() -> void:
 		"version": SAVE_VERSION, "res": res, "buildings": buildings, "relics": relics,
 		"deck": deck, "loadout": loadout, "runs": runs, "wins": wins, "best_day": best_day,
 		"total_kills": total_kills, "discovered": discovered, "seen_intro": seen_intro,
-		"acts_cleared": acts_cleared, "lure": lure, "warden": warden_id, "music_volume": music_volume, "sfx_volume": sfx_volume, "language": language, "fragments": fragments, "seen": seen,
+		"acts_cleared": acts_cleared, "lure": lure, "warden": warden_id, "act": selected_act, "music_volume": music_volume, "sfx_volume": sfx_volume, "language": language, "fragments": fragments, "seen": seen,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -444,6 +475,7 @@ func load_game() -> void:
 	deck = _str_list(d.get("deck", []), D.CARDS)
 	lure = str(d.get("lure", "gold"))
 	warden_id = str(d.get("warden", "bone"))
+	selected_act = int(d.get("act", 1))
 	music_volume = clampf(float(d.get("music_volume", 0.7)), 0.0, 1.0)
 	sfx_volume = clampf(float(d.get("sfx_volume", 0.8)), 0.0, 1.0)
 	language = str(d.get("language", ""))

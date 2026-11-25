@@ -134,6 +134,15 @@ def boss():
     return norm(out[0] * np.linspace(1, 0, out.shape[1]) ** 0.5, 0.85)
 
 
+def blast():
+    n = int(0.9 * SR)
+    t = np.arange(n) / SR
+    boom = np.sin(2 * np.pi * np.cumsum(70 * np.exp(-t * 6) + 30) / SR) * np.exp(-t * 4)
+    debris = M.lowpass(M.noise(n), 2500) * np.exp(-t * 5) * 0.8
+    crack = M.highpass(M.noise(n), 3000) * np.exp(-t * 30) * 0.6
+    return norm(np.tanh((boom + debris + crack) * 2.0), 0.9)
+
+
 def write(name, x):
     os.makedirs(OUT, exist_ok=True)
     from scipy.io import wavfile
@@ -149,5 +158,5 @@ def write(name, x):
 if __name__ == "__main__":
     for name, fn in [("hit", hit), ("warden_hit", warden_hit), ("death", death), ("devour", devour),
                      ("loot", loot), ("place", place), ("level", level), ("combo", combo),
-                     ("click", click), ("escape", escape), ("ability", ability), ("boss", boss)]:
+                     ("click", click), ("escape", escape), ("ability", ability), ("boss", boss), ("blast", blast)]:
         write(name, fn())

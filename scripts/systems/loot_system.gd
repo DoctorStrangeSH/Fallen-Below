@@ -34,7 +34,7 @@ func make_item(h: Dictionary) -> Dictionary:
 	var type_def: Dictionary = types[s.rng.randi() % types.size()]
 	var r := _roll_rarity(h["boss"])
 	var rar: Dictionary = D.RARITIES[r]
-	var level: int = s.loop * D.ITEM_LEVEL_PER_LOOP
+	var level: int = s.loop * D.ITEM_LEVEL_PER_LOOP + int(s.act_def()["item_bonus"])
 	var stats := {}
 	var main_stat: String = type_def["main"]
 	var second_stat: String = type_def["second"]

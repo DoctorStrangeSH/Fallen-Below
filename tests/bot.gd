@@ -52,6 +52,10 @@ func _ready() -> void:
 				lair_mode = kv[1]
 			"lang":
 				Loc.set_language(kv[1], false)
+			"act":
+				if not Meta.acts_cleared.has(1):
+					Meta.acts_cleared.append(1)
+				Meta.selected_act = int(kv[1])
 	rng.seed = 12345
 	Meta.no_save = true
 	# make every Warden and lure available to the bot (does not touch buildings permanently)

@@ -25,6 +25,7 @@ var hud: RunHud
 
 func _ready() -> void:
 	state = RunState.new()
+	state.act = Meta.selected_act
 	state.setup(Meta.start_jars(), Meta.card_weights(), Meta.loadout, Meta.lure)
 
 	heroes_sys = HeroSystem.new()
@@ -61,7 +62,7 @@ func _ready() -> void:
 
 const FX_SOUND := {"hit_hero": "hit", "hit_unit": "hit", "hit_warden": "warden_hit", "death": "death",
 	"devour": "devour", "loot": "loot", "place": "place", "level": "level", "combo": "combo",
-	"escape": "escape", "ability": "ability", "boss": "boss"}
+	"escape": "escape", "ability": "ability", "boss": "boss", "blast": "blast", "disarm": "click"}
 
 
 func _on_fx(kind: String, target, amount: float) -> void:
@@ -87,6 +88,7 @@ func _process(delta: float) -> void:
 		state.day_timer -= D.DAY_LENGTH
 		_new_day()
 	heroes_sys.move(delta)
+	heroes_sys.boss_tick(delta)
 	warden.move(delta)
 	warden.tick(delta)
 	state.combat_timer += delta
@@ -204,7 +206,7 @@ func cycle_speed() -> void:
 
 
 func set_lure(id: String) -> void:
-	if Meta.available_lures().has(id):
+	if Meta.available_lures(state.act).has(id):
 		state.lure = id
 		Meta.set_lure(id)
 		state.add_log(Loc.t("New lure: %s. Tomorrow's travelers will follow it.") % Loc.t(D.LURES[id]["name"]))

@@ -91,6 +91,9 @@ func place_selected(cell: Vector2i) -> void:
 		elif id == "spider":
 			for k in 3:
 				_spawn(idx, "spider")
+		elif id == "drowned":
+			for k in 2:
+				_spawn(idx, "drowned")
 		_check_path_combos(idx, id)
 	else:
 		s.scenery[cell] = id
@@ -141,6 +144,9 @@ func respawn_rooms() -> void:
 		var card := s.card_at(i)
 		if D.SKELETON_CAP.has(card):
 			_fill_skeletons(i)
+		if card == "drowned":
+			while s.count_units(i, "Drowned") < 2 + s.scenery_near(i, "graveyard"):
+				_spawn(i, "drowned")
 		if card == "necropolis" and s.count_units(i, "Bone Golem") == 0:
 			_spawn(i, "golem")
 		elif card == "mimic" and s.count_units(i, "Mimic") == 0:

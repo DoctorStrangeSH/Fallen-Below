@@ -96,6 +96,11 @@ func add_fx(kind: String, target, amount: float) -> void:
 			_burst(pos, Color(0.5, 0.85, 1.0), 70.0)
 		"escape":
 			_float(pos, Loc.t("escaped!"), Color(1, 0.5, 0.3), 13)
+		"blast":
+			_burst(pos, Color(1.0, 0.55, 0.15), 48.0)
+			_burst(pos, Color(1.0, 0.85, 0.4), 26.0)
+		"disarm":
+			_float(pos, Loc.t("disarmed"), Color(1, 0.7, 0.3), 12)
 
 
 func _fx_pos(target) -> Vector2:
@@ -144,6 +149,7 @@ func _draw() -> void:
 	_draw_units(s, t)
 	_draw_heroes(s, font, t)
 	_draw_warden(s, font, t)
+	_draw_charges(s, font, t)
 	_draw_effects(font)
 	_draw_vignette()
 	if s.paused and not s.game_over:
@@ -160,7 +166,15 @@ func _draw_floor(s) -> void:
 				continue
 			var n := _hash(x, y)
 			var base := Color(0.07, 0.06, 0.08).lerp(Color(0.1, 0.085, 0.11), n)
+			if s.act == 2:
+				base = Color(0.05, 0.07, 0.09).lerp(Color(0.07, 0.1, 0.12), n)
 			draw_rect(r, base)
+			if s.act == 2 and _hash(x, y, 9) > 0.78 and not s.path_lookup.has(c):
+				# black water pooling in the mines
+				var ripple := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 600.0 + n * 6.0)
+				draw_rect(r.grow(-2), Color(0.05, 0.15, 0.22, 0.85))
+				draw_line(r.position + Vector2(8, 18 + ripple * 4), r.position + Vector2(30, 18 + ripple * 4), Color(0.3, 0.55, 0.7, 0.4), 1.0)
+				continue
 			# a few cracks and pebbles
 			if n > 0.7:
 				var p := r.position + Vector2(8 + n * 20, 10 + _hash(y, x) * 22)
@@ -210,6 +224,8 @@ func _draw_path(s, t: float) -> void:
 			# worn flagstones: a slab with a darker rim and a crack
 			var n := _hash(cell.x, cell.y, 7)
 			var slab := STONE.lerp(STONE_LIGHT, n * 0.6)
+			if s.act == 2:
+				slab = Color(0.17, 0.2, 0.24).lerp(Color(0.24, 0.28, 0.32), n * 0.6)
 			if side:
 				slab = slab.darkened(0.25)
 			draw_rect(r, slab.darkened(0.35))
@@ -263,6 +279,15 @@ func _glyph(card: String, c: Vector2, t: float) -> void:
 				draw_colored_polygon(PackedVector2Array([tip, c + Vector2(x - 4, -2), c + Vector2(x + 4, -2)]), Color(0.75, 0.72, 0.7))
 			if card == "grinder":
 				draw_arc(c + Vector2(0, -6), 13, t * 4.0, t * 4.0 + PI * 1.5, 12, Color(0.9, 0.2, 0.2), 2.5)
+		"cavein":
+			for k in 4:
+				var o := Vector2((k % 2) * 10 - 5, (k / 2) * 8 - 10)
+				draw_colored_polygon(PackedVector2Array([c + o + Vector2(-6, 3), c + o + Vector2(0, -5), c + o + Vector2(6, 3)]), col.lightened(0.1 * k))
+			draw_line(c + Vector2(-14, -14), c + Vector2(14, -14), Color(0.4, 0.3, 0.2), 3.0)
+		"drowned":
+			draw_colored_polygon(PackedVector2Array([c + Vector2(-6, -11), c + Vector2(6, -11), c + Vector2(8, 7), c + Vector2(-8, 7)]), col.darkened(0.3))
+			var wave := sin(t * 2.0) * 2.0
+			draw_rect(Rect2(c + Vector2(-14, 2 + wave), Vector2(28, 6)), Color(0.15, 0.4, 0.55, 0.7))
 		"chest", "mimic":
 			draw_rect(Rect2(c + Vector2(-11, -12), Vector2(22, 14)), col.darkened(0.2))
 			draw_rect(Rect2(c + Vector2(-11, -12), Vector2(22, 4)), col.lightened(0.2))
@@ -375,6 +400,11 @@ func _monster_shape(u: Dictionary, kind: String, p: Vector2, t: float) -> void:
 		"golem":
 			draw_rect(Rect2(p + Vector2(-7, -8), Vector2(14, 14)), BONE.darkened(0.2))
 			draw_circle(p + Vector2(0, -1), 3.0, Color(0.4, 1.0, 0.7, 0.7 + 0.3 * sin(t * 4.0)))
+		"drowned":
+			draw_circle(p, 5.5, Color(0.3, 0.5, 0.55))
+			draw_circle(p + Vector2(-1.8, -1), 1.1, Color(0.6, 1, 0.9))
+			draw_circle(p + Vector2(1.8, -1), 1.1, Color(0.6, 1, 0.9))
+			draw_line(p + Vector2(-4, 4), p + Vector2(4, 4), Color(0.2, 0.45, 0.6), 1.5)
 		"mimic":
 			draw_rect(Rect2(p + Vector2(-8, -5), Vector2(16, 10)), Color(0.75, 0.45, 0.12))
 			for k in 3:
@@ -444,6 +474,19 @@ func _draw_warden(s, font: Font, t: float) -> void:
 	draw_rect(Rect2(p + Vector2(-18, -26), Vector2(36, 4)), Color(0.1, 0.1, 0.15))
 	draw_rect(Rect2(p + Vector2(-18, -26), Vector2(36 * frac, 4)), Color(0.4, 0.85, 1.0))
 	draw_string(font, p + Vector2(-30, 28), Loc.t("WARDEN"), HORIZONTAL_ALIGNMENT_CENTER, 60, 9, col)
+
+
+## Brann's planted charges: a pulsing ring and a countdown, so the player can react.
+func _draw_charges(s, font: Font, t: float) -> void:
+	for c in s.charges:
+		var tile: int = c["tile"]
+		var p := cell_center(s.cell_of(tile))
+		var fuse: float = c["fuse"]
+		var blink := 0.5 + 0.5 * sin(t * (10.0 + (D.BRANN_FUSE - fuse) * 8.0))
+		draw_arc(p, 22.0, 0, TAU, 24, Color(1, 0.3, 0.1, 0.5 + 0.5 * blink), 3.0)
+		draw_rect(Rect2(p + Vector2(-5, -8), Vector2(10, 12)), Color(0.5, 0.15, 0.08))
+		draw_string_outline(font, p + Vector2(-20, 24), "%.1f" % maxf(fuse, 0.0), HORIZONTAL_ALIGNMENT_CENTER, 40, 13, 3, Color(0, 0, 0))
+		draw_string(font, p + Vector2(-20, 24), "%.1f" % maxf(fuse, 0.0), HORIZONTAL_ALIGNMENT_CENTER, 40, 13, Color(1, 0.6, 0.3))
 
 
 func _draw_effects(font: Font) -> void:

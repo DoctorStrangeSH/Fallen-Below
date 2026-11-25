@@ -5,6 +5,7 @@ const D = preload("res://scripts/data/game_data.gd")
 const UI = preload("res://scripts/ui/ui_style.gd")
 
 var warden_box: HBoxContainer
+var act_box: HBoxContainer
 var deck_title: Label
 var deck_box: GridContainer
 var relic_title: Label
@@ -22,6 +23,11 @@ func _ready() -> void:
 	var sub := UI.label(Loc.t("Choose your Warden, the memories you will rebuild from, and the relics you carry."), 14, Color(1, 1, 1, 0.6))
 	sub.position = Vector2(40, 66)
 	add_child(sub)
+
+	act_box = HBoxContainer.new()
+	act_box.position = Vector2(760, 26)
+	act_box.add_theme_constant_override("separation", 8)
+	add_child(act_box)
 
 	warden_box = HBoxContainer.new()
 	warden_box.position = Vector2(40, 92)
@@ -58,7 +64,7 @@ func _ready() -> void:
 	row.add_theme_constant_override("separation", 12)
 	add_child(row)
 	var go := UI.button(Loc.t("DESCEND"), Vector2(260, 52))
-	go.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/run.tscn"))
+	go.pressed.connect(_descend)
 	row.add_child(go)
 	var lair := UI.button(Loc.t("The Lair"), Vector2(200, 52))
 	lair.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/lair.tscn"))
@@ -70,7 +76,32 @@ func _ready() -> void:
 	_rebuild()
 
 
+## The first descent into a new act plays its introduction.
+func _descend() -> void:
+	var act: Dictionary = D.ACTS[Meta.selected_act]
+	var intro: String = act.get("intro_story", "")
+	if intro != "" and Meta.first_time(intro):
+		Meta.play_story(intro, "res://scenes/run.tscn")
+	else:
+		get_tree().change_scene_to_file("res://scenes/run.tscn")
+
+
 func _rebuild() -> void:
+	for c in act_box.get_children():
+		c.queue_free()
+	for a in D.ACTS:
+		var act_id: int = a
+		var open: bool = act_id <= Meta.max_act()
+		var b := UI.button(Loc.t(D.ACTS[a]["name"]) if open else Loc.t("Locked: clear the previous act"), Vector2(230, 40))
+		b.add_theme_font_size_override("font_size", 12)
+		b.disabled = not open
+		if act_id == Meta.selected_act:
+			b.add_theme_stylebox_override("normal", UI.box(Color(0.3, 0.18, 0.4), Color(0.85, 0.7, 1.0)))
+		b.pressed.connect(func():
+			Meta.set_act(act_id)
+			_rebuild()
+		)
+		act_box.add_child(b)
 	for c in warden_box.get_children():
 		c.queue_free()
 	for id in D.WARDENS:

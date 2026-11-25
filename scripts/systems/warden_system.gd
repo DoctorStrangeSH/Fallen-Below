@@ -129,10 +129,11 @@ func take_hit(amount: float, attacker: Dictionary) -> void:
 	var dmg := maxf(amount - stat("def"), amount * 0.2)
 	s.warden["hp"] -= dmg
 	s.fx.emit("hit_warden", s.warden, dmg)
-	if s.rng.randf() * 100.0 < stat("counter"):
-		run.heroes_sys.damage(attacker, s.warden["dmg"])
-	if has("bone_spurs"):
-		run.heroes_sys.damage(attacker, 3.0)
+	if not attacker.is_empty():
+		if s.rng.randf() * 100.0 < stat("counter"):
+			run.heroes_sys.damage(attacker, s.warden["dmg"])
+		if has("bone_spurs"):
+			run.heroes_sys.damage(attacker, 3.0)
 	if s.warden["hp"] > 0.0:
 		return
 	if has("unbroken") and not s.warden["unbroken_used"]:
