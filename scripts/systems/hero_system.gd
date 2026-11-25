@@ -1,5 +1,6 @@
 extends Node
-## Hero spawning, movement along the loop, traits, damage, death and fleeing.
+## Hero spawning, movement along the path graph, fork decisions (bait AI),
+## traits, damage, death and fleeing.
 
 const D = preload("res://scripts/data/game_data.gd")
 const RunState = preload("res://scripts/run/run_state.gd")
@@ -15,12 +16,13 @@ func make_hero(cls: String, hero_name: String, mult: float, party: int, idx: int
 		"id": s.next_hero_id, "name": hero_name, "cls": cls, "title": "",
 		"hp": hp, "max_hp": hp, "dmg": base["dmg"] * mult,
 		"speed": base["speed"], "greed": base["greed"], "color": base["color"],
-		"party": party, "pos": 0.0, "delay": idx * 0.8, "loot": 0, "level": 0,
-		"revenge": false, "boss": false, "gone": false, "death_tile": 0,
+		"party": party, "cur": 0, "nxt": 0, "prog": 0.0, "delay": idx * 0.8, "stun": 0.0,
+		"loot": 0, "revenge": false, "boss": false, "gone": false, "death_tile": 0,
 		"trait": "",
 	}
 	if s.rng.randf() < D.TRAIT_CHANCE:
 		set_trait(h, D.TRAITS.keys()[s.rng.randi() % D.TRAITS.size()])
+	h["nxt"] = choose_next(h, 0)
 	s.next_hero_id += 1
 	s.heroes.append(h)
 	return h
@@ -67,29 +69,94 @@ func spawn_boss() -> void:
 	s.add_log("THE LIGHTBRINGER COMES. Kill her to win.")
 
 
+# ---------------------------------------------------------- movement
+
 func move(delta: float) -> void:
-	var n := s.path.size()
 	for h in s.heroes.duplicate():
 		if h["gone"]:
 			continue
 		if h["delay"] > 0.0:
 			h["delay"] -= delta
 			continue
-		if not s.alive_units(s.tile_of(h)).is_empty():
-			continue  # fighting
-		var old_i: int = int(floor(h["pos"]))
-		h["pos"] += h["speed"] * delta
-		var new_i: int = int(floor(h["pos"]))
-		if new_i == old_i:
+		if h["stun"] > 0.0:
+			h["stun"] -= delta
 			continue
-		var t: int = posmod(new_i, n)
-		if t == 0:
-			_on_lap(h)
-			if h["gone"] or s.game_over:
-				continue
-		_on_enter_tile(h, t)
-		if not h["gone"] and not s.alive_units(t).is_empty():
-			h["pos"] = float(new_i)  # stop at the room entrance
+		if not s.alive_units(h["cur"]).is_empty():
+			continue  # fighting
+		h["prog"] += h["speed"] * delta
+		while h["prog"] >= 1.0 and not h["gone"] and not s.game_over:
+			h["prog"] -= 1.0
+			var t: int = h["nxt"]
+			h["cur"] = t
+			if t == 0:
+				_on_lap(h)
+				if h["gone"] or s.game_over:
+					break
+			_on_enter_tile(h, t)
+			if h["gone"]:
+				break
+			h["nxt"] = choose_next(h, t)
+			if h["stun"] > 0.0 or not s.alive_units(t).is_empty():
+				h["prog"] = 0.0  # stop on this tile
+				break
+
+
+## Picks the next tile. At forks each hero scores both branches by personality.
+func choose_next(h: Dictionary, t: int) -> int:
+	var opts: Array = s.tiles[t]["next"]
+	if opts.size() == 1 or not s.forks.has(t):
+		return opts[0]
+	var fork: Dictionary = s.forks[t]
+	var best: int = opts[0]
+	var best_score := -INF
+	for o in opts:
+		var seg: Array = fork[o]
+		var sc := _score_segment(h, seg) + s.rng.randf() * 1.5
+		if sc > best_score:
+			best_score = sc
+			best = o
+	if best != opts[0] and not h["boss"]:
+		var reason := _lure_reason(h, fork[best])
+		if reason != "":
+			s.add_log("%s %s" % [s.hero_name(h), reason])
+	return best
+
+
+func _score_segment(h: Dictionary, seg: Array) -> float:
+	var cls: String = h["cls"]
+	var tr_id: String = h["trait"]
+	var greedy := tr_id == "greedy" or cls == "rogue"
+	var holy := tr_id == "zealot" or cls == "paladin"
+	var coward := tr_id == "coward"
+	var sc := 0.0
+	for id in seg:
+		var card := s.card_at(id)
+		if D.BAIT_CARDS.has(card):
+			sc += 8.0 if greedy else 1.5
+		if D.TRAP_DMG.has(card) and card != "chest":
+			sc -= 3.0 if coward else 1.0
+		var units := s.alive_units(id)
+		var undead := 0
+		for u in units:
+			if u["undead"]:
+				undead += 1
+		sc -= (2.0 if coward else 0.3) * units.size()
+		if holy:
+			sc += 3.0 * undead
+			sc += 4.0 * (s.scenery_near(id, "altar") + s.scenery_near(id, "spire"))
+	return sc
+
+
+func _lure_reason(h: Dictionary, seg: Array) -> String:
+	var cls: String = h["cls"]
+	var tr_id: String = h["trait"]
+	for id in seg:
+		var card := s.card_at(id)
+		if D.BAIT_CARDS.has(card) and (tr_id == "greedy" or cls == "rogue"):
+			return "can't resist the chest..."
+		if (tr_id == "zealot" or cls == "paladin") and (s.scenery_near(id, "altar") + s.scenery_near(id, "spire") > 0 or not s.undead_at(id).is_empty()):
+			return "goes to purge the darkness."
+	return ""
 
 
 func _on_lap(h: Dictionary) -> void:
@@ -110,14 +177,21 @@ func _on_lap(h: Dictionary) -> void:
 
 
 func _on_enter_tile(h: Dictionary, t: int) -> void:
-	if s.tiles[t]["card"] == "spikes":
-		var n := s.path.size()
-		var chain := 0
-		for d in [-1, 1]:
-			if s.tiles[posmod(t + d, n)]["card"] == "spikes":
-				chain += 1
-		damage(h, 5.0 + 2.0 * chain)
+	var card := s.card_at(t)
+	if not D.TRAP_DMG.has(card):
+		return
+	var dmg: float = D.TRAP_DMG[card]
+	if card == "spikes":
+		for nb in s.path_neighbors(t):
+			var c := s.card_at(nb)
+			if c == "spikes" or c == "grinder":
+				dmg += 2.0
+	elif card == "chest":
+		h["stun"] = D.CHEST_STUN
+	damage(h, dmg)
 
+
+# ---------------------------------------------------------- health
 
 func damage(h: Dictionary, amount: float) -> void:
 	if h["gone"]:
@@ -135,7 +209,7 @@ func heal(h: Dictionary, amount: float) -> void:
 
 
 func _kill(h: Dictionary) -> void:
-	h["death_tile"] = s.tile_of(h)
+	h["death_tile"] = h["cur"]
 	remove(h)
 	s.kills += 1
 	s.essence += 2
@@ -143,6 +217,7 @@ func _kill(h: Dictionary) -> void:
 	run.cards.draw_card()
 	if h["trait"] == "veteran":
 		run.cards.draw_card()
+	run.loot.drop_from(h)
 	for x in s.heroes:
 		if x["party"] == h["party"] and x["trait"] == "loyal":
 			x["dmg"] += 2.0
@@ -161,4 +236,3 @@ func remove(h: Dictionary) -> void:
 	h["gone"] = true
 	var id: int = h["id"]
 	s.heroes = s.heroes.filter(func(x): return x["id"] != id)
-

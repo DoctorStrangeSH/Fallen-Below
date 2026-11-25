@@ -7,6 +7,7 @@ const HeroSystem = preload("res://scripts/systems/hero_system.gd")
 const CombatSystem = preload("res://scripts/systems/combat_system.gd")
 const CardSystem = preload("res://scripts/systems/card_system.gd")
 const SoulSystem = preload("res://scripts/systems/soul_system.gd")
+const LootSystem = preload("res://scripts/systems/loot_system.gd")
 const RunView = preload("res://scripts/run/run_view.gd")
 const RunHud = preload("res://scripts/run/run_hud.gd")
 
@@ -15,6 +16,7 @@ var heroes_sys: HeroSystem
 var combat: CombatSystem
 var cards: CardSystem
 var souls: SoulSystem
+var loot: LootSystem
 var view: RunView
 var hud: RunHud
 
@@ -31,6 +33,8 @@ func _ready() -> void:
 	_add_system(cards, "Cards")
 	souls = SoulSystem.new()
 	_add_system(souls, "Souls")
+	loot = LootSystem.new()
+	_add_system(loot, "Loot")
 
 	view = RunView.new()
 	view.run = self
@@ -98,11 +102,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if mb.button_index == MOUSE_BUTTON_RIGHT:
 		state.selected = -1
+		state.selected_item = -1
 		state.hand_changed.emit()
+		state.inventory_changed.emit()
 	elif mb.button_index == MOUSE_BUTTON_LEFT:
 		if state.game_over or not state.pending_souls.is_empty():
 			return
-		cards.place_selected(view.mouse_cell())
+		if state.selected_item >= 0:
+			loot.equip_at(view.mouse_cell())
+		else:
+			cards.place_selected(view.mouse_cell())
 
 
 func toggle_pause() -> void:
@@ -125,12 +134,26 @@ func heal_heart() -> void:
 		state.heart_hp = mini(state.heart_max, state.heart_hp + 5)
 
 
+## Heart destroyed (win = false) or boss slain (win = true).
 func end_game(win: bool) -> void:
+	_finish("victory" if win else "defeat", 1.0 if win else D.DEFEAT_PCT)
+
+
+## Retreat like in Loop Hero: full payout at the end of a week, partial otherwise.
+func seal() -> void:
+	if state.game_over or not state.pending_souls.is_empty():
+		return
+	_finish("sealed", state.seal_pct())
+
+
+func _finish(outcome: String, pct: float) -> void:
 	if state.game_over:
 		return
 	state.game_over = true
-	var earned: int = Meta.record_run(state.day, state.kills, win)
-	hud.show_end(win, earned)
+	var win := outcome == "victory"
+	var earned := int(round(state.bones_value() * pct)) + (D.VICTORY_BONUS if win else 0)
+	Meta.record_run(state.day, state.kills, earned, win)
+	hud.show_end(outcome, earned, pct)
 
 
 func go_to(scene_path: String) -> void:

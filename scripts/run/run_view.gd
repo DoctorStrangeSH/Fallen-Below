@@ -24,13 +24,11 @@ func mouse_cell() -> Vector2i:
 
 
 func hero_world_pos(h: Dictionary) -> Vector2:
-	var path: Array[Vector2i] = run.state.path
-	var n := path.size()
-	var p: float = h["pos"]
-	var i := int(floor(p))
-	var a := cell_center(path[posmod(i, n)])
-	var b := cell_center(path[posmod(i + 1, n)])
-	return a.lerp(b, p - i)
+	var s = run.state
+	var a := cell_center(s.cell_of(h["cur"]))
+	var b := cell_center(s.cell_of(h["nxt"]))
+	var p: float = h["prog"]
+	return a.lerp(b, p)
 
 
 func _draw() -> void:
@@ -60,11 +58,12 @@ func _draw_floor() -> void:
 
 
 func _draw_path(s, font: Font) -> void:
-	var path: Array[Vector2i] = s.path
-	for i in path.size():
-		var r := cell_rect(path[i]).grow(-2)
+	for i in s.tiles.size():
+		var r := cell_rect(s.cell_of(i)).grow(-2)
 		var card: String = s.tiles[i]["card"]
 		var col := Color(0.24, 0.21, 0.27)
+		if i >= s.loop_size:
+			col = Color(0.2, 0.18, 0.22)  # side passage
 		if i == 0:
 			col = Color(0.55, 0.45, 0.2)
 		elif card != "":
@@ -76,6 +75,10 @@ func _draw_path(s, font: Font) -> void:
 		elif card != "":
 			var label: String = D.CARDS[card]["name"]
 			draw_string(font, r.position + Vector2(0, 14), label.substr(0, 6), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 10, Color(1, 1, 1, 0.7))
+	# fork markers
+	for f in s.forks:
+		var c := cell_center(s.cell_of(f))
+		draw_circle(c + Vector2(0, 14), 4.0, Color(1, 0.85, 0.3, 0.8))
 
 
 func _draw_scenery(s, font: Font) -> void:
@@ -101,28 +104,34 @@ func _draw_heart(s, font: Font) -> void:
 func _draw_preview(s) -> void:
 	if s.game_over or not s.pending_souls.is_empty():
 		return
-	var id: String = run.cards.selected_id()
-	if id == "":
-		return
 	var mc := mouse_cell()
-	var ok: bool = run.cards.can_place(id, mc)
+	var ok := false
+	if s.selected_item >= 0:
+		ok = run.loot.can_equip_at(mc)
+		for t in s.tiles.size():
+			if not s.undead_at(t).is_empty():
+				draw_rect(cell_rect(s.cell_of(t)), Color(0.5, 0.9, 1.0), false, 2.0)
+	else:
+		var id: String = run.cards.selected_id()
+		if id == "":
+			return
+		ok = run.cards.can_place(id, mc)
 	var r := cell_rect(mc)
 	draw_rect(r, Color(0.3, 1, 0.4, 0.25) if ok else Color(1, 0.2, 0.2, 0.2))
 	draw_rect(r, Color(0.3, 1, 0.4) if ok else Color(1, 0.3, 0.3), false, 2.0)
 
 
 func _draw_units(s) -> void:
-	var path: Array[Vector2i] = s.path
 	for i in s.tiles.size():
 		var units: Array = s.tiles[i]["units"]
 		var k := 0
 		for u in units:
 			if u["hp"] <= 0.0:
 				continue
-			var base := D.MAP_OFFSET + Vector2(path[i]) * D.CELL
+			var base := D.MAP_OFFSET + Vector2(s.cell_of(i)) * D.CELL
 			var p := base + Vector2(6 + (k % 3) * 13, 22 + (k / 3) * 13)
 			var sz := 11.0
-			if u["name"] == "Spider Queen":
+			if u["name"] in ["Spider Queen", "Bone Golem", "Mimic"]:
 				sz = 16.0
 			if u["undead"]:
 				draw_rect(Rect2(p - Vector2(1, 1), Vector2(sz + 2, sz + 2)), Color(0.5, 0.9, 1.0))
@@ -130,6 +139,8 @@ func _draw_units(s) -> void:
 			draw_rect(Rect2(p, Vector2(sz, sz)), col)
 			var frac: float = clampf(u["hp"] / u["max_hp"], 0.0, 1.0)
 			draw_rect(Rect2(p + Vector2(0, sz), Vector2(sz * frac, 2)), Color(0.4, 0.9, 1.0))
+			if u.get("gear", {}).size() > 0:
+				draw_rect(Rect2(p + Vector2(sz - 3, -2), Vector2(4, 4)), Color(1, 0.75, 0.2))
 			k += 1
 
 
@@ -153,6 +164,8 @@ func _draw_heroes(s, font: Font) -> void:
 		var frac: float = clampf(h["hp"] / h["max_hp"], 0.0, 1.0)
 		draw_rect(Rect2(p + Vector2(-rad, -rad - 6), Vector2(rad * 2, 3)), Color(0.2, 0, 0))
 		draw_rect(Rect2(p + Vector2(-rad, -rad - 6), Vector2(rad * 2 * frac, 3)), Color(1, 0.3, 0.3))
+		if h["stun"] > 0.0:
+			draw_string(font, p + Vector2(-rad, -rad - 8), "zz", HORIZONTAL_ALIGNMENT_CENTER, rad * 2, 11, Color(1, 0.85, 0.3))
 		if h["revenge"]:
 			draw_string(font, p + Vector2(rad, -rad), "!", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 0.3, 0.2))
 		var trait_id: String = h["trait"]

@@ -10,6 +10,7 @@ var runs := 0
 var wins := 0
 var best_day := 0
 var total_kills := 0
+var discovered := []  # combo ids
 
 
 func _ready() -> void:
@@ -71,9 +72,22 @@ func card_weights() -> Dictionary:
 	return w
 
 
-## Called when a run ends. Returns bones earned.
-func record_run(days: int, kills: int, win: bool) -> int:
-	var earned := days * 3 + kills + (25 if win else 0)
+## Raw bones value of a run before the payout percentage.
+static func bones_value(days: int, kills: int) -> int:
+	return days * 3 + kills
+
+
+## Marks a combo as discovered. Returns true the first time.
+func discover(id: String) -> bool:
+	if discovered.has(id):
+		return false
+	discovered.append(id)
+	save_game()
+	return true
+
+
+## Called when a run ends with the final bones payout.
+func record_run(days: int, kills: int, earned: int, win: bool) -> void:
 	bones += earned
 	runs += 1
 	total_kills += kills
@@ -81,7 +95,6 @@ func record_run(days: int, kills: int, win: bool) -> int:
 		wins += 1
 	best_day = maxi(best_day, days)
 	save_game()
-	return earned
 
 
 # ---------------------------------------------------------- save / load
@@ -90,6 +103,7 @@ func save_game() -> void:
 	var data := {
 		"version": 1, "bones": bones, "buildings": buildings, "runs": runs,
 		"wins": wins, "best_day": best_day, "total_kills": total_kills,
+		"discovered": discovered,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -111,6 +125,12 @@ func load_game() -> void:
 	wins = int(d.get("wins", 0))
 	best_day = int(d.get("best_day", 0))
 	total_kills = int(d.get("total_kills", 0))
+	discovered = []
+	var disc = d.get("discovered", [])
+	if disc is Array:
+		for c in disc:
+			if D.COMBOS.has(c):
+				discovered.append(str(c))
 	buildings = {}
 	var b = d.get("buildings", {})
 	if b is Dictionary:
@@ -126,4 +146,5 @@ func reset_save() -> void:
 	wins = 0
 	best_day = 0
 	total_kills = 0
+	discovered = []
 	save_game()

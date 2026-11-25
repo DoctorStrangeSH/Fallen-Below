@@ -1,5 +1,5 @@
 extends Node
-## Drawing, selecting and placing cards, plus placement synergies.
+## Drawing, selecting and placing cards, room respawns and secret combos.
 
 const D = preload("res://scripts/data/game_data.gd")
 const RunState = preload("res://scripts/run/run_state.gd")
@@ -38,7 +38,9 @@ func use_card(i: int) -> void:
 		s.selected = -1
 	else:
 		s.selected = -1 if s.selected == i else i
+	s.selected_item = -1
 	s.hand_changed.emit()
+	s.inventory_changed.emit()
 
 
 func selected_id() -> String:
@@ -55,7 +57,7 @@ func can_place(id: String, cell: Vector2i) -> bool:
 		if not s.path_lookup.has(cell):
 			return false
 		var idx: int = s.path_lookup[cell]
-		return idx != 0 and s.tiles[idx]["card"] == ""
+		return idx != 0 and s.card_at(idx) == ""
 	if kind == "scenery":
 		if s.path_lookup.has(cell) or s.scenery.has(cell):
 			return false
@@ -75,14 +77,14 @@ func place_selected(cell: Vector2i) -> void:
 		var idx: int = s.path_lookup[cell]
 		s.tiles[idx]["card"] = id
 		if id == "crypt":
-			for k in 2:
-				s.tiles[idx]["units"].append(make_monster("skeleton"))
+			_fill_skeletons(idx)
 		elif id == "spider":
 			for k in 3:
-				s.tiles[idx]["units"].append(make_monster("spider"))
-			_check_queen(idx)
+				_spawn(idx, "spider")
+		_check_path_combos(idx, id)
 	else:
 		s.scenery[cell] = id
+		_check_scenery_combos(cell, id)
 	s.threat += 8.0
 	s.hand.remove_at(s.selected)
 	s.selected = -1
@@ -92,33 +94,141 @@ func place_selected(cell: Vector2i) -> void:
 func make_monster(id: String) -> Dictionary:
 	var m: Dictionary = D.MONSTERS[id]
 	return {"name": m["name"], "hp": float(m["hp"]), "max_hp": float(m["hp"]), "dmg": m["dmg"],
-		"color": m["color"], "undead": false, "party": -1}
+		"color": m["color"], "undead": false, "party": -1, "affixes": []}
+
+
+func _spawn(t: int, monster_id: String) -> void:
+	s.tiles[t]["units"].append(make_monster(monster_id))
+
+
+func _skeleton_cap(t: int) -> int:
+	var card := s.card_at(t)
+	if not D.SKELETON_CAP.has(card):
+		return 0
+	var base: int = D.SKELETON_CAP[card]
+	return base + s.scenery_near(t, "graveyard")
+
+
+func _fill_skeletons(t: int) -> void:
+	var cap := _skeleton_cap(t)
+	while s.count_units(t, "Skeleton") < cap:
+		_spawn(t, "skeleton")
 
 
 ## Daily respawn of room monsters.
 func respawn_rooms() -> void:
 	for i in s.tiles.size():
-		var card: String = s.tiles[i]["card"]
-		if card == "crypt":
-			var cap := 2 + s.scenery_near(i, "graveyard")
-			while s.count_units(i, "Skeleton") < cap:
-				s.tiles[i]["units"].append(make_monster("skeleton"))
+		var card := s.card_at(i)
+		if D.SKELETON_CAP.has(card):
+			_fill_skeletons(i)
+		if card == "necropolis" and s.count_units(i, "Bone Golem") == 0:
+			_spawn(i, "golem")
+		elif card == "mimic" and s.count_units(i, "Mimic") == 0:
+			_spawn(i, "mimic")
 		elif card == "spider" or card == "queen":
 			if s.count_units(i, "Spider") < 4:
-				s.tiles[i]["units"].append(make_monster("spider"))
+				_spawn(i, "spider")
 
 
-func _check_queen(idx: int) -> void:
-	var n := s.path.size()
-	for start in [idx - 2, idx - 1, idx]:
-		var ok := true
-		for k in 3:
-			if s.tiles[posmod(start + k, n)]["card"] != "spider":
-				ok = false
-		if ok:
-			var mid := posmod(start + 1, n)
-			s.tiles[mid]["card"] = "queen"
-			s.tiles[mid]["units"].append(make_monster("queen"))
-			s.threat += 10.0
-			s.add_log("Three nests merge: the Spider Queen awakens!")
-			return
+# ---------------------------------------------------------- combos
+
+## Middle tile of a straight run of three `card` tiles through `t`, or -1.
+func _line3(t: int, card: String) -> int:
+	var candidates: Array = [t]
+	candidates.append_array(s.path_neighbors(t))
+	for m in candidates:
+		if m == 0 or s.card_at(m) != card:
+			continue
+		var has_prev := false
+		for p in s.tiles[m]["prev"]:
+			if s.card_at(p) == card:
+				has_prev = true
+		var has_next := false
+		for n in s.tiles[m]["next"]:
+			if s.card_at(n) == card:
+				has_next = true
+		if has_prev and has_next:
+			return m
+	return -1
+
+
+func _is_between(t: int, card: String) -> bool:
+	var a := false
+	for p in s.tiles[t]["prev"]:
+		if s.card_at(p) == card:
+			a = true
+	var b := false
+	for n in s.tiles[t]["next"]:
+		if s.card_at(n) == card:
+			b = true
+	return a and b
+
+
+func _check_path_combos(t: int, id: String) -> void:
+	match id:
+		"spider":
+			var m := _line3(t, "spider")
+			if m >= 0:
+				s.tiles[m]["card"] = "queen"
+				_spawn(m, "queen")
+				s.threat += 10.0
+				_found("queen")
+		"spikes":
+			var m := _line3(t, "spikes")
+			if m >= 0:
+				s.tiles[m]["card"] = "grinder"
+				_found("grinder")
+			for nb in s.path_neighbors(t):
+				_try_mimic(nb)
+		"chest":
+			_try_mimic(t)
+		"crypt":
+			for nb in s.path_neighbors(t):
+				if s.card_at(nb) == "crypt":
+					s.tiles[t]["card"] = "catacomb"
+					s.tiles[nb]["card"] = "catacomb"
+					_fill_skeletons(t)
+					_fill_skeletons(nb)
+					_found("catacombs")
+					break
+			_try_necropolis(t)
+
+
+func _try_mimic(t: int) -> void:
+	if s.card_at(t) == "chest" and _is_between(t, "spikes"):
+		s.tiles[t]["card"] = "mimic"
+		_spawn(t, "mimic")
+		_found("mimic")
+
+
+func _try_necropolis(t: int) -> void:
+	var card := s.card_at(t)
+	if (card == "crypt" or card == "catacomb") and s.scenery_near(t, "graveyard") >= 2:
+		s.tiles[t]["card"] = "necropolis"
+		_fill_skeletons(t)
+		_spawn(t, "golem")
+		s.threat += 10.0
+		_found("necropolis")
+
+
+func _check_scenery_combos(cell: Vector2i, id: String) -> void:
+	if id == "graveyard":
+		for nb in s.neighbors(cell):
+			if s.path_lookup.has(nb):
+				var t: int = s.path_lookup[nb]
+				_try_necropolis(t)
+	elif id == "altar":
+		if s.scenery_near_cell(cell, "altar") + s.scenery_near_cell(cell, "spire") >= 2:
+			s.scenery[cell] = "spire"
+			_found("spire")
+
+
+func _found(combo_id: String) -> void:
+	var def: Dictionary = D.COMBOS[combo_id]
+	var combo_name: String = def["name"]
+	if Meta.discover(combo_id):
+		s.add_log("NEW COMBO DISCOVERED: %s!" % combo_name)
+		s.combo_found.emit("NEW COMBO: %s" % combo_name)
+	else:
+		s.add_log("Combo: %s!" % combo_name)
+		s.combo_found.emit(combo_name)

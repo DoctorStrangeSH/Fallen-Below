@@ -26,10 +26,12 @@ func tick() -> void:
 		var hs: Array = by_tile[t]
 
 		var regen := s.scenery_near(t, "graveyard")
-		if regen > 0:
-			for u in units:
-				if u["undead"]:
-					u["hp"] = minf(u["max_hp"], u["hp"] + regen)
+		for u in units:
+			var r: float = float(regen) if u["undead"] else 0.0
+			if _has_affix(u, "regen"):
+				r += 2.0
+			if r > 0.0:
+				u["hp"] = minf(u["max_hp"], u["hp"] + r)
 
 		_heroes_strike(hs, units)
 		units = s.alive_units(t)
@@ -51,10 +53,12 @@ func _heroes_strike(hs: Array, units: Array) -> void:
 		if target["undead"] and h["trait"] == "zealot":
 			dmg *= 1.5
 		target["hp"] -= dmg
+		if _has_affix(target, "thorns"):
+			run.heroes_sys.damage(h, 3.0)
 
 
 func _dungeon_strikes(t: int, hs: Array, units: Array) -> void:
-	var bonus := 2.0 * s.scenery_near(t, "altar")
+	var bonus := 2.0 * s.scenery_near(t, "altar") + 5.0 * s.scenery_near(t, "spire")
 	for u in units:
 		var alive_h := hs.filter(func(x): return not x["gone"])
 		if alive_h.is_empty():
@@ -62,13 +66,20 @@ func _dungeon_strikes(t: int, hs: Array, units: Array) -> void:
 		var target: Dictionary = alive_h[s.rng.randi() % alive_h.size()]
 		var dmg: float = u["dmg"] + bonus
 		if u["undead"] and u["party"] == target["party"]:
-			if s.rng.randf() < D.BETRAY_CHANCE:
+			if not _has_affix(u, "chains") and s.rng.randf() < D.BETRAY_CHANCE:
 				u["hp"] = 0.0
 				run.heroes_sys.heal(target, 10.0)
 				s.add_log("%s remembers %s... and abandons you!" % [u["name"], target["name"]])
 				continue
 			dmg *= 1.5  # rage of the betrayed
 		run.heroes_sys.damage(target, dmg)
+		if _has_affix(u, "lifesteal"):
+			u["hp"] = minf(u["max_hp"], u["hp"] + dmg * 0.25)
+
+
+func _has_affix(u: Dictionary, affix: String) -> bool:
+	var list: Array = u.get("affixes", [])
+	return list.has(affix)
 
 
 func _paladin_heal(hs: Array) -> void:

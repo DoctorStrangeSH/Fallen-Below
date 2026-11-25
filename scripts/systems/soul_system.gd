@@ -57,7 +57,8 @@ func _raise(h: Dictionary) -> void:
 	var unit := {
 		"name": "%s %s" % [dark_name(h), h["name"]], "hp": hp, "max_hp": hp,
 		"dmg": h["dmg"] * 1.1, "color": col.darkened(0.55),
-		"undead": true, "party": h["party"],
+		"undead": true, "party": h["party"], "cls": h["cls"],
+		"base_dmg": h["dmg"] * 1.1, "base_hp": hp, "gear": {}, "affixes": [],
 	}
 	var t: int = h["death_tile"]
 	s.tiles[t]["units"].append(unit)
