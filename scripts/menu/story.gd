@@ -30,7 +30,7 @@ func _ready() -> void:
 	add_child(hint)
 
 	if pages.is_empty():
-		_finish()
+		_finish.call_deferred()
 	else:
 		_show_page()
 
@@ -62,7 +62,13 @@ func _next() -> void:
 		_show_page()
 
 
+var finished := false
+
+
 func _finish() -> void:
+	if finished:
+		return
+	finished = true
 	var next_scene: String = Meta.story_next
 	if next_scene == "":
 		next_scene = "res://scenes/main_menu.tscn"

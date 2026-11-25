@@ -10,4 +10,5 @@
 - Map is procedurally generated each run in `run_state.gd` (`_random_region` → `_trace_ring` → `_commit_loop` + detours).
 - Design rule from the owner: no mechanics for the sake of mechanics. Every feature must create a visible player decision tied to the core loop.
 - Balance model: `tools/balance_sim.py` (Python, mirrors key numbers from game_data.gd; keep in sync when tuning). Debug keys F1–F5 in `run.gd` (debug builds only).
+- Godot can be run in this sandbox: download `Godot_v4.7.1-stable_linux.x86_64.zip` from GitHub releases, `--headless --import`, then `--headless res://tests/bot.tscn -- --runs=N --warden=.. --lure=..` (autoplay bot, prints win/death stats; Meta.no_save). Screenshots: `xvfb-run -a -s "-screen 0 1280x720x24" godot --rendering-driver opengl3 res://tests/bot.tscn -- --runs=1 --shot=/path.png --shot_day=7`. Always run the bot after gameplay changes. Note: `--check-only --script` falsely reports "Meta not found"; run scenes instead.
 - GDScript gotcha: don't use `:=` on values read from Dictionaries (Variant) — declare explicit types.

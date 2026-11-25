@@ -114,7 +114,7 @@ func _draw_scenery(s, font: Font) -> void:
 ## The dungeon's hungry heart (decorative). Beats faster the more travelers are inside.
 func _draw_heart(s, font: Font) -> void:
 	var center := cell_center(s.heart_cell)
-	var beat := 300.0 / (1.0 + 0.25 * s.heroes.size())
+	var beat: float = 300.0 / (1.0 + 0.25 * s.heroes.size())
 	var pulse := 1.0 + 0.08 * sin(Time.get_ticks_msec() / beat)
 	if Art.draw(self, "heart", center, 44.0 * pulse):
 		return

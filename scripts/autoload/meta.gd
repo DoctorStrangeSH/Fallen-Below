@@ -23,6 +23,8 @@ var acts_cleared := []
 var fragments := {}      # traveler kind -> pages of the Book of the Fallen unlocked
 var seen := []           # one-time story beats and memories already shown
 
+var no_save := false     # set by the test bot so it never touches the real save
+
 # story scene hand-off (not saved)
 var pending_story := ""
 var story_next := ""
@@ -336,6 +338,8 @@ func record_run(days: int, kills: int, payout: Dictionary, new_relics: Array, wi
 # ---------------------------------------------------------- save / load
 
 func save_game() -> void:
+	if no_save:
+		return
 	var data := {
 		"version": SAVE_VERSION, "res": res, "buildings": buildings, "relics": relics,
 		"deck": deck, "loadout": loadout, "runs": runs, "wins": wins, "best_day": best_day,

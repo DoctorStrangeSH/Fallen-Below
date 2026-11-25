@@ -25,12 +25,18 @@ const INVENTORY_MAX := 6
 const CHEST_STUN := 1.5
 const LURE_SHARE := 0.7           # share of each party that follows your lure
 const RADIANCE_DMG := 4.0         # Champion burns undead nearby each combat tick
+const BOSS_HP := 260.0            # tuned with tests/bot.gd
+const BOSS_HP_PER_LOOP := 50.0
+const BOSS_DMG := 10.0
+const BOSS_DMG_PER_LOOP := 2.0
 
 # --- attention of the Order (boss meter) ---
 # tuned with sim/balance.py: champion arrives around day 15-17
 const THREAT_PER_CARD := 0.8
 const THREAT_PER_KILL := 0.8
 const THREAT_PER_ESCAPE := 6.0
+const THREAT_PER_COMBO := 3.0
+const MONSTER_LOOP_POWER := 0.12  # your monsters also grow stronger each loop
 
 # --- sleeping (retreat) ---
 const SEAL_EVERY := 5             # full payout on days divisible by this
@@ -52,9 +58,9 @@ const WARDENS := {
 	},
 	"brood": {
 		"name": "The Broodmother", "color": Color(0.45, 0.9, 0.4),
-		"hp": 90.0, "dmg": 5.0, "def": 1.0, "speed": 1.1,
+		"hp": 110.0, "dmg": 6.0, "def": 1.5, "speed": 1.1,
 		"slots": ["armor", "amulet", "amulet", "ring", "ring"],
-		"passive": "Brood", "passive_desc": "Every traveler she kills leaves a spider on that tile. Spider Nests come twice as often.",
+		"passive": "Brood", "passive_desc": "Every traveler she kills leaves a spider on that tile. Her spiders are 30% stronger. Spider Nests come twice as often.",
 		"active": "Swarm", "active_desc": "Lays 3 spiders on her tile.",
 		"cooldown": 22.0,
 		"style": "No weapons. Fills the dungeon with her children.",
@@ -64,7 +70,7 @@ const WARDENS := {
 		"name": "The Mimic King", "color": Color(1.0, 0.75, 0.25),
 		"hp": 100.0, "dmg": 7.0, "def": 0.5, "speed": 1.5,
 		"slots": ["weapon", "weapon", "ring", "ring", "ring"],
-		"passive": "Hoard", "passive_desc": "+0.2 damage for every Gold in this run's harvest. Cursed Chests come twice as often.",
+		"passive": "Hoard", "passive_desc": "+0.1 damage for every Gold in this run's harvest. Cursed Chests come twice as often.",
 		"active": "Swallow", "active_desc": "Swallows a weakened traveler (below 40% HP) whole: devoured at once, double harvest.",
 		"cooldown": 18.0,
 		"style": "Two weapons, three rings. Grows rich, then grows cruel.",
@@ -72,7 +78,7 @@ const WARDENS := {
 	},
 	"saint": {
 		"name": "The Hollow Saint", "color": Color(0.95, 0.9, 0.75),
-		"hp": 100.0, "dmg": 6.0, "def": 1.0, "speed": 1.2,
+		"hp": 125.0, "dmg": 7.0, "def": 1.5, "speed": 1.2,
 		"slots": ["weapon", "armor", "amulet", "amulet", "ring"],
 		"passive": "Shepherd of the Dead", "passive_desc": "+2 undead servant slots, servants rise with 50% more HP. Devouring heals only half.",
 		"active": "Call the Dead", "active_desc": "Every servant heals 50%, and the Saint heals 5% for each servant.",

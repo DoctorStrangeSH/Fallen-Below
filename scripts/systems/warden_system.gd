@@ -208,7 +208,7 @@ func recompute() -> void:
 		if def.has("cap"):
 			st[k] = minf(st[k], float(def["cap"]))
 	if is_kind("mimic"):
-		st["dmg"] += 0.2 * int(s.pouch.get("gold", 0))
+		st["dmg"] += 0.1 * int(s.pouch.get("gold", 0))
 	w["stats"] = st
 	var gain: float = st["hp"] - w["max_hp"]
 	w["max_hp"] = st["hp"]

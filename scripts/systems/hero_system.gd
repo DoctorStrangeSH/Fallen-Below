@@ -69,9 +69,9 @@ func spawn_boss() -> void:
 	h["trait"] = ""
 	h["boss"] = true
 	h["title"] = act["boss_title"]
-	h["hp"] = 200.0 + s.loop * 40.0
+	h["hp"] = D.BOSS_HP + s.loop * D.BOSS_HP_PER_LOOP
 	h["max_hp"] = h["hp"]
-	h["dmg"] = 8.0 + s.loop * 2.0
+	h["dmg"] = D.BOSS_DMG + s.loop * D.BOSS_DMG_PER_LOOP
 	h["speed"] = 1.3
 	h["color"] = Color(1, 1, 1)
 	for line in D.BOSS_LINES["arrive"]:
@@ -196,7 +196,8 @@ func escape_laps() -> int:
 func escape(h: Dictionary, how: String) -> void:
 	remove(h)
 	var t := D.THREAT_PER_ESCAPE * (0.5 if s.has_relic("whispering_skull") else 1.0)
-	s.add_threat(t)
+	s.add_threat(t, "escapes")
+	s.escapes += 1
 	s.add_log("%s %s and will tell the Order!" % [s.hero_name(h), how])
 	run.beat("first_escape")
 	run.beat("tut_escape")
@@ -244,7 +245,7 @@ func _kill(h: Dictionary) -> void:
 	h["death_tile"] = h["cur"]
 	remove(h)
 	s.kills += 1
-	s.add_threat(D.THREAT_PER_KILL)
+	s.add_threat(D.THREAT_PER_KILL, "kills")
 	_harvest(h)
 	run.cards.draw_card()
 	run.loot.drop_from(h)

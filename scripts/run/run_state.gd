@@ -364,8 +364,14 @@ func gain(resource: String, amount: int) -> void:
 	pouch[resource] = int(pouch.get(resource, 0)) + amount
 
 
-func add_threat(amount: float) -> void:
-	threat += amount * (0.75 if has_relic("slow_dawn") else 1.0)
+var threat_from := {}         # source -> attention gained (for balancing)
+var escapes := 0
+
+
+func add_threat(amount: float, source: String = "other") -> void:
+	var v := amount * (0.75 if has_relic("slow_dawn") else 1.0)
+	threat += v
+	threat_from[source] = float(threat_from.get(source, 0.0)) + v
 
 
 func seal_pct() -> float:

@@ -95,7 +95,7 @@ func place_selected(cell: Vector2i) -> void:
 	else:
 		s.scenery[cell] = id
 		_check_scenery_combos(cell, id)
-	s.add_threat(D.THREAT_PER_CARD)
+	s.add_threat(D.THREAT_PER_CARD, "cards")
 	s.hand.remove_at(s.selected)
 	s.selected = -1
 	s.hand_changed.emit()
@@ -103,7 +103,10 @@ func place_selected(cell: Vector2i) -> void:
 
 func make_monster(id: String) -> Dictionary:
 	var m: Dictionary = D.MONSTERS[id]
-	return {"name": m["name"], "hp": float(m["hp"]), "max_hp": float(m["hp"]), "dmg": m["dmg"],
+	var mult := 1.0 + D.MONSTER_LOOP_POWER * (s.loop - 1)  # the dungeon deepens with every loop too
+	var brood := 1.3 if id == "spider" and s.warden.get("id", "") == "brood" else 1.0
+	var hp: float = round(float(m["hp"]) * mult * brood)
+	return {"name": m["name"], "hp": hp, "max_hp": hp, "dmg": float(m["dmg"]) * mult * brood,
 		"color": m["color"], "undead": false, "party": -1, "kind": id}
 
 
@@ -187,7 +190,7 @@ func _check_path_combos(t: int, id: String) -> void:
 			if m >= 0:
 				s.tiles[m]["card"] = "queen"
 				_spawn(m, "queen")
-				s.add_threat(10.0)
+				s.add_threat(D.THREAT_PER_COMBO, "combos")
 				_found("queen")
 		"spikes":
 			var m := _line3(t, "spikes")
@@ -223,7 +226,7 @@ func _try_necropolis(t: int) -> void:
 		s.tiles[t]["card"] = "necropolis"
 		_fill_skeletons(t)
 		_spawn(t, "golem")
-		s.add_threat(10.0)
+		s.add_threat(D.THREAT_PER_COMBO, "combos")
 		_found("necropolis")
 
 
