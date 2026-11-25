@@ -210,7 +210,7 @@ func _on_enter_tile(h: Dictionary, t: int) -> void:
 	var card := s.card_at(t)
 	if not D.TRAP_DMG.has(card):
 		return
-	var dmg: float = D.TRAP_DMG[card]
+	var dmg: float = D.TRAP_DMG[card] * Meta.trap_mult()
 	if (card == "spikes" or card == "grinder") and s.has_relic("thorned_halls"):
 		dmg += 3.0
 	if card == "spikes":

@@ -21,6 +21,7 @@ var lure := "gold"
 var sleep_mode := ""
 var shot_path := ""
 var shot_day := 6
+var lair_mode := ""   # none | mid | full: simulate a fresh, half-built or finished Lair
 var results: Array = []
 var current: Node = null
 var rng := RandomNumberGenerator.new()
@@ -47,6 +48,8 @@ func _ready() -> void:
 				shot_day = int(kv[1])
 			"growth":
 				Meta.buildings["pit"] = int(kv[1])
+			"lair":
+				lair_mode = kv[1]
 	rng.seed = 12345
 	Meta.no_save = true
 	# make every Warden and lure available to the bot (does not touch buildings permanently)
@@ -55,7 +58,19 @@ func _ready() -> void:
 	Meta.deck = D.START_CARDS.duplicate()
 	Meta.loadout = []
 	Meta.seen = D.BEATS.keys()  # skip tutorial narration
-	print("BOT: %d runs, warden=%s, lure=%s, sleep=%s" % [runs_total, warden_id, lure, sleep_mode])
+	if lair_mode != "":
+		Meta.buildings = {}
+		for id in D.BUILDINGS:
+			var max_lvl: int = Meta.max_level(id)
+			match lair_mode:
+				"mid":
+					Meta.buildings[id] = int(ceil(max_lvl / 2.0))
+				"full":
+					Meta.buildings[id] = max_lvl
+		if lair_mode == "none":
+			Meta.buildings = {}
+		Meta.deck = D.START_CARDS.duplicate()
+	print("BOT: %d runs, warden=%s, lure=%s, lair=%s" % [runs_total, warden_id, lure, lair_mode])
 	_start_run()
 
 
@@ -259,5 +274,6 @@ func _report() -> void:
 		outcomes[r["outcome"]] = int(outcomes.get(r["outcome"], 0)) + 1
 		days.append(r["day"])
 	days.sort()
-	print("==== SUMMARY warden=%s lure=%s: %s | day min %d median %d max %d" % [
-		warden_id, lure, str(outcomes), days[0], days[days.size() / 2], days[days.size() - 1]])
+	var wins := int(outcomes.get("victory", 0))
+	print("==== SUMMARY warden=%s lure=%s lair=%s: win %d%% %s | day min %d median %d max %d" % [
+		warden_id, lure, lair_mode, int(100.0 * wins / results.size()), str(outcomes), days[0], days[days.size() / 2], days[days.size() - 1]])

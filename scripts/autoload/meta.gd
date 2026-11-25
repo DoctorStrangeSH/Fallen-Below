@@ -77,9 +77,26 @@ func next_cost(id: String) -> Dictionary:
 	return costs[lvl]
 
 
+## Every building listed in `requires` is built to at least the required level.
+func requirements_met(id: String) -> bool:
+	var req: Dictionary = D.BUILDINGS[id].get("requires", {})
+	for b in req:
+		if level(b) < int(req[b]):
+			return false
+	return true
+
+
+func requirements_text(id: String) -> String:
+	var req: Dictionary = D.BUILDINGS[id].get("requires", {})
+	var parts: Array = []
+	for b in req:
+		parts.append("%s %d" % [D.BUILDINGS[b]["name"], int(req[b])])
+	return ", ".join(parts)
+
+
 func buy(id: String) -> bool:
 	var c := next_cost(id)
-	if c.is_empty() or not can_afford(c):
+	if c.is_empty() or not can_afford(c) or not requirements_met(id):
 		return false
 	pay(c)
 	buildings[id] = level(id) + 1
@@ -187,14 +204,14 @@ func set_warden(id: String) -> void:
 
 
 func warden_hp() -> float:
-	var hp: float = float(warden_def()["hp"]) + 10.0 * level("den")
+	var hp: float = float(warden_def()["hp"]) + 15.0 * level("den")
 	if loadout.has("blood_price"):
 		hp -= 25.0
 	return hp
 
 
 func warden_dmg() -> float:
-	var dmg: float = float(warden_def()["dmg"]) + level("forge")
+	var dmg: float = float(warden_def()["dmg"]) + 1.5 * level("forge")
 	if loadout.has("blood_price"):
 		dmg += 3.0
 	if loadout.has("hollow_echo"):
@@ -308,6 +325,28 @@ func warden_title() -> String:
 ## Experience and abilities exist only once the Hungering Pit is built.
 func growth_unlocked() -> bool:
 	return level("pit") > 0
+
+
+# ---------------------------------------------------------- Lair bonuses used in runs
+
+func warden_def_bonus() -> float:
+	return 0.5 * level("walls")
+
+
+func devour_bonus() -> float:
+	return 0.05 * level("larder")
+
+
+func xp_mult() -> float:
+	return 1.0 + 0.25 * maxi(0, level("pit") - 1)
+
+
+func monster_mult() -> float:
+	return 1.0 + 0.12 * level("pens")
+
+
+func trap_mult() -> float:
+	return 1.0 + 0.2 * level("traps")
 
 
 ## Marks a combo as discovered. Returns true the first time.

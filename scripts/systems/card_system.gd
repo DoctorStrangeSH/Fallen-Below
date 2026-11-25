@@ -103,7 +103,7 @@ func place_selected(cell: Vector2i) -> void:
 
 func make_monster(id: String) -> Dictionary:
 	var m: Dictionary = D.MONSTERS[id]
-	var mult := 1.0 + D.MONSTER_LOOP_POWER * (s.loop - 1)  # the dungeon deepens with every loop too
+	var mult := (1.0 + D.MONSTER_LOOP_POWER * (s.loop - 1)) * Meta.monster_mult()  # deeper loops, Monster Pens
 	var brood := 1.0
 	if id == "spider" and s.warden.get("id", "") == "brood":
 		brood = 1.3 * (1.5 if run.warden.has("queens_blood") else 1.0)

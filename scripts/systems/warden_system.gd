@@ -17,7 +17,7 @@ func setup(base_hp: float, base_dmg: float) -> void:
 		base[k] = 0.0
 	base["hp"] = base_hp
 	base["dmg"] = base_dmg
-	base["def"] = float(Meta.warden_def().get("def", 0.0))
+	base["def"] = float(Meta.warden_def().get("def", 0.0)) + Meta.warden_def_bonus()
 	var def: Dictionary = Meta.warden_def()
 	s.warden = {
 		"id": Meta.warden_id, "name": Meta.warden_name(), "color": def["color"], "speed": def["speed"],
@@ -172,9 +172,9 @@ func devour(h: Dictionary) -> void:
 		mult *= 1.5
 	w["diet"][diet["stat"]] += float(diet["amount"]) * mult
 	recompute()
-	var heal: float = w["max_hp"] * D.DEVOUR_HEAL
+	var heal: float = w["max_hp"] * (D.DEVOUR_HEAL + Meta.devour_bonus())
 	if is_kind("bone"):
-		heal = w["max_hp"] * 0.4
+		heal = w["max_hp"] * (0.4 + Meta.devour_bonus())
 	elif is_kind("saint"):
 		heal *= 0.5
 	if has("gnaw"):
@@ -245,7 +245,7 @@ func recompute() -> void:
 			st[k] = minf(st[k], float(def["cap"]))
 	var gold := int(s.pouch.get("gold", 0))
 	if is_kind("mimic"):
-		st["dmg"] += (0.15 if has("gilded_teeth") else 0.1) * gold
+		st["dmg"] += (0.08 if has("gilded_teeth") else 0.05) * gold
 	st["dmg"] += float(w.get("bonus_dmg", 0.0))
 	if has("thick_marrow"):
 		st["hp"] *= 1.25
@@ -361,7 +361,7 @@ func gain_xp(amount: int) -> void:
 	var w := s.warden
 	if not w.get("growth", false) or amount <= 0 or not alive():
 		return
-	w["xp"] += amount
+	w["xp"] += int(round(amount * Meta.xp_mult()))
 	while xp_to_next() > 0 and int(w["xp"]) >= xp_to_next():
 		w["level"] += 1
 		heal_by(w["max_hp"] * D.LEVEL_UP_HEAL)

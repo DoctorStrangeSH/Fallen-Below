@@ -25,10 +25,10 @@ const INVENTORY_MAX := 6
 const CHEST_STUN := 1.5
 const LURE_SHARE := 0.7           # share of each party that follows your lure
 const RADIANCE_DMG := 4.0         # Champion burns undead nearby each combat tick
-const BOSS_HP := 260.0            # tuned with tests/bot.gd
-const BOSS_HP_PER_LOOP := 50.0
-const BOSS_DMG := 10.0
-const BOSS_DMG_PER_LOOP := 2.0
+const BOSS_HP := 420.0            # tuned with tests/bot.gd (lair none/mid/full)
+const BOSS_HP_PER_LOOP := 60.0
+const BOSS_DMG := 13.0
+const BOSS_DMG_PER_LOOP := 2.5
 
 # --- attention of the Order (boss meter) ---
 # tuned with sim/balance.py: champion arrives around day 15-17
@@ -50,7 +50,7 @@ const WARDENS := {
 	"bone": {
 		"name": "Marrowgrave", "title": "the Bone Warden", "color": Color(0.55, 0.85, 1.0),
 		"xp_source": "Learns by devouring.",
-		"hp": 110.0, "dmg": 8.0, "def": 1.0, "speed": 1.3,
+		"hp": 70.0, "dmg": 6.0, "def": 0.0, "speed": 1.3,
 		"slots": ["weapon", "shield", "armor", "amulet", "ring"],
 		"passive": "Marrow Feast", "passive_desc": "Devouring heals 40% HP instead of 25%.",
 		"active": "Bone Storm", "active_desc": "Deals double damage to every traveler on the Warden's tile and the tiles next to it.",
@@ -60,7 +60,7 @@ const WARDENS := {
 	"brood": {
 		"name": "Vesh'ka", "title": "Mother of Threads", "color": Color(0.45, 0.9, 0.4),
 		"xp_source": "Learns when travelers die among her spiders.",
-		"hp": 110.0, "dmg": 6.0, "def": 1.5, "speed": 1.1,
+		"hp": 75.0, "dmg": 4.5, "def": 0.5, "speed": 1.1,
 		"slots": ["armor", "amulet", "amulet", "ring", "ring"],
 		"passive": "Brood", "passive_desc": "Every traveler she kills leaves a spider on that tile. Her spiders are 30% stronger. Spider Nests come twice as often.",
 		"active": "Swarm", "active_desc": "Lays 3 spiders on her tile.",
@@ -71,9 +71,9 @@ const WARDENS := {
 	"mimic": {
 		"name": "Goldtooth", "title": "the Mimic King", "color": Color(1.0, 0.75, 0.25),
 		"xp_source": "Learns from every coin of gold harvested.",
-		"hp": 100.0, "dmg": 7.0, "def": 0.5, "speed": 1.5,
+		"hp": 70.0, "dmg": 5.0, "def": 0.0, "speed": 1.5,
 		"slots": ["weapon", "weapon", "ring", "ring", "ring"],
-		"passive": "Hoard", "passive_desc": "+0.1 damage for every Gold in this run's harvest. Cursed Chests come twice as often.",
+		"passive": "Hoard", "passive_desc": "+0.05 damage for every Gold in this run's harvest. Cursed Chests come twice as often.",
 		"active": "Swallow", "active_desc": "Swallows a weakened traveler (below 40% HP) whole: devoured at once, double harvest.",
 		"cooldown": 18.0,
 		"style": "Two weapons, three rings. Grows rich, then grows cruel.",
@@ -82,7 +82,7 @@ const WARDENS := {
 	"saint": {
 		"name": "Sister Ashen", "title": "the Hollow Saint", "color": Color(0.95, 0.9, 0.75),
 		"xp_source": "Learns by raising the dead.",
-		"hp": 125.0, "dmg": 7.0, "def": 1.5, "speed": 1.2,
+		"hp": 85.0, "dmg": 5.0, "def": 0.5, "speed": 1.2,
 		"slots": ["weapon", "armor", "amulet", "amulet", "ring"],
 		"passive": "Shepherd of the Dead", "passive_desc": "+2 undead servant slots, servants rise with 50% more HP. Devouring heals only half.",
 		"active": "Call the Dead", "active_desc": "Every servant heals 50%, and the Saint heals 5% for each servant.",
@@ -169,7 +169,7 @@ const DIET := {
 
 # --- loop scaling (like Loop Hero): every patrol loop the Warden completes
 #     makes new travelers stronger and their gear better ---
-const LOOP_POWER := 0.15          # +15% traveler HP/damage per loop
+const LOOP_POWER := 0.18          # +18% traveler HP/damage per loop
 const ITEM_LEVEL_PER_LOOP := 1
 
 # --- economy: resources harvested from the dead, paid out when the run ends ---
@@ -218,7 +218,7 @@ const CARD_WEIGHTS := {"crypt": 3, "spider": 3, "spikes": 3, "altar": 2, "gravey
 
 ## Travelers the dungeon lures below. `drop` is what their bodies give you.
 const HERO_CLASSES := {
-	"seeker": {"name": "Treasure Seeker", "hp": 20, "dmg": 4.0, "speed": 2.4, "color": Color(1.0, 0.8, 0.3),
+	"seeker": {"name": "Treasure Seeker", "hp": 24, "dmg": 4.5, "speed": 2.4, "color": Color(1.0, 0.8, 0.3),
 		"dark": "Shade", "drop": {"gold": 4, "bones": 1}},
 	"pilgrim": {"name": "Pilgrim", "hp": 26, "dmg": 3.0, "speed": 1.6, "color": Color(1.0, 0.95, 0.75),
 		"dark": "Hollow Saint", "drop": {"blood": 4, "bones": 1}},
@@ -325,32 +325,56 @@ const FIRST_NAMES := ["Alric", "Brann", "Cedric", "Dara", "Elowen", "Finn", "Gre
 	"Sable", "Tamsin", "Ulric", "Vera", "Wren", "Yorick"]
 
 ## Lair buildings. `cost` has one Dictionary of resources per level.
-## `unlock` adds a card, `lure` makes a lure available.
+## `requires` = {building: level} that must be built first. `pos` = spot on the Lair map (0..1).
+## `unlock` adds a card, lures and Wardens reference buildings by id.
 const BUILDINGS := {
-	"den": {"name": "Warden's Den", "desc": "+10 Warden max HP per level.",
-		"cost": [{"bones": 20}, {"bones": 40, "blood": 10}, {"bones": 70, "blood": 25}]},
-	"forge": {"name": "Bone Forge", "desc": "+1 Warden damage per level.",
-		"cost": [{"bones": 25, "gold": 10}, {"bones": 50, "gold": 30}]},
-	"archive": {"name": "Memory Archive", "desc": "+1 card type in your deck per level.",
-		"cost": [{"bones": 30}, {"bones": 60, "gold": 20}]},
-	"reliquary": {"name": "Reliquary", "desc": "+1 relic slot per level.",
-		"cost": [{"gold": 25, "blood": 10}, {"gold": 60, "blood": 30}]},
-	"shrine": {"name": "Shrine of Lies", "desc": "Unlocks the Holy Fire lure (pilgrims).",
-		"cost": [{"gold": 20}]},
-	"stones": {"name": "Whispering Stones", "desc": "Unlocks the Arcane Signs lure (arcanists).",
-		"cost": [{"blood": 20, "gold": 20}]},
-	"treasury": {"name": "False Treasury", "desc": "Unlocks the Cursed Chest card.", "unlock": "chest",
-		"cost": [{"gold": 15, "bones": 10}]},
-	"library": {"name": "Forbidden Library", "desc": "Unlocks the Graveyard card.", "unlock": "graveyard",
+	"den": {"name": "Warden's Den", "desc": "Where the Warden sleeps. +15 Warden max HP per level.", "pos": Vector2(0.5, 0.52),
+		"cost": [{"bones": 15}, {"bones": 35}, {"bones": 60, "blood": 10}, {"bones": 90, "blood": 25}, {"bones": 130, "blood": 45}]},
+	"forge": {"name": "Bone Forge", "desc": "Sharpens claws and bones. +1.5 Warden damage per level.", "pos": Vector2(0.33, 0.4),
+		"requires": {"den": 1},
+		"cost": [{"bones": 25, "gold": 5}, {"bones": 50, "gold": 20}, {"bones": 80, "gold": 40}, {"bones": 120, "gold": 70}]},
+	"walls": {"name": "Ossuary Walls", "desc": "Bones fused into armour. +0.5 Warden defense per level.", "pos": Vector2(0.18, 0.28),
+		"requires": {"forge": 1},
+		"cost": [{"bones": 40, "blood": 10}, {"bones": 80, "blood": 30}, {"bones": 130, "blood": 60}]},
+	"larder": {"name": "Larder of Flesh", "desc": "Devouring heals 5% more per level.", "pos": Vector2(0.66, 0.66),
+		"requires": {"den": 1},
+		"cost": [{"bones": 20, "blood": 10}, {"bones": 45, "blood": 25}, {"bones": 80, "blood": 50}]},
+	"pit": {"name": "The Hungering Pit", "desc": "Level 1: the Warden gains experience and picks 1 of 3 of its own abilities on level up. Further levels: +25% experience.", "pos": Vector2(0.82, 0.8),
+		"requires": {"larder": 1},
+		"cost": [{"bones": 30, "blood": 15}, {"bones": 70, "blood": 40}, {"bones": 120, "blood": 80}]},
+	"pens": {"name": "Monster Pens", "desc": "Your skeletons, spiders and golems are 12% stronger per level.", "pos": Vector2(0.3, 0.72),
+		"requires": {"den": 1},
+		"cost": [{"bones": 25}, {"bones": 55, "blood": 15}, {"bones": 95, "blood": 35}]},
+	"traps": {"name": "Trap Workshop", "desc": "Spikes, Grinders and Chests deal 20% more damage per level.", "pos": Vector2(0.12, 0.58),
+		"requires": {"pens": 1},
+		"cost": [{"bones": 30, "gold": 10}, {"bones": 60, "gold": 25}, {"bones": 100, "gold": 50}]},
+	"archive": {"name": "Memory Archive", "desc": "+1 card type in your deck per level.", "pos": Vector2(0.64, 0.3),
+		"requires": {"den": 1},
+		"cost": [{"bones": 30}, {"bones": 70, "gold": 25}]},
+	"reliquary": {"name": "Reliquary", "desc": "+1 relic slot per level.", "pos": Vector2(0.8, 0.16),
+		"requires": {"archive": 1},
+		"cost": [{"gold": 25, "blood": 10}, {"gold": 70, "blood": 35}]},
+	"library": {"name": "Forbidden Library", "desc": "Unlocks the Graveyard card.", "unlock": "graveyard", "pos": Vector2(0.5, 0.14),
+		"requires": {"archive": 1},
 		"cost": [{"bones": 25, "blood": 15}]},
-	"pit": {"name": "The Hungering Pit", "desc": "Your Wardens gain experience and choose 1 of 3 of their own abilities on every level up.",
-		"cost": [{"bones": 30, "blood": 10}]},
-	"jars": {"name": "Trophy Hall", "desc": "+1 undead servant slot per level.",
-		"cost": [{"bones": 25, "blood": 5}, {"bones": 55, "blood": 20}]},
-	"brood_chamber": {"name": "Brood Chamber", "desc": "A new Warden: the Broodmother.",
-		"cost": [{"bones": 40, "blood": 20}]},
-	"golden_hoard": {"name": "Golden Hoard", "desc": "A new Warden: the Mimic King.",
-		"cost": [{"gold": 50, "bones": 20}]},
+	"treasury": {"name": "False Treasury", "desc": "Unlocks the Cursed Chest card.", "unlock": "chest", "pos": Vector2(0.9, 0.42),
+		"requires": {"archive": 1},
+		"cost": [{"gold": 15, "bones": 10}]},
+	"golden_hoard": {"name": "Golden Hoard", "desc": "A new Warden: Goldtooth, the Mimic King.", "pos": Vector2(0.93, 0.66),
+		"requires": {"treasury": 1},
+		"cost": [{"gold": 60, "bones": 30}]},
+	"shrine": {"name": "Shrine of Lies", "desc": "Unlocks the Holy Fire lure (pilgrims).", "pos": Vector2(0.36, 0.12),
+		"requires": {"archive": 1},
+		"cost": [{"gold": 20}]},
+	"stones": {"name": "Whispering Stones", "desc": "Unlocks the Arcane Signs lure (arcanists).", "pos": Vector2(0.16, 0.1),
+		"requires": {"shrine": 1},
+		"cost": [{"blood": 25, "gold": 25}]},
+	"jars": {"name": "Trophy Hall", "desc": "+1 undead servant slot per level.", "pos": Vector2(0.5, 0.86),
+		"requires": {"den": 1},
+		"cost": [{"bones": 25, "blood": 5}, {"bones": 60, "blood": 25}]},
+	"brood_chamber": {"name": "Brood Chamber", "desc": "A new Warden: Vesh'ka, Mother of Threads.", "pos": Vector2(0.14, 0.86),
+		"requires": {"pens": 1},
+		"cost": [{"bones": 50, "blood": 25}]},
 }
 
 ## Relics change the rules of a run. Earned in runs, equipped before descending.

@@ -40,4 +40,6 @@ static func background(parent: Control) -> void:
 	bg.color = Color(0.05, 0.04, 0.07)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg.size = Vector2(1280, 720)
+	bg.position = Vector2.ZERO
 	parent.add_child(bg)
