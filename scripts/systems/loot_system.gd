@@ -19,6 +19,7 @@ func drop_from(h: Dictionary) -> void:
 		s.add_log("No room: %s is left in the dark." % lost["name"])
 	s.inventory.append(item)
 	s.add_log("%s dropped %s." % [h["name"], item["name"]])
+	run.beat("tut_loot")
 	s.inventory_changed.emit()
 
 

@@ -1,7 +1,9 @@
 extends Node2D
-## Draws the map, units and heroes with primitives. Will be replaced by sprites in M1.
+## Draws the map, units, travelers and the Warden. Uses sprites from res://art/
+## when they exist (see docs/ART.md), primitives otherwise.
 
 const D = preload("res://scripts/data/game_data.gd")
+const Art = preload("res://scripts/ui/art.gd")
 
 var run  # run.gd
 
@@ -61,8 +63,9 @@ func _draw_floor(s) -> void:
 				if s.path_lookup.has(nb):
 					near_path = true
 					break
-			draw_rect(r, Color(0.11, 0.1, 0.13) if near_path else Color(0.08, 0.07, 0.1))
-			draw_rect(r, Color(0.13, 0.12, 0.16), false, 1.0)
+			if not Art.draw(self, "tile_floor", r.get_center(), D.CELL, Color(1, 1, 1) if near_path else Color(0.7, 0.7, 0.75)):
+				draw_rect(r, Color(0.11, 0.1, 0.13) if near_path else Color(0.08, 0.07, 0.1))
+				draw_rect(r, Color(0.13, 0.12, 0.16), false, 1.0)
 
 
 func _draw_path(s, font: Font) -> void:
@@ -77,9 +80,15 @@ func _draw_path(s, font: Font) -> void:
 		elif card != "":
 			var cc: Color = D.CARDS[card]["color"]
 			col = cc.darkened(0.35)
-		draw_rect(r, col)
+		var base_id := "tile_gate" if i == 0 else ("tile_side" if i >= s.loop_size else "tile_path")
+		var center := r.get_center()
+		if not Art.draw(self, base_id, center, D.CELL):
+			draw_rect(r, col)
+		if card != "" and Art.draw(self, "card_" + card, center, D.CELL):
+			continue
 		if i == 0:
-			draw_string(font, r.position + Vector2(0, 30), "GATE", HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 12)
+			if Art.tex("tile_gate") == null:
+				draw_string(font, r.position + Vector2(0, 30), "GATE", HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 12)
 		elif card != "":
 			var label: String = D.CARDS[card]["name"]
 			draw_string(font, r.position + Vector2(0, 14), label.substr(0, 6), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 10, Color(1, 1, 1, 0.7))
@@ -94,6 +103,8 @@ func _draw_scenery(s, font: Font) -> void:
 		var cell: Vector2i = c
 		var r := cell_rect(cell).grow(-6)
 		var id: String = s.scenery[c]
+		if Art.draw(self, "card_" + id, cell_rect(cell).get_center(), D.CELL):
+			continue
 		var col: Color = D.CARDS[id]["color"]
 		draw_rect(r, col)
 		var label: String = D.CARDS[id]["name"]
@@ -105,6 +116,8 @@ func _draw_heart(s, font: Font) -> void:
 	var center := cell_center(s.heart_cell)
 	var beat := 300.0 / (1.0 + 0.25 * s.heroes.size())
 	var pulse := 1.0 + 0.08 * sin(Time.get_ticks_msec() / beat)
+	if Art.draw(self, "heart", center, 44.0 * pulse):
+		return
 	draw_circle(center, 20.0 * pulse, Color(0.45, 0.05, 0.12))
 	draw_circle(center, 13.0 * pulse, Color(0.8, 0.15, 0.25))
 	draw_string(font, center + Vector2(-40, 36), "HUNGER", HORIZONTAL_ALIGNMENT_CENTER, 80, 10, Color(1, 0.5, 0.5, 0.6))
@@ -125,11 +138,12 @@ func _draw_warden(s, font: Font) -> void:
 	var p := warden_world_pos(s) + Vector2(0, -2)
 	var glow := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 200.0)
 	draw_circle(p, 19.0, Color(0.3, 0.7, 1.0, 0.25 + 0.2 * glow))
-	var body := PackedVector2Array([p + Vector2(0, -15), p + Vector2(13, 0), p + Vector2(0, 15), p + Vector2(-13, 0)])
-	draw_colored_polygon(body, Color(0.12, 0.2, 0.3))
-	draw_polyline(body + PackedVector2Array([body[0]]), w["color"], 2.0)
-	draw_circle(p + Vector2(-4, -2), 2.2, Color(0.6, 1, 1))
-	draw_circle(p + Vector2(4, -2), 2.2, Color(0.6, 1, 1))
+	if not Art.draw(self, "warden_" + str(w["id"]), p, 40.0):
+		var body := PackedVector2Array([p + Vector2(0, -15), p + Vector2(13, 0), p + Vector2(0, 15), p + Vector2(-13, 0)])
+		draw_colored_polygon(body, Color(0.12, 0.2, 0.3))
+		draw_polyline(body + PackedVector2Array([body[0]]), w["color"], 2.0)
+		draw_circle(p + Vector2(-4, -2), 2.2, Color(0.6, 1, 1))
+		draw_circle(p + Vector2(4, -2), 2.2, Color(0.6, 1, 1))
 	var frac: float = clampf(w["hp"] / w["max_hp"], 0.0, 1.0)
 	draw_rect(Rect2(p + Vector2(-18, -24), Vector2(36, 4)), Color(0.1, 0.1, 0.15))
 	draw_rect(Rect2(p + Vector2(-18, -24), Vector2(36 * frac, 4)), Color(0.4, 0.85, 1.0))
@@ -161,10 +175,12 @@ func _draw_units(s) -> void:
 			var sz := 11.0
 			if u["name"] in ["Spider Queen", "Bone Golem", "Mimic"]:
 				sz = 16.0
-			if u["undead"]:
-				draw_rect(Rect2(p - Vector2(1, 1), Vector2(sz + 2, sz + 2)), Color(0.5, 0.9, 1.0))
-			var col: Color = u["color"]
-			draw_rect(Rect2(p, Vector2(sz, sz)), col)
+			var sprite_id: String = ("undead_" + str(u.get("cls", ""))) if u["undead"] else ("monster_" + str(u.get("kind", "")))
+			if not Art.draw(self, sprite_id, p + Vector2(sz, sz) * 0.5, sz + 8.0):
+				if u["undead"]:
+					draw_rect(Rect2(p - Vector2(1, 1), Vector2(sz + 2, sz + 2)), Color(0.5, 0.9, 1.0))
+				var col: Color = u["color"]
+				draw_rect(Rect2(p, Vector2(sz, sz)), col)
 			var frac: float = clampf(u["hp"] / u["max_hp"], 0.0, 1.0)
 			draw_rect(Rect2(p + Vector2(0, sz), Vector2(sz * frac, 2)), Color(0.4, 0.9, 1.0))
 			k += 1
@@ -183,10 +199,12 @@ func _draw_heroes(s, font: Font) -> void:
 		var rad := 16.0 if is_boss else 10.0
 		if is_boss:
 			draw_circle(p, rad + 3, Color(1, 0.2, 0.2))
-		var col: Color = h["color"]
-		draw_circle(p, rad, col)
-		var cls_name: String = D.HERO_CLASSES[h["cls"]]["name"]
-		draw_string(font, p + Vector2(-rad, 5), cls_name.substr(0, 1), HORIZONTAL_ALIGNMENT_CENTER, rad * 2, 13, Color(0.1, 0.05, 0.05))
+		var sprite_id := "boss_aurelia" if is_boss else "traveler_" + str(h["cls"])
+		if not Art.draw(self, sprite_id, p, rad * 2.6):
+			var col: Color = h["color"]
+			draw_circle(p, rad, col)
+			var cls_name: String = D.HERO_CLASSES[h["cls"]]["name"]
+			draw_string(font, p + Vector2(-rad, 5), cls_name.substr(0, 1), HORIZONTAL_ALIGNMENT_CENTER, rad * 2, 13, Color(0.1, 0.05, 0.05))
 		var frac: float = clampf(h["hp"] / h["max_hp"], 0.0, 1.0)
 		draw_rect(Rect2(p + Vector2(-rad, -rad - 6), Vector2(rad * 2, 3)), Color(0.2, 0, 0))
 		draw_rect(Rect2(p + Vector2(-rad, -rad - 6), Vector2(rad * 2 * frac, 3)), Color(1, 0.3, 0.3))

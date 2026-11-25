@@ -104,7 +104,7 @@ func place_selected(cell: Vector2i) -> void:
 func make_monster(id: String) -> Dictionary:
 	var m: Dictionary = D.MONSTERS[id]
 	return {"name": m["name"], "hp": float(m["hp"]), "max_hp": float(m["hp"]), "dmg": m["dmg"],
-		"color": m["color"], "undead": false, "party": -1, "affixes": []}
+		"color": m["color"], "undead": false, "party": -1, "kind": id}
 
 
 func spawn_at(t: int, monster_id: String) -> void:

@@ -5,6 +5,7 @@ extends CanvasLayer
 const D = preload("res://scripts/data/game_data.gd")
 const UI = preload("res://scripts/ui/ui_style.gd")
 const LootSystem = preload("res://scripts/systems/loot_system.gd")
+const Art = preload("res://scripts/ui/art.gd")
 
 const MAP_CENTER := Vector2(16 + 19 * 48 / 2.0, 16 + 11 * 48 / 2.0)
 
@@ -260,6 +261,11 @@ func _card_button(id: String, highlighted: bool, min_size: Vector2) -> Button:
 	btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.add_theme_font_size_override("font_size", 12)
+	var icon := Art.tex("card_" + id)
+	if icon != null:
+		btn.icon = icon
+		btn.expand_icon = true
+		btn.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 	var base: Color = def["color"]
 	var col := base.darkened(0.45)
 	var border := Color(1, 1, 1) if highlighted else col.lightened(0.3)

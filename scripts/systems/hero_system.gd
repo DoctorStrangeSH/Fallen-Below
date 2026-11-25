@@ -199,6 +199,7 @@ func escape(h: Dictionary, how: String) -> void:
 	s.add_threat(t)
 	s.add_log("%s %s and will tell the Order!" % [s.hero_name(h), how])
 	run.beat("first_escape")
+	run.beat("tut_escape")
 
 
 func _on_enter_tile(h: Dictionary, t: int) -> void:
@@ -255,6 +256,7 @@ func _kill(h: Dictionary) -> void:
 	s.hand_changed.emit()
 	run.souls.on_death(h)
 	run.beat("first_kill")
+	run.beat("tut_souls")
 	if h["boss"]:
 		for line in D.BOSS_LINES["death"]:
 			s.narrate.emit(line)

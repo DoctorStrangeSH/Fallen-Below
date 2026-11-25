@@ -53,6 +53,8 @@ func _ready() -> void:
 	state.add_log("The door in the mountain opens. Someone is coming down.")
 	heroes_sys.spawn_party()
 	state.hand_changed.emit()
+	beat("tut_start")
+	beat("tut_warden")
 
 
 func _add_system(sys: Node, sys_name: String) -> void:
@@ -90,7 +92,10 @@ func _new_day() -> void:
 	cards.draw_card()
 	cards.respawn_rooms()
 	heroes_sys.spawn_party()
+	if state.day == 2:
+		beat("tut_lure")
 	if state.day % D.SEAL_EVERY == 0:
+		beat("tut_week")
 		state.add_log("The week ends: the dungeon may sleep now and keep everything.")
 		hud.show_banner("WEEK'S END: SLEEP TO KEEP 100%")
 	state.hand_changed.emit()

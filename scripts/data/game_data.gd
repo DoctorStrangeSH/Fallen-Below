@@ -364,6 +364,14 @@ const BEATS := {
 	"first_devour": "The Warden eats. Its bones crack and grow. For a moment a name almost rises to the surface. Then it is gone.",
 	"attention_half": "Bells ring in the white towers. The Order has noticed you. Something bright is being prepared.",
 	"first_sleep": "The door in the mountain closes. The dungeon curls around its full belly and dreams of the next door.",
+	# tutorial hints (first run)
+	"tut_start": "Pick a card at the bottom, then a tile. Rooms and traps go on the path; altars and graveyards go beside it.",
+	"tut_warden": "The glowing shape is your Warden. It walks against the travelers and fights whoever it meets. Press Q for its ability. If it falls, the run is over.",
+	"tut_souls": "The dead are yours. Press R to switch between devouring them (the Warden grows) and raising them (servants that whisper the truth).",
+	"tut_loot": "They dropped something. Click it on the right and the Warden will wear it. Hover to compare with what it wears now.",
+	"tut_lure": "The lure on the right decides who comes down tomorrow, and what you harvest from them.",
+	"tut_escape": "Travelers who survive three loops find the way out. Watch the red dots under them.",
+	"tut_week": "The week ends. Sleep now to keep the whole harvest, or risk another week for more.",
 }
 
 ## What the act champion says, and when.
