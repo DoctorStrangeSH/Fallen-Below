@@ -38,7 +38,7 @@ func tick() -> void:
 				if u["undead"]:
 					u["hp"] = minf(u["max_hp"], u["hp"] + regen)
 
-		_travelers_strike(hs, units, warden_here)
+		_travelers_strike(t, hs, units, warden_here)
 		if s.game_over:
 			return
 		for u in units:
@@ -62,7 +62,7 @@ func tick() -> void:
 		s.tiles[t]["units"] = s.alive_units(t)
 
 
-func _travelers_strike(hs: Array, units: Array, warden_here: bool) -> void:
+func _travelers_strike(t: int, hs: Array, units: Array, warden_here: bool) -> void:
 	var targets := units.size() + (1 if warden_here else 0)
 	for h in hs:
 		if h["gone"] or s.game_over:
@@ -80,6 +80,7 @@ func _travelers_strike(hs: Array, units: Array, warden_here: bool) -> void:
 		if target["undead"] and h["trait"] == "zealot":
 			dmg *= 1.5
 		target["hp"] -= dmg
+		s.fx.emit("hit_unit", t, dmg)
 
 
 func _monsters_strike(t: int, hs: Array, units: Array, warden_here: bool) -> void:

@@ -52,6 +52,15 @@ func _ready() -> void:
 		music.text = Loc.t("Music: %d%%") % int(Meta.music_volume * 100.0)
 	)
 	buttons.add_child(music)
+	var sound := UI.button(Loc.t("Sound: %d%%") % int(Meta.sfx_volume * 100.0), Vector2(260, 48))
+	sound.pressed.connect(func():
+		var steps: Array = [0.0, 0.4, 0.8, 1.0]
+		var i := steps.find(snappedf(Meta.sfx_volume, 0.05))
+		Meta.sfx_volume = steps[(i + 1) % steps.size()] if i >= 0 else 0.8
+		Meta.save_game()
+		sound.text = Loc.t("Sound: %d%%") % int(Meta.sfx_volume * 100.0)
+	)
+	buttons.add_child(sound)
 	var lang := UI.button(Loc.t("Language: %s") % Loc.LANGUAGES[Loc.lang], Vector2(260, 48))
 	lang.pressed.connect(func():
 		Loc.next_language()

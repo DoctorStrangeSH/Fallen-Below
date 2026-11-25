@@ -96,6 +96,7 @@ func place_selected(cell: Vector2i) -> void:
 		s.scenery[cell] = id
 		_check_scenery_combos(cell, id)
 	s.add_threat(D.THREAT_PER_CARD, "cards")
+	s.fx.emit("place", cell, 0.0)
 	s.hand.remove_at(s.selected)
 	s.selected = -1
 	s.hand_changed.emit()
@@ -247,6 +248,7 @@ func _check_scenery_combos(cell: Vector2i, id: String) -> void:
 func _found(combo_id: String) -> void:
 	var def: Dictionary = D.COMBOS[combo_id]
 	var combo_name: String = Loc.t(def["name"])
+	s.fx.emit("combo", 0, 0.0)
 	if Meta.discover(combo_id):
 		s.add_log(Loc.t("NEW COMBO DISCOVERED: %s!") % combo_name)
 		s.combo_found.emit(Loc.t("NEW COMBO: %s") % combo_name)

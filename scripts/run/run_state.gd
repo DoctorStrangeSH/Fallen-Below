@@ -14,6 +14,10 @@ signal inventory_changed
 signal combo_found(combo_name: String)
 signal narrate(text: String)
 signal level_up
+## Something happened that the player should see and hear.
+## kind: hit_hero, hit_unit, hit_warden, evade, death, devour, loot, place, level, combo, escape, ability, boss
+## target: a traveler / the Warden Dictionary, a tile id (int) or a cell (Vector2i)
+signal fx(kind: String, target, amount: float)
 
 var rng := RandomNumberGenerator.new()
 

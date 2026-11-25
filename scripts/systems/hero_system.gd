@@ -78,6 +78,7 @@ func spawn_boss() -> void:
 		s.narrate.emit(Loc.t(line))
 	s.add_log(Loc.t("%s descends. Her radiance burns undead nearby: meet her with the Warden and the living.") % s.hero_name(h))
 	s.combo_found.emit(Loc.t("%s DESCENDS") % s.hero_name(h).to_upper())
+	s.fx.emit("boss", h, 0.0)
 
 
 # ---------------------------------------------------------- movement
@@ -198,6 +199,7 @@ func escape_laps() -> int:
 
 func escape(h: Dictionary, how: String) -> void:
 	remove(h)
+	s.fx.emit("escape", h, 0.0)
 	var t := D.THREAT_PER_ESCAPE * (0.5 if s.has_relic("whispering_skull") else 1.0)
 	s.add_threat(t, "escapes")
 	s.escapes += 1
@@ -232,6 +234,7 @@ func damage(h: Dictionary, amount: float) -> void:
 	if h["gone"]:
 		return
 	h["hp"] -= amount
+	s.fx.emit("hit_hero", h, amount)
 	if h["boss"] and not h["half_said"] and h["hp"] > 0.0 and h["hp"] < h["max_hp"] * 0.5:
 		h["half_said"] = true
 		for line in D.BOSS_LINES["half"]:
@@ -250,6 +253,7 @@ func _kill(h: Dictionary) -> void:
 	h["death_tile"] = h["cur"]
 	remove(h)
 	s.kills += 1
+	s.fx.emit("death", h, 0.0)
 	if run.warden.is_kind("brood") and s.count_units(h["cur"], "Spider") > 0:
 		run.warden.gain_xp(D.XP_BROOD_KILL)
 	s.add_threat(D.THREAT_PER_KILL, "kills")

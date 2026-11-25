@@ -47,6 +47,7 @@ func _ready() -> void:
 	hud = RunHud.new()
 	hud.run = self
 	add_child(hud)
+	state.fx.connect(_on_fx)
 
 	for i in Meta.start_cards():
 		cards.draw_card()
@@ -56,6 +57,17 @@ func _ready() -> void:
 	beat("tut_start")
 	beat("tut_warden")
 	Music.play("run")
+
+
+const FX_SOUND := {"hit_hero": "hit", "hit_unit": "hit", "hit_warden": "warden_hit", "death": "death",
+	"devour": "devour", "loot": "loot", "place": "place", "level": "level", "combo": "combo",
+	"escape": "escape", "ability": "ability", "boss": "boss"}
+
+
+func _on_fx(kind: String, target, amount: float) -> void:
+	if FX_SOUND.has(kind):
+		Sfx.play(FX_SOUND[kind])
+	view.add_fx(kind, target, amount)
 
 
 func _add_system(sys: Node, sys_name: String) -> void:

@@ -20,6 +20,7 @@ func drop_from(h: Dictionary) -> void:
 	s.inventory.append(item)
 	s.add_log(Loc.t("%s dropped %s.") % [h["name"], item["name"]])
 	run.beat("tut_loot")
+	s.fx.emit("loot", h, 0.0)
 	s.inventory_changed.emit()
 
 

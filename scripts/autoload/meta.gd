@@ -24,6 +24,7 @@ var fragments := {}      # traveler kind -> pages of the Book of the Fallen unlo
 var seen := []           # one-time story beats and memories already shown
 
 var music_volume := 0.7
+var sfx_volume := 0.8
 var language := ""
 var no_save := false     # set by the test bot so it never touches the real save
 
@@ -394,7 +395,7 @@ func save_game() -> void:
 		"version": SAVE_VERSION, "res": res, "buildings": buildings, "relics": relics,
 		"deck": deck, "loadout": loadout, "runs": runs, "wins": wins, "best_day": best_day,
 		"total_kills": total_kills, "discovered": discovered, "seen_intro": seen_intro,
-		"acts_cleared": acts_cleared, "lure": lure, "warden": warden_id, "music_volume": music_volume, "language": language, "fragments": fragments, "seen": seen,
+		"acts_cleared": acts_cleared, "lure": lure, "warden": warden_id, "music_volume": music_volume, "sfx_volume": sfx_volume, "language": language, "fragments": fragments, "seen": seen,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -444,6 +445,7 @@ func load_game() -> void:
 	lure = str(d.get("lure", "gold"))
 	warden_id = str(d.get("warden", "bone"))
 	music_volume = clampf(float(d.get("music_volume", 0.7)), 0.0, 1.0)
+	sfx_volume = clampf(float(d.get("sfx_volume", 0.8)), 0.0, 1.0)
 	language = str(d.get("language", ""))
 	fragments = {}
 	var fr = d.get("fragments", {})

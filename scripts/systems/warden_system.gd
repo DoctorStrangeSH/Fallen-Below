@@ -122,11 +122,13 @@ func take_hit(amount: float, attacker: Dictionary) -> void:
 	if not alive():
 		return
 	if s.rng.randf() * 100.0 < stat("evade"):
+		s.fx.emit("evade", s.warden, 0.0)
 		return
 	if has("halo"):
 		amount *= 0.75
 	var dmg := maxf(amount - stat("def"), amount * 0.2)
 	s.warden["hp"] -= dmg
+	s.fx.emit("hit_warden", s.warden, dmg)
 	if s.rng.randf() * 100.0 < stat("counter"):
 		run.heroes_sys.damage(attacker, s.warden["dmg"])
 	if has("bone_spurs"):
@@ -185,6 +187,7 @@ func devour(h: Dictionary) -> void:
 		heal *= 1.5
 		s.gain("blood", 2)
 	heal_by(heal)
+	s.fx.emit("devour", s.warden, heal)
 	run.beat("first_devour")
 	gain_xp(int(D.XP_DEVOUR.get(w["id"], 4)) * (3 if h["boss"] else 1))
 
@@ -298,6 +301,7 @@ func use_active() -> void:
 		"saint":
 			used = _call_the_dead()
 	if used:
+		s.fx.emit("ability", s.warden, 0.0)
 		s.warden["cooldown"] = cooldown_max()
 		s.add_log(Loc.t("%s: %s!") % [s.warden["name"], Loc.t(Meta.warden_def()["active"])])
 
@@ -367,6 +371,7 @@ func gain_xp(amount: int) -> void:
 		heal_by(w["max_hp"] * D.LEVEL_UP_HEAL)
 		s.add_log(Loc.t("%s reaches level %d.") % [w["name"], w["level"]])
 		run.beat("first_level")
+		s.fx.emit("level", w, 0.0)
 		pending_levels += 1
 	if s.level_choices.is_empty():
 		_offer_ability()

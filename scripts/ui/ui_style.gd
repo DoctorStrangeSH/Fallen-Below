@@ -18,6 +18,7 @@ static func button(text: String, min_size: Vector2 = Vector2(220, 44)) -> Button
 	b.text = text
 	b.custom_minimum_size = min_size
 	b.focus_mode = Control.FOCUS_NONE
+	b.pressed.connect(func(): Sfx.play("click"))
 	var base := Color(0.16, 0.11, 0.22)
 	b.add_theme_stylebox_override("normal", box(base, Color(0.45, 0.3, 0.6)))
 	b.add_theme_stylebox_override("hover", box(base.lightened(0.15), Color(0.7, 0.5, 0.9)))
@@ -36,6 +37,9 @@ static func label(text: String, size: int = 16, color: Color = Color(1, 1, 1)) -
 
 ## Full-screen dark background for menu scenes.
 static func background(parent: Control) -> void:
+	parent.set_anchors_preset(Control.PRESET_FULL_RECT)
+	parent.position = Vector2.ZERO
+	parent.size = Vector2(1280, 720)
 	var bg := ColorRect.new()
 	bg.color = Color(0.05, 0.04, 0.07)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
