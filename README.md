@@ -23,10 +23,27 @@ Roguelite с непрямым управлением на **Godot 4.7**. Пол�
 - Шкала **Threat** на 100% призывает босса. Убей его, чтобы победить.
 - ПКМ отменяет выбор карты.
 
+## Меню и Логово
+
+- Игра стартует с главного меню: **New Run**, **The Lair**, **Quit**.
+- В конце забега ты получаешь **Bones** (дни × 3 + убийства, +25 за победу).
+- В **Логове** Bones тратятся на постройки: больше HP Сердца, стартовые склянки, карты, эссенция и открытие карты Graveyard.
+- Прогресс сохраняется в `user://save.json`. На Windows это `%APPDATA%\Godot\app_userdata\Fallen Below\`.
+
 ## Структура
 
 ```
-docs/GDD.md        дизайн-документ
-scenes/main.tscn   главная сцена
-scripts/main.gd    весь прототип (позже разнесём по системам)
+docs/GDD.md                  дизайн-документ
+scenes/                      main_menu, lair, run
+scripts/autoload/meta.gd     мета-прогресс и сохранения (autoload "Meta")
+scripts/data/game_data.gd    все данные и баланс: карты, герои, черты, постройки
+scripts/run/run.gd           корень забега: часы, ввод, связывает системы
+scripts/run/run_state.gd     состояние забега + запросы
+scripts/run/run_view.gd      отрисовка карты (пока примитивы)
+scripts/run/run_hud.gd       интерфейс забега
+scripts/systems/             hero / combat / card / soul системы
+scripts/menu/                главное меню и Логово
+scripts/ui/ui_style.gd       общие стили UI
 ```
+
+Баланс правится в одном месте: `scripts/data/game_data.gd`.

@@ -7,8 +7,12 @@ config_version=5
 
 config/name="Fallen Below"
 config/description="Loop Hero in reverse: you are the dungeon."
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[autoload]
+
+Meta="*res://scripts/autoload/meta.gd"
 
 [display]
 
