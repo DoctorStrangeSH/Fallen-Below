@@ -27,7 +27,7 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	UI.background(self)
 
-	var title := UI.label("THE LAIR", 34, Color(0.75, 0.55, 1.0))
+	var title := UI.label(Loc.t("THE LAIR"), 34, Color(0.75, 0.55, 1.0))
 	title.position = Vector2(30, 14)
 	add_child(title)
 	res_label = UI.label("", 18, Color(0.95, 0.9, 0.75))
@@ -65,7 +65,7 @@ func _ready() -> void:
 	v.add_child(req_label)
 	cost_label = UI.label("", 15)
 	v.add_child(cost_label)
-	build_btn = UI.button("Build", Vector2(390, 52))
+	build_btn = UI.button(Loc.t("Build"), Vector2(390, 52))
 	build_btn.pressed.connect(func():
 		if Meta.buy(selected_id):
 			_refresh()
@@ -76,16 +76,16 @@ func _ready() -> void:
 	row.position = Vector2(20, 650)
 	row.add_theme_constant_override("separation", 12)
 	add_child(row)
-	var run_btn := UI.button("Prepare descent")
+	var run_btn := UI.button(Loc.t("Prepare descent"))
 	run_btn.pressed.connect(func(): Meta.start_run())
 	row.add_child(run_btn)
-	var book := UI.button("Book of the Fallen")
+	var book := UI.button(Loc.t("Book of the Fallen"))
 	book.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/book.tscn"))
 	row.add_child(book)
-	var grim := UI.button("Grimoire")
+	var grim := UI.button(Loc.t("Grimoire"))
 	grim.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/grimoire.tscn"))
 	row.add_child(grim)
-	var back := UI.button("Main menu")
+	var back := UI.button(Loc.t("Main menu"))
 	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
 	row.add_child(back)
 
@@ -110,23 +110,23 @@ func _select(id: String) -> void:
 func _refresh() -> void:
 	var parts: Array = []
 	for k in D.RESOURCES:
-		parts.append("%s %d" % [D.RESOURCES[k]["name"], int(Meta.res[k])])
-	res_label.text = "     ".join(parts)
+		parts.append("%s %d" % [Loc.t(D.RESOURCES[k]["name"]), int(Meta.res[k])])
+	res_label.text = Loc.t("     ").join(parts)
 
 	var def: Dictionary = D.BUILDINGS[selected_id]
 	var lvl: int = Meta.level(selected_id)
 	var max_lvl: int = Meta.max_level(selected_id)
-	title_label.text = def["name"]
-	level_label.text = "Level %d / %d" % [lvl, max_lvl]
-	desc_label.text = def["desc"]
+	title_label.text = Loc.t(def["name"])
+	level_label.text = Loc.t("Level %d / %d") % [lvl, max_lvl]
+	desc_label.text = Loc.t(def["desc"])
 	var met: bool = Meta.requirements_met(selected_id)
-	req_label.text = "" if met else "Requires: %s" % Meta.requirements_text(selected_id)
+	req_label.text = "" if met else Loc.t("Requires: %s") % Meta.requirements_text(selected_id)
 	var cost: Dictionary = Meta.next_cost(selected_id)
 	if cost.is_empty():
-		cost_label.text = "Fully built."
-		build_btn.text = "Built"
+		cost_label.text = Loc.t("Fully built.")
+		build_btn.text = Loc.t("Built")
 		build_btn.disabled = true
 	else:
-		cost_label.text = "Next level: %s" % Meta.cost_text(cost)
-		build_btn.text = "Build" if lvl == 0 else "Upgrade to level %d" % (lvl + 1)
+		cost_label.text = Loc.t("Next level: %s") % Meta.cost_text(cost)
+		build_btn.text = Loc.t("Build") if lvl == 0 else Loc.t("Upgrade to level %d") % (lvl + 1)
 		build_btn.disabled = not met or not Meta.can_afford(cost)

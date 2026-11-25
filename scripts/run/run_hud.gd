@@ -65,7 +65,7 @@ func _ready() -> void:
 	s.combo_found.connect(show_banner)
 	s.narrate.connect(_on_narrate)
 	s.level_up.connect(show_level_up)
-	act_label.text = D.ACTS[s.act]["name"]
+	act_label.text = Loc.t(D.ACTS[s.act]["name"])
 	rebuild_hand()
 	rebuild_trophies()
 	rebuild_lures()
@@ -102,9 +102,11 @@ func _build_panel() -> void:
 	panel.position = Vector2(D.PANEL_X, 8)
 	panel.custom_minimum_size = Vector2(1272 - D.PANEL_X, 704)
 	panel.add_theme_stylebox_override("panel", UI.box(Color(0.08, 0.06, 0.11), Color(0.3, 0.22, 0.4)))
+	panel.clip_contents = true
 	add_child(panel)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 4)
+	v.custom_minimum_size = Vector2(1272 - D.PANEL_X - 20, 0)
 	panel.add_child(v)
 
 	act_label = UI.label("", 13, Color(0.75, 0.55, 1.0))
@@ -128,13 +130,15 @@ func _build_panel() -> void:
 	active_btn = UI.button("", Vector2(304, 28))
 	active_btn.add_theme_font_size_override("font_size", 12)
 	active_btn.pressed.connect(func(): run.warden.use_active())
+	active_btn.clip_text = true
+	active_btn.add_theme_font_size_override("font_size", 12)
 	v.add_child(active_btn)
 
 	# the dungeon
-	v.add_child(UI.label("Order's attention (champion at 100%)", 12, Color(1, 0.9, 0.6)))
+	v.add_child(UI.label(Loc.t("Order's attention (champion at 100%)"), 12, Color(1, 0.9, 0.6)))
 	attention_bar = _bar(D.BOSS_THREAT, Color(1.0, 0.85, 0.5), 8)
 	v.add_child(attention_bar)
-	v.add_child(UI.label("Lure: who answers the call tomorrow", 12, Color(1, 0.8, 0.5)))
+	v.add_child(UI.label(Loc.t("Lure: who answers the call tomorrow"), 12, Color(1, 0.8, 0.5)))
 	lure_box = GridContainer.new()
 	lure_box.columns = 2
 	lure_box.add_theme_constant_override("h_separation", 4)
@@ -142,6 +146,8 @@ func _build_panel() -> void:
 	v.add_child(lure_box)
 	stance_btn = UI.button("", Vector2(304, 28))
 	stance_btn.pressed.connect(func(): run.souls.toggle_stance())
+	stance_btn.clip_text = true
+	stance_btn.add_theme_font_size_override("font_size", 12)
 	v.add_child(stance_btn)
 	harvest_label = _small("", 12, Color(1, 1, 1, 0.85))
 	v.add_child(harvest_label)
@@ -149,15 +155,21 @@ func _build_panel() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)
 	v.add_child(row)
-	pause_btn = UI.button("Pause", Vector2(70, 28))
+	pause_btn = UI.button(Loc.t("Pause"), Vector2(70, 28))
 	pause_btn.pressed.connect(func(): run.toggle_pause())
+	pause_btn.clip_text = true
+	pause_btn.add_theme_font_size_override("font_size", 12)
 	row.add_child(pause_btn)
-	speed_btn = UI.button("x1", Vector2(60, 28))
+	speed_btn = UI.button(Loc.t("x1"), Vector2(60, 28))
 	speed_btn.pressed.connect(func(): run.cycle_speed())
+	speed_btn.clip_text = true
+	speed_btn.add_theme_font_size_override("font_size", 12)
 	row.add_child(speed_btn)
-	sleep_btn = UI.button("Sleep", Vector2(166, 28))
-	sleep_btn.tooltip_text = "End the run and keep the harvest. 100% at the end of each week (every 5th day), 60% otherwise."
+	sleep_btn = UI.button(Loc.t("Sleep"), Vector2(166, 28))
+	sleep_btn.tooltip_text = Loc.t("End the run and keep the harvest. 100% at the end of each week (every 5th day), 60% otherwise.")
 	sleep_btn.pressed.connect(func(): run.sleep())
+	sleep_btn.clip_text = true
+	sleep_btn.add_theme_font_size_override("font_size", 12)
 	row.add_child(sleep_btn)
 
 	trophy_title = _small("", 11, Color(1, 0.85, 0.5))
@@ -190,10 +202,10 @@ func _build_level_panel() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	level_panel.add_child(v)
-	var title := UI.label("THE WARDEN REMEMBERS", 22, Color(0.8, 0.65, 1.0))
+	var title := UI.label(Loc.t("THE WARDEN REMEMBERS"), 22, Color(0.8, 0.65, 1.0))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)
-	var sub := UI.label("Choose an ability", 13, Color(1, 1, 1, 0.6))
+	var sub := UI.label(Loc.t("Choose an ability"), 13, Color(1, 1, 1, 0.6))
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(sub)
 	level_box = HBoxContainer.new()
@@ -212,7 +224,7 @@ func show_level_up() -> void:
 	for i in s.level_choices.size():
 		var def: Dictionary = run.warden.ability_def(s.level_choices[i])
 		var btn := Button.new()
-		btn.text = "%s\n\n%s" % [def["name"], def["desc"]]
+		btn.text = "%s\n\n%s" % [Loc.t(def["name"]), Loc.t(def["desc"])]
 		btn.custom_minimum_size = Vector2(190, 150)
 		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		btn.focus_mode = Control.FOCUS_NONE
@@ -302,7 +314,7 @@ func _process(delta: float) -> void:
 func _card_button(id: String, highlighted: bool, min_size: Vector2) -> Button:
 	var def: Dictionary = D.CARDS[id]
 	var btn := Button.new()
-	btn.text = "%s\n\n%s" % [def["name"], def["desc"]]
+	btn.text = Loc.t("%s\n\n%s") % [Loc.t(def["name"]), Loc.t(def["desc"])]
 	btn.custom_minimum_size = min_size
 	btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	btn.focus_mode = Control.FOCUS_NONE
@@ -338,14 +350,14 @@ func rebuild_lures() -> void:
 	var available: Array = Meta.available_lures()
 	for id in D.LURES:
 		var def: Dictionary = D.LURES[id]
-		var btn := UI.button(def["name"], Vector2(150, 26))
+		var btn := UI.button(Loc.t(def["name"]), Vector2(150, 26))
 		btn.add_theme_font_size_override("font_size", 11)
 		var lure_id: String = id
 		if not available.has(lure_id):
 			btn.disabled = true
-			btn.tooltip_text = "Locked. Build it in the Lair."
+			btn.tooltip_text = Loc.t("Locked. Build it in the Lair.")
 		else:
-			btn.tooltip_text = def["desc"]
+			btn.tooltip_text = Loc.t(def["desc"])
 			if lure_id == s.lure:
 				btn.add_theme_stylebox_override("normal", UI.box(Color(0.35, 0.22, 0.08), Color(1, 0.8, 0.4)))
 			btn.pressed.connect(func():
@@ -359,12 +371,12 @@ func rebuild_lures() -> void:
 
 func refresh() -> void:
 	var s = run.state
-	day_label.text = "Loop %d  ·  Day %d  ·  week ends day %d" % [s.loop, s.day, (s.day + D.SEAL_EVERY - 1) / D.SEAL_EVERY * D.SEAL_EVERY]
+	day_label.text = Loc.t("Loop %d  ·  Day %d  ·  week ends day %d") % [s.loop, s.day, (s.day + D.SEAL_EVERY - 1) / D.SEAL_EVERY * D.SEAL_EVERY]
 	day_bar.value = s.day_timer
 
 	var w: Dictionary = s.warden
 	var growth: bool = w.get("growth", false)
-	warden_label.text = "%s, %s%s" % [w["name"], w["title"], ("   Lv %d" % int(w["level"])) if growth else ""]
+	warden_label.text = Loc.t("%s, %s%s") % [w["name"], w["title"], (Loc.t("   Lv %d") % int(w["level"])) if growth else ""]
 	xp_bar.visible = growth
 	if growth:
 		var need: int = run.warden.xp_to_next()
@@ -373,30 +385,30 @@ func refresh() -> void:
 	hp_bar.max_value = w["max_hp"]
 	hp_bar.value = w["hp"]
 	var st: Dictionary = w["stats"]
-	var parts: Array = ["HP %d/%d" % [int(w["hp"]), int(w["max_hp"])], "DMG %.1f" % st["dmg"]]
+	var parts: Array = [Loc.t("HP %d/%d") % [int(w["hp"]), int(w["max_hp"])], Loc.t("DMG %.1f") % st["dmg"]]
 	for k in ["def", "regen", "vamp", "evade", "counter"]:
 		var v: float = st[k]
 		if v > 0.0:
 			var def: Dictionary = D.STATS[k]
 			if def["pct"]:
-				parts.append("%s %d%%" % [def["name"], int(v)])
+				parts.append("%s %d%%" % [Loc.t(def["name"]), int(v)])
 			else:
-				parts.append("%s %.1f" % [def["name"], v])
+				parts.append("%s %.1f" % [Loc.t(def["name"]), v])
 	var eaten: Dictionary = w["eaten"]
 	var diet_parts: Array = []
 	for kind in eaten:
-		diet_parts.append("%d %s" % [int(eaten[kind]), D.HERO_CLASSES[kind]["name"]])
+		diet_parts.append("%d %s" % [int(eaten[kind]), Loc.t(D.HERO_CLASSES[kind]["name"])])
 	var abil: Array = []
 	for a in w.get("abilities", []):
-		abil.append(run.warden.ability_def(a)["name"])
-	warden_stats.text = "   ".join(parts) + "\nEaten: " + (", ".join(diet_parts) if not diet_parts.is_empty() else "nothing yet")
+		abil.append(Loc.t(run.warden.ability_def(a)["name"]))
+	warden_stats.text = "   ".join(parts) + Loc.t("\nEaten: ") + (", ".join(diet_parts) if not diet_parts.is_empty() else Loc.t("nothing yet"))
 	if not abil.is_empty():
-		warden_stats.text += "\nAbilities: " + ", ".join(abil)
+		warden_stats.text += Loc.t("\nAbilities: ") + ", ".join(abil)
 	var gear_parts: Array = []
 	var gear: Dictionary = w["gear"]
 	var slots: Array = w["slots"]
 	for i in slots.size():
-		var label := str(slots[i]).capitalize()
+		var label := Loc.t(str(slots[i]).capitalize())
 		gear_parts.append("%s: %s" % [label, gear[i]["name"] if gear.has(i) else "-"])
 	var gear_lines: Array = []
 	for i in range(0, gear_parts.size(), 2):
@@ -404,30 +416,30 @@ func refresh() -> void:
 	gear_label.text = "\n".join(gear_lines)
 	var wdef: Dictionary = Meta.warden_def()
 	var cd: float = w["cooldown"]
-	active_btn.text = "[Q] %s%s" % [wdef["active"], "" if cd <= 0.0 else "  (%ds)" % int(ceil(cd))]
+	active_btn.text = Loc.t("[Q] %s%s") % [Loc.t(wdef["active"]), "" if cd <= 0.0 else "  (%ds)" % int(ceil(cd))]
 	active_btn.disabled = cd > 0.0 or s.game_over
-	active_btn.tooltip_text = "%s\n\nPassive, %s: %s" % [wdef["active_desc"], wdef["passive"], wdef["passive_desc"]]
+	active_btn.tooltip_text = Loc.t("%s\n\nPassive, %s: %s") % [Loc.t(wdef["active_desc"]), Loc.t(wdef["passive"]), Loc.t(wdef["passive_desc"])]
 
 	attention_bar.value = s.threat
-	stance_btn.text = ("Souls: RAISE as servants (%d/%d)" % [s.undead_count(), s.jar_cap]) if s.raise_souls else "Souls: the Warden DEVOURS them"
-	stance_btn.tooltip_text = "Devour heals the Warden and gives XP. Raise makes an undead servant where the traveler fell. Hotkey: R"
+	stance_btn.text = (Loc.t("Souls: RAISE as servants (%d/%d)") % [s.undead_count(), s.jar_cap]) if s.raise_souls else Loc.t("Souls: the Warden DEVOURS them")
+	stance_btn.tooltip_text = Loc.t("Devour heals the Warden and gives XP. Raise makes an undead servant where the traveler fell. Hotkey: R")
 	var pct: float = s.seal_pct()
 	var relic_names: Array = []
 	for r in s.relics:
-		relic_names.append(D.RELICS[r]["name"])
+		relic_names.append(Loc.t(D.RELICS[r]["name"]))
 	var found: Array = []
 	for r in s.found_relics:
-		found.append(D.RELICS[r]["name"])
-	var txt := "Harvest: %d Bones  %d Blood  %d Gold" % [s.pouch["bones"], s.pouch["blood"], s.pouch["gold"]]
+		found.append(Loc.t(D.RELICS[r]["name"]))
+	var txt := Loc.t("Harvest: %d Bones  %d Blood  %d Gold") % [s.pouch["bones"], s.pouch["blood"], s.pouch["gold"]]
 	if not relic_names.is_empty():
-		txt += "\nRelics: " + ", ".join(relic_names)
+		txt += Loc.t("\nRelics: ") + ", ".join(relic_names)
 	if not found.is_empty():
-		txt += "\nFound (survive to keep): " + ", ".join(found)
+		txt += Loc.t("\nFound (survive to keep): ") + ", ".join(found)
 	harvest_label.text = txt
 
-	pause_btn.text = "Play" if s.paused else "Pause"
-	speed_btn.text = "x%d" % int(s.time_scale)
-	sleep_btn.text = "Sleep (keep %d%%)" % int(pct * 100.0)
+	pause_btn.text = Loc.t("Play") if s.paused else Loc.t("Pause")
+	speed_btn.text = Loc.t("x%d") % int(s.time_scale)
+	sleep_btn.text = Loc.t("Sleep (keep %d%%)") % int(pct * 100.0)
 	sleep_btn.disabled = s.game_over
 	sleep_btn.modulate = Color(1, 0.9, 0.4) if pct >= 1.0 else Color(1, 1, 1)
 	_update_tooltip()
@@ -440,30 +452,30 @@ func show_end(outcome: String, payout: Dictionary, pct: float, kept: Array, lost
 	var head := ""
 	match outcome:
 		"victory":
-			head = "ACT CLEARED\n%s has been devoured." % D.ACTS[s.act]["boss"]
+			head = Loc.t("ACT CLEARED\n%s has been devoured.") % D.ACTS[s.act]["boss"]
 		"sleep":
-			head = "THE DUNGEON SLEEPS\nYou keep %d%% of the harvest." % int(pct * 100.0)
+			head = Loc.t("THE DUNGEON SLEEPS\nYou keep %d%% of the harvest.") % int(pct * 100.0)
 		_:
-			head = "THE WARDEN FALLS\nOnly %d%% of the harvest remains." % int(pct * 100.0)
+			head = Loc.t("THE WARDEN FALLS\nOnly %d%% of the harvest remains.") % int(pct * 100.0)
 	var gains: Array = []
 	for k in payout:
-		gains.append("+%d %s" % [int(payout[k]), D.RESOURCES[k]["name"]])
-	var text := "%s\n\nDays: %d   Travelers taken: %d\n%s" % [head, s.day, s.kills, "   ".join(gains)]
+		gains.append("+%d %s" % [int(payout[k]), Loc.t(D.RESOURCES[k]["name"])])
+	var text := Loc.t("%s\n\nDays: %d   Travelers taken: %d\n%s") % [head, s.day, s.kills, "   ".join(gains)]
 	for r in kept:
-		text += "\nNew relic: %s" % D.RELICS[r]["name"]
+		text += Loc.t("\nNew relic: %s") % Loc.t(D.RELICS[r]["name"])
 	for r in lost:
-		text += "\nLost in the dark: %s" % D.RELICS[r]["name"]
+		text += Loc.t("\nLost in the dark: %s") % Loc.t(D.RELICS[r]["name"])
 	end_label.text = text
 	for c in end_buttons.get_children():
 		c.queue_free()
 	if outcome == "victory":
-		var cont := UI.button("Continue")
+		var cont := UI.button(Loc.t("Continue"))
 		cont.pressed.connect(func(): run.continue_after_victory())
 		end_buttons.add_child(cont)
-	var lair := UI.button("Return to the Lair")
+	var lair := UI.button(Loc.t("Return to the Lair"))
 	lair.pressed.connect(func(): run.go_to("res://scenes/lair.tscn"))
 	end_buttons.add_child(lair)
-	var again := UI.button("New run")
+	var again := UI.button(Loc.t("New run"))
 	again.pressed.connect(func(): run.go_to("res://scenes/prepare.tscn"))
 	end_buttons.add_child(again)
 	end_panel.visible = true
@@ -471,7 +483,7 @@ func show_end(outcome: String, payout: Dictionary, pct: float, kept: Array, lost
 
 func rebuild_trophies() -> void:
 	var s = run.state
-	trophy_title.text = "Loot %d/%d   (click: the Warden wears it · RMB: throw away)" % [s.inventory.size(), D.INVENTORY_MAX]
+	trophy_title.text = Loc.t("Loot %d/%d   (click: the Warden wears it · RMB: throw away)") % [s.inventory.size(), D.INVENTORY_MAX]
 	for c in trophy_box.get_children():
 		c.queue_free()
 	for i in s.inventory.size():
@@ -479,8 +491,8 @@ func rebuild_trophies() -> void:
 		var rar: Dictionary = D.RARITIES[item["rarity"]]
 		var col: Color = rar["color"]
 		var btn := Button.new()
-		btn.text = "%s  %s" % [item["name"], LootSystem.describe(item)]
-		btn.tooltip_text = "%s  (%s, level %d)\n%s\n\nWearing now: %s" % [item["name"], str(item["slot"]).capitalize(),
+		btn.text = Loc.t("%s  %s") % [item["name"], LootSystem.describe(item)]
+		btn.tooltip_text = Loc.t("%s  (%s, level %d)\n%s\n\nWearing now: %s") % [item["name"], Loc.t(str(item["slot"]).capitalize()),
 			int(item["level"]), LootSystem.describe(item).replace(", ", "\n"), _worn_text(item["slot"])]
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -503,11 +515,11 @@ func rebuild_trophies() -> void:
 
 func _worn_text(slot: String) -> String:
 	if not run.warden.can_wear(slot):
-		return "this Warden has no %s slot" % slot
+		return Loc.t("this Warden has no %s slot") % Loc.t(slot.capitalize())
 	var idx: int = run.warden.slot_for(slot)
 	var gear: Dictionary = run.state.warden["gear"]
 	if not gear.has(idx):
-		return "nothing"
+		return Loc.t("nothing")
 	var it: Dictionary = gear[idx]
 	return "%s  %s" % [it["name"], LootSystem.describe(it)]
 
@@ -521,7 +533,7 @@ func show_banner(text: String) -> void:
 
 
 func _on_log() -> void:
-	log_label.text = "\n".join(run.state.log_lines)
+	log_label.text = Loc.t("\n").join(run.state.log_lines)
 
 
 func _update_tooltip() -> void:
@@ -535,31 +547,31 @@ func _update_tooltip() -> void:
 		var t: int = s.path_lookup[cell]
 		var card: String = s.card_at(t)
 		if t == 0:
-			lines.append("The door: travelers come in here. Three laps and they find the way out.")
+			lines.append(Loc.t("The door: travelers come in here. Three laps and they find the way out."))
 		elif card != "":
-			lines.append("%s: %s" % [D.CARDS[card]["name"], D.CARDS[card]["desc"]])
+			lines.append("%s: %s" % [Loc.t(D.CARDS[card]["name"]), Loc.t(D.CARDS[card]["desc"])])
 		elif t >= s.loop_size:
-			lines.append("Side passage (the Warden never walks here)")
+			lines.append(Loc.t("Side passage (the Warden never walks here)"))
 		if s.forks.has(t):
-			lines.append("Fork: each traveler picks a branch by personality.")
+			lines.append(Loc.t("Fork: each traveler picks a branch by personality."))
 		if s.warden_at(t):
-			lines.append("%s  %d/%d HP  %.1f dmg" % [s.warden["name"], int(s.warden["hp"]), int(s.warden["max_hp"]), s.warden["dmg"]])
+			lines.append(Loc.t("%s  %d/%d HP  %.1f dmg") % [s.warden["name"], int(s.warden["hp"]), int(s.warden["max_hp"]), s.warden["dmg"]])
 		for u in s.alive_units(t):
-			lines.append("%s  %d/%d HP  %.1f dmg" % [u["name"], int(u["hp"]), int(u["max_hp"]), u["dmg"]])
+			lines.append(Loc.t("%s  %d/%d HP  %.1f dmg") % [Loc.t(u["name"]), int(u["hp"]), int(u["max_hp"]), u["dmg"]])
 		for h in s.travelers_at(t):
 			var trait_id: String = h["trait"]
-			var tr_txt := "" if trait_id == "" else "  [%s]" % D.TRAITS[trait_id]["name"]
-			lines.append("%s (%s)%s  %d/%d HP  lap %d/%d" % [s.hero_name(h), D.HERO_CLASSES[h["cls"]]["name"], tr_txt,
+			var tr_txt := "" if trait_id == "" else "  [%s]" % Loc.t(D.TRAITS[trait_id]["name"])
+			lines.append(Loc.t("%s (%s)%s  %d/%d HP  lap %d/%d") % [s.hero_name(h), D.HERO_CLASSES[h["cls"]]["name"], tr_txt,
 				int(h["hp"]), int(h["max_hp"]), int(h["laps"]), run.heroes_sys.escape_laps()])
 	elif s.scenery.has(cell):
 		var id: String = s.scenery[cell]
-		lines.append("%s: %s" % [D.CARDS[id]["name"], D.CARDS[id]["desc"]])
+		lines.append("%s: %s" % [Loc.t(D.CARDS[id]["name"]), Loc.t(D.CARDS[id]["desc"])])
 	elif cell == s.heart_cell:
-		lines.append("The dungeon's heart. It hungers.")
+		lines.append(Loc.t("The dungeon's heart. It hungers."))
 	if lines.is_empty():
 		tooltip.visible = false
 		return
-	tooltip_label.text = "\n".join(lines)
+	tooltip_label.text = Loc.t("\n").join(lines)
 	tooltip.visible = true
 	tooltip.reset_size()
 	var mp: Vector2 = get_viewport().get_mouse_position() + Vector2(16, 16)

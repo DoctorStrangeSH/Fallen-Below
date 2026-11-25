@@ -24,7 +24,7 @@ func _ready() -> void:
 	text_label.size = Vector2(900, 360)
 	add_child(text_label)
 
-	hint = UI.label("click to continue   ·   Esc to skip", 14, Color(1, 1, 1, 0.35))
+	hint = UI.label(Loc.t("click to continue   ·   Esc to skip"), 14, Color(1, 1, 1, 0.35))
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.position = Vector2(0, 640)
 	hint.size = Vector2(1280, 30)
@@ -37,7 +37,7 @@ func _ready() -> void:
 
 
 func _show_page() -> void:
-	text_label.text = pages[index]
+	text_label.text = Loc.t(pages[index])
 	text_label.modulate.a = 0.0
 	create_tween().tween_property(text_label, "modulate:a", 1.0, 0.8)
 

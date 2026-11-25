@@ -10,10 +10,10 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	UI.background(self)
 
-	var title := UI.label("THE BOOK OF THE FALLEN", 34, Color(0.75, 0.55, 1.0))
+	var title := UI.label(Loc.t("THE BOOK OF THE FALLEN"), 34, Color(0.75, 0.55, 1.0))
 	title.position = Vector2(40, 20)
 	add_child(title)
-	var sub := UI.label("Pages %d/%d. Raise the dead instead of devouring them, and they will tell you what they knew." % [
+	var sub := UI.label(Loc.t("Pages %d/%d. Raise the dead instead of devouring them, and they will tell you what they knew.") % [
 		Meta.fragment_count(), Meta.fragment_total()], 14, Color(1, 1, 1, 0.6))
 	sub.position = Vector2(40, 66)
 	add_child(sub)
@@ -39,24 +39,24 @@ func _ready() -> void:
 		var v := VBoxContainer.new()
 		v.add_theme_constant_override("separation", 6)
 		panel.add_child(v)
-		var kind_name: String = D.HERO_CLASSES[kind]["name"]
-		v.add_child(UI.label("%ss  (%d/%d)" % [kind_name, have, pages.size()], 17, Color(1, 0.85, 0.55)))
+		var kind_name: String = Loc.t(D.HERO_CLASSES[kind]["name"])
+		v.add_child(UI.label(Loc.t("%ss  (%d/%d)") % [kind_name, have, pages.size()], 17, Color(1, 0.85, 0.55)))
 		for i in pages.size():
-			var text := "\"%s\"" % pages[i] if i < have else "???"
+			var text := "\"%s\"" % Loc.t(pages[i]) if i < have else "???"
 			var l := UI.label(text, 13, Color(0.92, 0.88, 1.0) if i < have else Color(1, 1, 1, 0.3))
 			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			l.custom_minimum_size = Vector2(560, 0)
 			v.add_child(l)
 		if have == 0 and D.LURES.values().any(func(lu): return lu["traveler"] == kind and lu.has("building")):
-			v.add_child(UI.label("Lure them first: build their shrine in the Lair.", 12, Color(1, 0.6, 0.4, 0.7)))
+			v.add_child(UI.label(Loc.t("Lure them first: build their shrine in the Lair."), 12, Color(1, 0.6, 0.4, 0.7)))
 
 	var row := HBoxContainer.new()
 	row.position = Vector2(40, 640)
 	row.add_theme_constant_override("separation", 12)
 	add_child(row)
-	var lair := UI.button("The Lair")
+	var lair := UI.button(Loc.t("The Lair"))
 	lair.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/lair.tscn"))
 	row.add_child(lair)
-	var menu := UI.button("Main menu")
+	var menu := UI.button(Loc.t("Main menu"))
 	menu.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
 	row.add_child(menu)

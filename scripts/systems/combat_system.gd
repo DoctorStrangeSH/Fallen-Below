@@ -104,7 +104,7 @@ func _monsters_strike(t: int, hs: Array, units: Array, warden_here: bool) -> voi
 			if not loyal_dead and s.rng.randf() < D.BETRAY_CHANCE:
 				u["hp"] = 0.0
 				run.heroes_sys.heal(target, 10.0)
-				s.add_log("%s remembers %s... and abandons you!" % [u["name"], target["name"]])
+				s.add_log(Loc.t("%s remembers %s... and abandons you!") % [Loc.t(u["name"]), target["name"]])
 				continue
 			dmg *= 1.5  # rage of the betrayed
 		run.heroes_sys.damage(target, dmg)

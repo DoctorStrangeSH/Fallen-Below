@@ -50,6 +50,8 @@ func _ready() -> void:
 				Meta.buildings["pit"] = int(kv[1])
 			"lair":
 				lair_mode = kv[1]
+			"lang":
+				Loc.set_language(kv[1], false)
 	rng.seed = 12345
 	Meta.no_save = true
 	# make every Warden and lure available to the bot (does not touch buildings permanently)

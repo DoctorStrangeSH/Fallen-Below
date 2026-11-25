@@ -16,10 +16,10 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	UI.background(self)
 
-	var title := UI.label("PREPARE THE DESCENT", 36, Color(0.75, 0.55, 1.0))
+	var title := UI.label(Loc.t("PREPARE THE DESCENT"), 36, Color(0.75, 0.55, 1.0))
 	title.position = Vector2(40, 24)
 	add_child(title)
-	var sub := UI.label("Choose your Warden, the memories you will rebuild from, and the relics you carry.", 14, Color(1, 1, 1, 0.6))
+	var sub := UI.label(Loc.t("Choose your Warden, the memories you will rebuild from, and the relics you carry."), 14, Color(1, 1, 1, 0.6))
 	sub.position = Vector2(40, 66)
 	add_child(sub)
 
@@ -57,13 +57,13 @@ func _ready() -> void:
 	row.position = Vector2(40, 640)
 	row.add_theme_constant_override("separation", 12)
 	add_child(row)
-	var go := UI.button("DESCEND", Vector2(260, 52))
+	var go := UI.button(Loc.t("DESCEND"), Vector2(260, 52))
 	go.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/run.tscn"))
 	row.add_child(go)
-	var lair := UI.button("The Lair", Vector2(200, 52))
+	var lair := UI.button(Loc.t("The Lair"), Vector2(200, 52))
 	lair.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/lair.tscn"))
 	row.add_child(lair)
-	var menu := UI.button("Main menu", Vector2(200, 52))
+	var menu := UI.button(Loc.t("Main menu"), Vector2(200, 52))
 	menu.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
 	row.add_child(menu)
 
@@ -79,10 +79,10 @@ func _rebuild() -> void:
 		var on: bool = Meta.warden_id == id
 		var btn := Button.new()
 		if unlocked:
-			btn.text = "%s\n%s\n\n%s: %s\n[Q] %s" % [def["name"], def["style"], def["passive"], def["passive_desc"], def["active"]]
-			btn.tooltip_text = "%s: %s\nSlots: %s" % [def["active"], def["active_desc"], ", ".join(def["slots"])]
+			btn.text = Loc.t("%s\n%s\n\n%s: %s\n[Q] %s") % [Loc.t(def["name"]), Loc.t(def["style"]), Loc.t(def["passive"]), Loc.t(def["passive_desc"]), Loc.t(def["active"])]
+			btn.tooltip_text = Loc.t("%s: %s\nSlots: %s") % [Loc.t(def["active"]), Loc.t(def["active_desc"]), ", ".join(def["slots"].map(func(x): return Loc.t(str(x).capitalize())))]
 		else:
-			btn.text = "%s\n\nLOCKED\n%s" % [def["name"], Meta.unlock_text(id)]
+			btn.text = Loc.t("%s\n\nLOCKED\n%s") % [Loc.t(def["name"]), Meta.unlock_text(id)]
 			btn.disabled = true
 		btn.custom_minimum_size = Vector2(294, 148)
 		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -102,14 +102,14 @@ func _rebuild() -> void:
 		)
 		warden_box.add_child(btn)
 
-	deck_title.text = "Deck: %d/%d card types" % [Meta.deck.size(), Meta.deck_slots()]
+	deck_title.text = Loc.t("Deck: %d/%d card types") % [Meta.deck.size(), Meta.deck_slots()]
 	for c in deck_box.get_children():
 		c.queue_free()
 	for id in Meta.unlocked_cards():
 		var def: Dictionary = D.CARDS[id]
 		var on: bool = Meta.deck.has(id)
 		var btn := Button.new()
-		btn.text = "%s\n\n%s" % [def["name"], def["desc"]]
+		btn.text = Loc.t("%s\n\n%s") % [Loc.t(def["name"]), Loc.t(def["desc"])]
 		btn.custom_minimum_size = Vector2(180, 100)
 		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		btn.focus_mode = Control.FOCUS_NONE
@@ -129,18 +129,18 @@ func _rebuild() -> void:
 		)
 		deck_box.add_child(btn)
 
-	relic_title.text = "Relics: %d/%d equipped   (%d found of %d)" % [
+	relic_title.text = Loc.t("Relics: %d/%d equipped   (%d found of %d)") % [
 		Meta.loadout.size(), Meta.relic_slots(), Meta.relics.size(), D.RELICS.size()]
 	for c in relic_box.get_children():
 		c.queue_free()
 	if Meta.relics.is_empty():
-		var hint := UI.label("No relics yet. Veterans sometimes carry one, champions always do,\nand a dungeon sealed at the end of a week may give one up.", 14, Color(1, 1, 1, 0.5))
+		var hint := UI.label(Loc.t("No relics yet. Veterans sometimes carry one, champions always do,\nand a dungeon sealed at the end of a week may give one up."), 14, Color(1, 1, 1, 0.5))
 		relic_box.add_child(hint)
 	for id in Meta.relics:
 		var def: Dictionary = D.RELICS[id]
 		var on: bool = Meta.loadout.has(id)
 		var btn := Button.new()
-		btn.text = "%s  —  %s" % [def["name"], def["desc"]]
+		btn.text = Loc.t("%s  —  %s") % [Loc.t(def["name"]), Loc.t(def["desc"])]
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		btn.custom_minimum_size = Vector2(570, 48)

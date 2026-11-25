@@ -104,5 +104,5 @@ func _draw() -> void:
 			var pp := p + Vector2((k - (max_lvl - 1) * 0.5) * 8.0, r + 7)
 			draw_circle(pp, 2.5, Color(1, 0.8, 0.4) if k < lvl else Color(0.3, 0.27, 0.33))
 		var name_col := Color(1, 1, 1, 0.9) if lvl > 0 else (Color(1, 1, 1, 0.55) if can else Color(1, 1, 1, 0.25))
-		var label: String = D.BUILDINGS[id]["name"]
+		var label: String = Loc.t(D.BUILDINGS[id]["name"])
 		draw_string(font, p + Vector2(-70, r + 24), label, HORIZONTAL_ALIGNMENT_CENTER, 140, 12, name_col)

@@ -14,6 +14,7 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 
 Meta="*res://scripts/autoload/meta.gd"
 Music="*res://scripts/autoload/music.gd"
+Loc="*res://scripts/autoload/loc.gd"
 
 [display]
 

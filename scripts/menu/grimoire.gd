@@ -17,11 +17,11 @@ func _ready() -> void:
 	v.add_theme_constant_override("separation", 10)
 	center.add_child(v)
 
-	var title := UI.label("GRIMOIRE", 44, Color(0.75, 0.55, 1.0))
+	var title := UI.label(Loc.t("GRIMOIRE"), 44, Color(0.75, 0.55, 1.0))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)
 	var found: int = Meta.discovered.size()
-	var sub := UI.label("Secret combos discovered: %d/%d" % [found, D.COMBOS.size()], 16, Color(1, 1, 1, 0.7))
+	var sub := UI.label(Loc.t("Secret combos discovered: %d/%d") % [found, D.COMBOS.size()], 16, Color(1, 1, 1, 0.7))
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(sub)
 
@@ -36,19 +36,19 @@ func _ready() -> void:
 		var box := VBoxContainer.new()
 		panel.add_child(box)
 		if known:
-			box.add_child(UI.label(def["name"], 18, Color(1, 0.85, 0.5)))
-			box.add_child(UI.label(def["desc"], 14, Color(1, 1, 1, 0.75)))
+			box.add_child(UI.label(Loc.t(def["name"]), 18, Color(1, 0.85, 0.5)))
+			box.add_child(UI.label(Loc.t(def["desc"]), 14, Color(1, 1, 1, 0.75)))
 		else:
-			box.add_child(UI.label("???", 18, Color(1, 1, 1, 0.4)))
-			box.add_child(UI.label("Hint: %s" % def["hint"], 14, Color(1, 1, 1, 0.5)))
+			box.add_child(UI.label(Loc.t("???"), 18, Color(1, 1, 1, 0.4)))
+			box.add_child(UI.label(Loc.t("Hint: %s") % Loc.t(def["hint"]), 14, Color(1, 1, 1, 0.5)))
 
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 12)
 	v.add_child(row)
-	var lair := UI.button("The Lair")
+	var lair := UI.button(Loc.t("The Lair"))
 	lair.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/lair.tscn"))
 	row.add_child(lair)
-	var back := UI.button("Main menu")
+	var back := UI.button(Loc.t("Main menu"))
 	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
 	row.add_child(back)

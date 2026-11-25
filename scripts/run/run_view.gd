@@ -49,7 +49,7 @@ func _draw() -> void:
 	_draw_warden(s, font)
 	if s.paused and not s.game_over:
 		var vr := get_viewport_rect()
-		draw_string(font, Vector2(D.MAP_OFFSET.x, vr.size.y * 0.42), "PAUSED", HORIZONTAL_ALIGNMENT_CENTER, D.GRID_W * D.CELL, 40, Color(1, 1, 1, 0.8))
+		draw_string(font, Vector2(D.MAP_OFFSET.x, vr.size.y * 0.42), Loc.t("PAUSED"), HORIZONTAL_ALIGNMENT_CENTER, D.GRID_W * D.CELL, 40, Color(1, 1, 1, 0.8))
 
 
 func _draw_floor(s) -> void:
@@ -88,9 +88,9 @@ func _draw_path(s, font: Font) -> void:
 			continue
 		if i == 0:
 			if Art.tex("tile_gate") == null:
-				draw_string(font, r.position + Vector2(0, 30), "GATE", HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 12)
+				draw_string(font, r.position + Vector2(0, 30), Loc.t("GATE"), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 12)
 		elif card != "":
-			var label: String = D.CARDS[card]["name"]
+			var label: String = Loc.t(D.CARDS[card]["name"])
 			draw_string(font, r.position + Vector2(0, 14), label.substr(0, 6), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 10, Color(1, 1, 1, 0.7))
 	# fork markers
 	for f in s.forks:
@@ -107,7 +107,7 @@ func _draw_scenery(s, font: Font) -> void:
 			continue
 		var col: Color = D.CARDS[id]["color"]
 		draw_rect(r, col)
-		var label: String = D.CARDS[id]["name"]
+		var label: String = Loc.t(D.CARDS[id]["name"])
 		draw_string(font, r.position + Vector2(0, 24), label.substr(0, 5).to_upper(), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 10)
 
 
@@ -120,7 +120,7 @@ func _draw_heart(s, font: Font) -> void:
 		return
 	draw_circle(center, 20.0 * pulse, Color(0.45, 0.05, 0.12))
 	draw_circle(center, 13.0 * pulse, Color(0.8, 0.15, 0.25))
-	draw_string(font, center + Vector2(-40, 36), "HUNGER", HORIZONTAL_ALIGNMENT_CENTER, 80, 10, Color(1, 0.5, 0.5, 0.6))
+	draw_string(font, center + Vector2(-40, 36), Loc.t("HUNGER"), HORIZONTAL_ALIGNMENT_CENTER, 80, 10, Color(1, 0.5, 0.5, 0.6))
 
 
 func warden_world_pos(s) -> Vector2:
@@ -147,7 +147,7 @@ func _draw_warden(s, font: Font) -> void:
 	var frac: float = clampf(w["hp"] / w["max_hp"], 0.0, 1.0)
 	draw_rect(Rect2(p + Vector2(-18, -24), Vector2(36, 4)), Color(0.1, 0.1, 0.15))
 	draw_rect(Rect2(p + Vector2(-18, -24), Vector2(36 * frac, 4)), Color(0.4, 0.85, 1.0))
-	draw_string(font, p + Vector2(-30, 28), "WARDEN", HORIZONTAL_ALIGNMENT_CENTER, 60, 9, Color(0.6, 0.9, 1.0))
+	draw_string(font, p + Vector2(-30, 28), Loc.t("WARDEN"), HORIZONTAL_ALIGNMENT_CENTER, 60, 9, Color(0.6, 0.9, 1.0))
 
 
 func _draw_preview(s) -> void:
@@ -217,5 +217,5 @@ func _draw_heroes(s, font: Font) -> void:
 			draw_string(font, p + Vector2(rad, -rad), "!", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 0.3, 0.2))
 		var trait_id: String = h["trait"]
 		if trait_id != "":
-			var tn: String = D.TRAITS[trait_id]["name"]
+			var tn: String = Loc.t(D.TRAITS[trait_id]["name"])
 			draw_string(font, p + Vector2(rad - 2, rad + 8), tn.substr(0, 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 0.85, 0.3))

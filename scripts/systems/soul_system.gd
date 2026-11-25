@@ -42,16 +42,16 @@ func _raise(h: Dictionary) -> void:
 		if x["party"] == h["party"]:
 			x["revenge"] = true
 			avengers += 1
-	s.add_log("%s rises to serve you." % unit["name"])
+	s.add_log(Loc.t("%s rises to serve you.") % unit["name"])
 	if run.warden.is_kind("saint"):
 		run.warden.gain_xp(D.XP_RAISE)
 	run.beat("first_raise")
 	var page: String = Meta.next_fragment(h["cls"])
 	if page != "":
-		s.narrate.emit("%s whispers: \"%s\"" % [h["name"], page])
-		s.add_log("New page in the Book of the Fallen (%d/%d)." % [Meta.fragment_count(), Meta.fragment_total()])
+		s.narrate.emit(Loc.t("%s whispers: \"%s\"") % [h["name"], Loc.t(page)])
+		s.add_log(Loc.t("New page in the Book of the Fallen (%d/%d).") % [Meta.fragment_count(), Meta.fragment_total()])
 	else:
 		var lines: Array = D.WHISPERS[h["cls"]]
-		s.add_log("\"%s\"" % lines[s.rng.randi() % lines.size()])
+		s.add_log(Loc.t("\"%s\"") % Loc.t(lines[s.rng.randi() % lines.size()]))
 	if avengers > 0:
-		s.add_log("Their companions swear revenge!")
+		s.add_log(Loc.t("Their companions swear revenge!"))

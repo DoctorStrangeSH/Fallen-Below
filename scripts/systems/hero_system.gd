@@ -55,29 +55,29 @@ func spawn_party() -> void:
 		var share := D.LURE_SHARE_LANTERN if s.has_relic("lantern_of_lies") else D.LURE_SHARE
 		if s.rng.randf() >= share:
 			cls = D.HERO_CLASSES.keys()[s.rng.randi() % D.HERO_CLASSES.size()]
-		var hero_name: String = D.FIRST_NAMES[s.rng.randi() % D.FIRST_NAMES.size()]
+		var hero_name: String = Loc.t(D.FIRST_NAMES[s.rng.randi() % D.FIRST_NAMES.size()])
 		make_hero(cls, hero_name, mult, pid, i)
-		names.append(D.HERO_CLASSES[cls]["name"])
-	s.add_log("Day %d (loop %d): lured below: %s." % [s.day, s.loop, ", ".join(names)])
+		names.append(Loc.t(D.HERO_CLASSES[cls]["name"]))
+	s.add_log(Loc.t("Day %d (loop %d): lured below: %s.") % [s.day, s.loop, ", ".join(names)])
 
 
 func spawn_boss() -> void:
 	s.boss_spawned = true
 	var act: Dictionary = D.ACTS[s.act]
-	var h := make_hero("pilgrim", act["boss"], 1.0, s.next_party_id, 0)
+	var h := make_hero("pilgrim", Loc.t(act["boss"]), 1.0, s.next_party_id, 0)
 	s.next_party_id += 1
 	h["trait"] = ""
 	h["boss"] = true
-	h["title"] = act["boss_title"]
+	h["title"] = Loc.t(act["boss_title"])
 	h["hp"] = D.BOSS_HP + s.loop * D.BOSS_HP_PER_LOOP
 	h["max_hp"] = h["hp"]
 	h["dmg"] = D.BOSS_DMG + s.loop * D.BOSS_DMG_PER_LOOP
 	h["speed"] = 1.3
 	h["color"] = Color(1, 1, 1)
 	for line in D.BOSS_LINES["arrive"]:
-		s.narrate.emit(line)
-	s.add_log("%s descends. Her radiance burns undead nearby: meet her with the Warden and the living." % s.hero_name(h))
-	s.combo_found.emit("%s DESCENDS" % s.hero_name(h).to_upper())
+		s.narrate.emit(Loc.t(line))
+	s.add_log(Loc.t("%s descends. Her radiance burns undead nearby: meet her with the Warden and the living.") % s.hero_name(h))
+	s.combo_found.emit(Loc.t("%s DESCENDS") % s.hero_name(h).to_upper())
 
 
 # ---------------------------------------------------------- movement
@@ -136,7 +136,7 @@ func choose_next(h: Dictionary, t: int) -> int:
 	if best != opts[0] and not h["boss"]:
 		var reason := _lure_reason(h, fork[best])
 		if reason != "":
-			s.add_log("%s %s" % [s.hero_name(h), reason])
+			s.add_log(Loc.t("%s %s") % [s.hero_name(h), reason])
 	return best
 
 
@@ -175,9 +175,9 @@ func _lure_reason(h: Dictionary, seg: Array) -> String:
 	for id in seg:
 		var card := s.card_at(id)
 		if D.BAIT_CARDS.has(card) and _is_greedy(h):
-			return "can't resist the chest..."
+			return Loc.t("can't resist the chest...")
 		if _is_holy(h) and (s.scenery_near(id, "altar") + s.scenery_near(id, "spire") > 0 or not s.undead_at(id).is_empty()):
-			return "goes to purge the darkness."
+			return Loc.t("goes to purge the darkness.")
 	return ""
 
 
@@ -187,9 +187,9 @@ func _on_lap(h: Dictionary) -> void:
 		return  # the champion hunts the Warden, she does not leave
 	h["laps"] += 1
 	if h["laps"] >= escape_laps():
-		escape(h, "found the way out")
+		escape(h, Loc.t("found the way out"))
 	else:
-		s.add_log("%s is getting closer to the exit (%d/%d)." % [s.hero_name(h), h["laps"], escape_laps()])
+		s.add_log(Loc.t("%s is getting closer to the exit (%d/%d).") % [s.hero_name(h), h["laps"], escape_laps()])
 
 
 func escape_laps() -> int:
@@ -201,7 +201,7 @@ func escape(h: Dictionary, how: String) -> void:
 	var t := D.THREAT_PER_ESCAPE * (0.5 if s.has_relic("whispering_skull") else 1.0)
 	s.add_threat(t, "escapes")
 	s.escapes += 1
-	s.add_log("%s %s and will tell the Order!" % [s.hero_name(h), how])
+	s.add_log(Loc.t("%s %s and will tell the Order!") % [s.hero_name(h), how])
 	run.beat("first_escape")
 	run.beat("tut_escape")
 
@@ -235,11 +235,11 @@ func damage(h: Dictionary, amount: float) -> void:
 	if h["boss"] and not h["half_said"] and h["hp"] > 0.0 and h["hp"] < h["max_hp"] * 0.5:
 		h["half_said"] = true
 		for line in D.BOSS_LINES["half"]:
-			s.narrate.emit(line)
+			s.narrate.emit(Loc.t(line))
 	if h["hp"] <= 0.0:
 		_kill(h)
 	elif h["trait"] == "coward" and not h["boss"] and h["hp"] < h["max_hp"] * 0.3:
-		escape(h, "panics and flees for the surface")
+		escape(h, Loc.t("panics and flees for the surface"))
 
 
 func heal(h: Dictionary, amount: float) -> void:
@@ -260,15 +260,15 @@ func _kill(h: Dictionary) -> void:
 		if x["party"] == h["party"] and x["trait"] == "loyal":
 			x["dmg"] += 2.0
 			x["revenge"] = true
-			s.add_log("%s the Loyal swears to avenge %s!" % [x["name"], h["name"]])
+			s.add_log(Loc.t("%s the Loyal swears to avenge %s!") % [x["name"], h["name"]])
 	s.hand_changed.emit()
 	run.souls.on_death(h)
 	run.beat("first_kill")
 	run.beat("tut_souls")
 	if h["boss"]:
 		for line in D.BOSS_LINES["death"]:
-			s.narrate.emit(line)
-		s.add_log("%s has fallen!" % s.hero_name(h))
+			s.narrate.emit(Loc.t(line))
+		s.add_log(Loc.t("%s has fallen!") % s.hero_name(h))
 		run.end_game(true)
 
 
@@ -304,9 +304,9 @@ func _find_relic(h: Dictionary) -> void:
 	if id == "":
 		return
 	s.found_relics.append(id)
-	var relic_name: String = D.RELICS[id]["name"]
-	s.add_log("%s carried a relic: %s! Survive to keep it." % [h["name"], relic_name])
-	s.combo_found.emit("RELIC FOUND: %s" % relic_name)
+	var relic_name: String = Loc.t(D.RELICS[id]["name"])
+	s.add_log(Loc.t("%s carried a relic: %s! Survive to keep it.") % [h["name"], relic_name])
+	s.combo_found.emit(Loc.t("RELIC FOUND: %s") % relic_name)
 
 
 func remove(h: Dictionary) -> void:

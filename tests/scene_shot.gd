@@ -20,6 +20,8 @@ func _ready() -> void:
 				scene = kv[1]
 			"out":
 				out = kv[1]
+			"lang":
+				Loc.set_language(kv[1], false)
 			"lair":
 				Meta.buildings = {}
 				for id in D.BUILDINGS:

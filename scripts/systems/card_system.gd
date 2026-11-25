@@ -45,7 +45,7 @@ func use_card(i: int) -> void:
 	if D.CARDS[id]["kind"] == "instant":
 		if id == "jar":
 			s.jar_cap += 1
-			s.add_log("Undead servant slots: %d." % s.jar_cap)
+			s.add_log(Loc.t("Undead servant slots: %d.") % s.jar_cap)
 		s.hand.remove_at(i)
 		s.selected = -1
 	else:
@@ -246,10 +246,10 @@ func _check_scenery_combos(cell: Vector2i, id: String) -> void:
 
 func _found(combo_id: String) -> void:
 	var def: Dictionary = D.COMBOS[combo_id]
-	var combo_name: String = def["name"]
+	var combo_name: String = Loc.t(def["name"])
 	if Meta.discover(combo_id):
-		s.add_log("NEW COMBO DISCOVERED: %s!" % combo_name)
-		s.combo_found.emit("NEW COMBO: %s" % combo_name)
+		s.add_log(Loc.t("NEW COMBO DISCOVERED: %s!") % combo_name)
+		s.combo_found.emit(Loc.t("NEW COMBO: %s") % combo_name)
 	else:
-		s.add_log("Combo: %s!" % combo_name)
+		s.add_log(Loc.t("Combo: %s!") % combo_name)
 		s.combo_found.emit(combo_name)

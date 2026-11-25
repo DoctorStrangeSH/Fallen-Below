@@ -16,9 +16,9 @@ func drop_from(h: Dictionary) -> void:
 	var item := make_item(h)
 	if s.inventory.size() >= D.INVENTORY_MAX:
 		var lost: Dictionary = s.inventory.pop_front()  # the oldest item is left behind
-		s.add_log("No room: %s is left in the dark." % lost["name"])
+		s.add_log(Loc.t("No room: %s is left in the dark.") % lost["name"])
 	s.inventory.append(item)
-	s.add_log("%s dropped %s." % [h["name"], item["name"]])
+	s.add_log(Loc.t("%s dropped %s.") % [h["name"], item["name"]])
 	run.beat("tut_loot")
 	s.inventory_changed.emit()
 
@@ -47,7 +47,7 @@ func make_item(h: Dictionary) -> Dictionary:
 		var k: String = pool[i]
 		stats[k] = _roll(k, level, 0.6 * rar["mult"])
 	return {
-		"name": "%s %s" % [rar["name"], type_def["name"]] if r > 0 else str(type_def["name"]),
+		"name": Loc.t(str(type_def["name"])) + ("" if r == 0 else " [%s]" % Loc.t(rar["name"])),
 		"slot": slot, "rarity": r, "level": level, "stats": stats,
 	}
 
@@ -85,10 +85,10 @@ func _roll_rarity(boss: bool) -> int:
 static func stat_text(k: String, v: float) -> String:
 	var def: Dictionary = D.STATS[k]
 	if def["pct"]:
-		return "+%d%% %s" % [int(v), def["name"]]
+		return "+%d%% %s" % [int(v), Loc.t(def["name"])]
 	if k == "hp":
-		return "+%d %s" % [int(v), def["name"]]
-	return "+%s %s" % [str(snappedf(v, 0.1)), def["name"]]
+		return "+%d %s" % [int(v), Loc.t(def["name"])]
+	return "+%s %s" % [str(snappedf(v, 0.1)), Loc.t(def["name"])]
 
 
 static func describe(item: Dictionary) -> String:
@@ -107,13 +107,13 @@ func equip(i: int) -> void:
 		return
 	var item: Dictionary = s.inventory[i]
 	if not run.warden.can_wear(item["slot"]):
-		s.add_log("%s cannot wear that." % s.warden["name"])
+		s.add_log(Loc.t("%s cannot wear that.") % s.warden["name"])
 		return
 	s.inventory.remove_at(i)
 	var old: Dictionary = run.warden.equip(item)
 	if not old.is_empty():
 		s.inventory.append(old)
-	s.add_log("The Warden takes %s." % item["name"])
+	s.add_log(Loc.t("The Warden takes %s.") % item["name"])
 	s.inventory_changed.emit()
 
 

@@ -50,7 +50,7 @@ func _ready() -> void:
 
 	for i in Meta.start_cards():
 		cards.draw_card()
-	state.add_log("The door in the mountain opens. Someone is coming down.")
+	state.add_log(Loc.t("The door in the mountain opens. Someone is coming down."))
 	heroes_sys.spawn_party()
 	state.hand_changed.emit()
 	beat("tut_start")
@@ -110,7 +110,7 @@ func _new_day() -> void:
 		beat("tut_lure")
 	if state.day % D.SEAL_EVERY == 0:
 		beat("tut_week")
-		state.add_log("The week ends: the dungeon may sleep now and keep everything.")
+		state.add_log(Loc.t("The week ends: the dungeon may sleep now and keep everything."))
 		hud.show_banner("WEEK'S END: SLEEP TO KEEP 100%")
 	state.hand_changed.emit()
 
@@ -149,7 +149,7 @@ func _unhandled_input(event: InputEvent) -> void:
 ## One-time story moment (saved across runs).
 func beat(id: String) -> void:
 	if D.BEATS.has(id) and Meta.first_time(id):
-		state.narrate.emit(D.BEATS[id])
+		state.narrate.emit(Loc.t(D.BEATS[id]))
 
 
 ## Playtest shortcuts, only in debug builds (running from the editor).
@@ -160,15 +160,15 @@ func _debug_key(code: Key) -> void:
 		KEY_F1:
 			cards.draw_card()
 			state.hand_changed.emit()
-			state.add_log("[debug] +1 card")
+			state.add_log(Loc.t("[debug] +1 card"))
 		KEY_F2:
 			state.threat = D.BOSS_THREAT
-			state.add_log("[debug] the champion is summoned")
+			state.add_log(Loc.t("[debug] the champion is summoned"))
 		KEY_F3:
 			for k in Meta.res:
 				Meta.res[k] = int(Meta.res[k]) + 50
 			Meta.save_game()
-			state.add_log("[debug] +50 of every resource (Lair)")
+			state.add_log(Loc.t("[debug] +50 of every resource (Lair)"))
 		KEY_F4:
 			var fake := {"cls": D.HERO_CLASSES.keys()[state.rng.randi() % D.HERO_CLASSES.size()],
 				"boss": false, "trait": "veteran", "name": "Debug"}
@@ -195,7 +195,7 @@ func set_lure(id: String) -> void:
 	if Meta.available_lures().has(id):
 		state.lure = id
 		Meta.set_lure(id)
-		state.add_log("New lure: %s. Tomorrow's travelers will follow it." % D.LURES[id]["name"])
+		state.add_log(Loc.t("New lure: %s. Tomorrow's travelers will follow it.") % Loc.t(D.LURES[id]["name"]))
 
 
 ## Warden slain (win = false) or champion slain (win = true).

@@ -87,7 +87,7 @@ func _complete_loop() -> void:
 		s.warden["base"]["hp"] += 3.0
 		recompute()
 	heal_by(s.warden["max_hp"] * D.LOOP_HEAL)
-	s.add_log("Loop %d: the dungeon grows deeper. Travelers and their gear grow stronger." % s.loop)
+	s.add_log(Loc.t("Loop %d: the dungeon grows deeper. Travelers and their gear grow stronger.") % s.loop)
 	run.beat("first_loop")
 
 
@@ -136,16 +136,16 @@ func take_hit(amount: float, attacker: Dictionary) -> void:
 	if has("unbroken") and not s.warden["unbroken_used"]:
 		s.warden["unbroken_used"] = true
 		s.warden["hp"] = s.warden["max_hp"] * 0.4
-		s.add_log("%s refuses to break!" % s.warden["name"])
-		s.combo_found.emit("UNBROKEN")
+		s.add_log(Loc.t("%s refuses to break!") % s.warden["name"])
+		s.combo_found.emit(Loc.t("UNBROKEN"))
 	elif s.has_relic("second_heartbeat") and not s.warden["relic_used"]:
 		s.warden["relic_used"] = true
 		s.warden["hp"] = s.warden["max_hp"] * 0.5
-		s.add_log("Second Heartbeat! The Warden rises again.")
-		s.combo_found.emit("SECOND HEARTBEAT")
+		s.add_log(Loc.t("Second Heartbeat! The Warden rises again."))
+		s.combo_found.emit(Loc.t("SECOND HEARTBEAT"))
 	else:
 		s.warden["hp"] = 0.0
-		s.add_log("The Warden falls...")
+		s.add_log(Loc.t("The Warden falls..."))
 		run.end_game(false)
 
 
@@ -299,7 +299,7 @@ func use_active() -> void:
 			used = _call_the_dead()
 	if used:
 		s.warden["cooldown"] = cooldown_max()
-		s.add_log("%s: %s!" % [s.warden["name"], Meta.warden_def()["active"]])
+		s.add_log(Loc.t("%s: %s!") % [s.warden["name"], Loc.t(Meta.warden_def()["active"])])
 
 
 func _bone_storm() -> bool:
@@ -320,7 +320,7 @@ func _bone_storm() -> bool:
 				h["stun"] = maxf(h["stun"], 1.0)
 			hit = true
 	if not hit:
-		s.add_log("Bone Storm: no travelers near the Warden.")
+		s.add_log(Loc.t("Bone Storm: no travelers near the Warden."))
 	return hit
 
 
@@ -332,7 +332,7 @@ func _swallow() -> bool:
 		if best == null or h["hp"] < best["hp"]:
 			best = h
 	if best == null:
-		s.add_log("Swallow: no weakened traveler on the Mimic King's tile.")
+		s.add_log(Loc.t("Swallow: no weakened traveler on the Mimic King's tile."))
 		return false
 	best["swallowed"] = true
 	run.heroes_sys.damage(best, best["hp"] + 1.0)
@@ -346,7 +346,7 @@ func _call_the_dead() -> bool:
 			u["hp"] = minf(u["max_hp"], u["hp"] + u["max_hp"] * 0.5)
 			count += 1
 	if count == 0:
-		s.add_log("Call the Dead: you have no servants.")
+		s.add_log(Loc.t("Call the Dead: you have no servants."))
 		return false
 	heal_by(s.warden["max_hp"] * 0.05 * count)
 	if has("resurrection"):
@@ -365,7 +365,7 @@ func gain_xp(amount: int) -> void:
 	while xp_to_next() > 0 and int(w["xp"]) >= xp_to_next():
 		w["level"] += 1
 		heal_by(w["max_hp"] * D.LEVEL_UP_HEAL)
-		s.add_log("%s reaches level %d." % [w["name"], w["level"]])
+		s.add_log(Loc.t("%s reaches level %d.") % [w["name"], w["level"]])
 		run.beat("first_level")
 		pending_levels += 1
 	if s.level_choices.is_empty():
@@ -407,7 +407,7 @@ func pick_ability(i: int) -> void:
 		return
 	var id: String = s.level_choices[i]
 	s.warden["abilities"].append(id)
-	s.add_log("New ability: %s." % ability_def(id)["name"])
+	s.add_log(Loc.t("New ability: %s.") % Loc.t(ability_def(id)["name"]))
 	if id == "mass":
 		s.jar_cap += 2
 	recompute()

@@ -24,6 +24,7 @@ var fragments := {}      # traveler kind -> pages of the Book of the Fallen unlo
 var seen := []           # one-time story beats and memories already shown
 
 var music_volume := 0.7
+var language := ""
 var no_save := false     # set by the test bot so it never touches the real save
 
 # story scene hand-off (not saved)
@@ -53,7 +54,7 @@ func pay(cost: Dictionary) -> void:
 static func cost_text(cost: Dictionary) -> String:
 	var parts: Array = []
 	for k in cost:
-		parts.append("%d %s" % [int(cost[k]), D.RESOURCES[k]["name"]])
+		parts.append("%d %s" % [int(cost[k]), Loc.t(D.RESOURCES[k]["name"])])
 	return ", ".join(parts)
 
 
@@ -90,7 +91,7 @@ func requirements_text(id: String) -> String:
 	var req: Dictionary = D.BUILDINGS[id].get("requires", {})
 	var parts: Array = []
 	for b in req:
-		parts.append("%s %d" % [D.BUILDINGS[b]["name"], int(req[b])])
+		parts.append("%s %d" % [Loc.t(D.BUILDINGS[b]["name"]), int(req[b])])
 	return ", ".join(parts)
 
 
@@ -191,9 +192,9 @@ func warden_unlocked(id: String) -> bool:
 func unlock_text(id: String) -> String:
 	var def: Dictionary = D.WARDENS[id]
 	if def.has("unlock_building"):
-		return "Build the %s in the Lair." % D.BUILDINGS[def["unlock_building"]]["name"]
+		return Loc.t("Build the %s in the Lair.") % Loc.t(D.BUILDINGS[def["unlock_building"]]["name"])
 	if def.has("unlock_pages"):
-		return "Collect %d pages of the Book of the Fallen." % int(def["unlock_pages"])
+		return Loc.t("Collect %d pages of the Book of the Fallen.") % int(def["unlock_pages"])
 	return ""
 
 
@@ -314,12 +315,12 @@ func pending_memory() -> String:
 
 func warden_name() -> String:
 	if warden_id == "bone" and acts_cleared.has(1):
-		return D.WARDEN_TRUE_NAME
-	return str(warden_def()["name"])
+		return Loc.t(D.WARDEN_TRUE_NAME)
+	return Loc.t(str(warden_def()["name"]))
 
 
 func warden_title() -> String:
-	return str(warden_def()["title"])
+	return Loc.t(str(warden_def()["title"]))
 
 
 ## Experience and abilities exist only once the Hungering Pit is built.
@@ -393,7 +394,7 @@ func save_game() -> void:
 		"version": SAVE_VERSION, "res": res, "buildings": buildings, "relics": relics,
 		"deck": deck, "loadout": loadout, "runs": runs, "wins": wins, "best_day": best_day,
 		"total_kills": total_kills, "discovered": discovered, "seen_intro": seen_intro,
-		"acts_cleared": acts_cleared, "lure": lure, "warden": warden_id, "music_volume": music_volume, "fragments": fragments, "seen": seen,
+		"acts_cleared": acts_cleared, "lure": lure, "warden": warden_id, "music_volume": music_volume, "language": language, "fragments": fragments, "seen": seen,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -443,6 +444,7 @@ func load_game() -> void:
 	lure = str(d.get("lure", "gold"))
 	warden_id = str(d.get("warden", "bone"))
 	music_volume = clampf(float(d.get("music_volume", 0.7)), 0.0, 1.0)
+	language = str(d.get("language", ""))
 	fragments = {}
 	var fr = d.get("fragments", {})
 	if fr is Dictionary:
