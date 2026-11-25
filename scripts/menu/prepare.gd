@@ -4,6 +4,7 @@ extends Control
 const D = preload("res://scripts/data/game_data.gd")
 const UI = preload("res://scripts/ui/ui_style.gd")
 
+var warden_box: HBoxContainer
 var deck_title: Label
 var deck_box: GridContainer
 var relic_title: Label
@@ -17,28 +18,33 @@ func _ready() -> void:
 	var title := UI.label("PREPARE THE DESCENT", 36, Color(0.75, 0.55, 1.0))
 	title.position = Vector2(40, 24)
 	add_child(title)
-	var sub := UI.label("Choose the memories you will rebuild from, and the relics you carry. More slots and cards come from the Lair.", 14, Color(1, 1, 1, 0.6))
-	sub.position = Vector2(40, 74)
+	var sub := UI.label("Choose your Warden, the memories you will rebuild from, and the relics you carry.", 14, Color(1, 1, 1, 0.6))
+	sub.position = Vector2(40, 66)
 	add_child(sub)
+
+	warden_box = HBoxContainer.new()
+	warden_box.position = Vector2(40, 92)
+	warden_box.add_theme_constant_override("separation", 8)
+	add_child(warden_box)
 
 	# deck column
 	deck_title = UI.label("", 18, Color(1, 0.9, 0.6))
-	deck_title.position = Vector2(40, 110)
+	deck_title.position = Vector2(40, 250)
 	add_child(deck_title)
 	deck_box = GridContainer.new()
 	deck_box.columns = 3
-	deck_box.position = Vector2(40, 142)
+	deck_box.position = Vector2(40, 280)
 	deck_box.add_theme_constant_override("h_separation", 8)
 	deck_box.add_theme_constant_override("v_separation", 8)
 	add_child(deck_box)
 
 	# relic column
 	relic_title = UI.label("", 18, Color(0.8, 0.7, 1.0))
-	relic_title.position = Vector2(640, 110)
+	relic_title.position = Vector2(640, 250)
 	add_child(relic_title)
 	var scroll := ScrollContainer.new()
-	scroll.position = Vector2(640, 142)
-	scroll.size = Vector2(600, 470)
+	scroll.position = Vector2(640, 280)
+	scroll.size = Vector2(600, 340)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	add_child(scroll)
 	relic_box = VBoxContainer.new()
@@ -64,6 +70,37 @@ func _ready() -> void:
 
 
 func _rebuild() -> void:
+	for c in warden_box.get_children():
+		c.queue_free()
+	for id in D.WARDENS:
+		var def: Dictionary = D.WARDENS[id]
+		var unlocked: bool = Meta.warden_unlocked(id)
+		var on: bool = Meta.warden_id == id
+		var btn := Button.new()
+		if unlocked:
+			btn.text = "%s\n%s\n\n%s: %s\n[Q] %s" % [def["name"], def["style"], def["passive"], def["passive_desc"], def["active"]]
+			btn.tooltip_text = "%s: %s\nSlots: %s" % [def["active"], def["active_desc"], ", ".join(def["slots"])]
+		else:
+			btn.text = "%s\n\nLOCKED\n%s" % [def["name"], Meta.unlock_text(id)]
+			btn.disabled = true
+		btn.custom_minimum_size = Vector2(294, 148)
+		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.add_theme_font_size_override("font_size", 12)
+		var col: Color = def["color"]
+		var bg := col.darkened(0.75) if on else Color(0.08, 0.07, 0.1)
+		var border := col if on else Color(0.3, 0.28, 0.35)
+		btn.add_theme_stylebox_override("normal", UI.box(bg, border))
+		btn.add_theme_stylebox_override("hover", UI.box(bg.lightened(0.1), col))
+		btn.add_theme_stylebox_override("pressed", UI.box(bg.lightened(0.2), col))
+		btn.add_theme_stylebox_override("disabled", UI.box(Color(0.05, 0.05, 0.06), Color(0.2, 0.2, 0.22)))
+		var wid: String = id
+		btn.pressed.connect(func():
+			Meta.set_warden(wid)
+			_rebuild()
+		)
+		warden_box.add_child(btn)
+
 	deck_title.text = "Deck: %d/%d card types" % [Meta.deck.size(), Meta.deck_slots()]
 	for c in deck_box.get_children():
 		c.queue_free()
@@ -72,7 +109,7 @@ func _rebuild() -> void:
 		var on: bool = Meta.deck.has(id)
 		var btn := Button.new()
 		btn.text = "%s\n\n%s" % [def["name"], def["desc"]]
-		btn.custom_minimum_size = Vector2(180, 120)
+		btn.custom_minimum_size = Vector2(180, 100)
 		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.add_theme_font_size_override("font_size", 13)

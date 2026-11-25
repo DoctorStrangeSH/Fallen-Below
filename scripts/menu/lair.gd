@@ -31,9 +31,13 @@ func _ready() -> void:
 	bones_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(bones_label)
 
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(760, 500)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(scroll)
 	list = VBoxContainer.new()
 	list.add_theme_constant_override("separation", 5)
-	v.add_child(list)
+	scroll.add_child(list)
 
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER

@@ -40,11 +40,17 @@ func tick() -> void:
 		_travelers_strike(hs, units, warden_here)
 		if s.game_over:
 			return
-		if s.has_relic("brittle_bones"):
-			for u in units:
-				if u["hp"] <= 0.0 and u["name"] == "Skeleton":
-					for h in hs:
-						run.heroes_sys.damage(h, 4.0)
+		for u in units:
+			if u["hp"] > 0.0:
+				continue
+			var burst := 0.0
+			if u["name"] == "Skeleton" and s.has_relic("brittle_bones"):
+				burst = 4.0
+			elif u["undead"] and s.has_relic("sweet_rot"):
+				burst = 6.0
+			if burst > 0.0:
+				for h in hs:
+					run.heroes_sys.damage(h, burst)
 		units = s.alive_units(t)
 		s.tiles[t]["units"] = units
 		_monsters_strike(t, hs, units, warden_here)

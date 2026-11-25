@@ -38,9 +38,48 @@ const SEAL_EARLY_PCT := 0.6
 const DEFEAT_PCT := 0.3
 const VICTORY_BONUS := 25
 
-# --- the Warden (your monster) ---
-const WARDEN := {"name": "The Bone Warden", "hp": 60.0, "dmg": 6.0, "speed": 1.3,
-	"color": Color(0.55, 0.85, 1.0)}
+# --- the Wardens (your monster). Each has its own gear slots, a passive and an active ability ---
+const WARDENS := {
+	"bone": {
+		"name": "The Bone Warden", "color": Color(0.55, 0.85, 1.0),
+		"hp": 60.0, "dmg": 6.0, "speed": 1.3,
+		"slots": ["weapon", "shield", "armor", "amulet", "ring"],
+		"passive": "Marrow Feast", "passive_desc": "Devouring heals 40% HP instead of 25%.",
+		"active": "Bone Storm", "active_desc": "Deals double damage to every traveler on the Warden's tile and the tiles next to it.",
+		"cooldown": 20.0,
+		"style": "Balanced. Eats, wears heavy gear, holds the line.",
+	},
+	"brood": {
+		"name": "The Broodmother", "color": Color(0.45, 0.9, 0.4),
+		"hp": 50.0, "dmg": 4.0, "speed": 1.1,
+		"slots": ["armor", "amulet", "amulet", "ring", "ring"],
+		"passive": "Brood", "passive_desc": "Every traveler she kills leaves a spider on that tile. Spider Nests come twice as often.",
+		"active": "Swarm", "active_desc": "Lays 3 spiders on her tile.",
+		"cooldown": 22.0,
+		"style": "No weapons. Fills the dungeon with her children.",
+		"unlock_building": "brood_chamber",
+	},
+	"mimic": {
+		"name": "The Mimic King", "color": Color(1.0, 0.75, 0.25),
+		"hp": 55.0, "dmg": 5.0, "speed": 1.5,
+		"slots": ["weapon", "weapon", "ring", "ring", "ring"],
+		"passive": "Hoard", "passive_desc": "+0.2 damage for every Gold in this run's harvest. Cursed Chests come twice as often.",
+		"active": "Swallow", "active_desc": "Swallows a weakened traveler (below 40% HP) whole: devoured at once, double harvest.",
+		"cooldown": 18.0,
+		"style": "Two weapons, three rings. Grows rich, then grows cruel.",
+		"unlock_building": "golden_hoard",
+	},
+	"saint": {
+		"name": "The Hollow Saint", "color": Color(0.95, 0.9, 0.75),
+		"hp": 55.0, "dmg": 5.0, "speed": 1.2,
+		"slots": ["weapon", "armor", "amulet", "amulet", "ring"],
+		"passive": "Shepherd of the Dead", "passive_desc": "+2 undead servant slots, servants rise with 50% more HP. Devouring heals only half.",
+		"active": "Call the Dead", "active_desc": "Every servant heals 50%, and the Saint heals 5% for each servant.",
+		"cooldown": 25.0,
+		"style": "Raise, don't eat. Leads an army of the faithful dead.",
+		"unlock_pages": 8,
+	},
+}
 const DEVOUR_HEAL := 0.25         # share of max HP restored by devouring
 const LOOP_HEAL := 0.15           # each completed patrol loop the dungeon feeds the Warden
 
@@ -104,6 +143,7 @@ const CARDS := {
 const SKELETON_CAP := {"crypt": 2, "catacomb": 3, "necropolis": 4}
 const TRAP_DMG := {"spikes": 5.0, "grinder": 14.0, "chest": 6.0}
 const BAIT_CARDS := ["chest", "mimic"]
+const LURE_SHARE_LANTERN := 0.9
 
 ## Deck building: cards known from the start; the rest are unlocked in the Lair.
 const START_CARDS := ["crypt", "spider", "spikes", "altar", "jar"]
@@ -241,6 +281,10 @@ const BUILDINGS := {
 		"cost": [{"bones": 25, "blood": 15}]},
 	"jars": {"name": "Trophy Hall", "desc": "+1 undead servant slot per level.",
 		"cost": [{"bones": 25, "blood": 5}, {"bones": 55, "blood": 20}]},
+	"brood_chamber": {"name": "Brood Chamber", "desc": "A new Warden: the Broodmother.",
+		"cost": [{"bones": 40, "blood": 20}]},
+	"golden_hoard": {"name": "Golden Hoard", "desc": "A new Warden: the Mimic King.",
+		"cost": [{"gold": 50, "bones": 20}]},
 }
 
 ## Relics change the rules of a run. Earned in runs, equipped before descending.
@@ -257,6 +301,14 @@ const RELICS := {
 	"blood_price": {"name": "Blood Price", "desc": "The Warden deals +3 damage but has 15 less max HP."},
 	"slow_dawn": {"name": "Slow Dawn", "desc": "The Order's attention grows 25% slower."},
 	"grave_robber": {"name": "Grave Robber", "desc": "Travelers always drop gear."},
+	"ravenous_maw": {"name": "Ravenous Maw", "desc": "Everything the Warden devours feeds it 50% more."},
+	"deep_roots": {"name": "Deep Roots", "desc": "Each completed loop gives the Warden +3 max HP."},
+	"cracked_hourglass": {"name": "Cracked Hourglass", "desc": "The Warden's ability recharges 30% faster."},
+	"gilded_cage": {"name": "Gilded Cage", "desc": "Epic and Legendary gear drops twice as often."},
+	"patient_hunger": {"name": "Patient Hunger", "desc": "Travelers need 4 loops instead of 3 to find the way out."},
+	"sweet_rot": {"name": "Sweet Rot", "desc": "Your undead servants burst when they fall: 6 damage to travelers on their tile."},
+	"lantern_of_lies": {"name": "Lantern of Lies", "desc": "90% of each party follows your lure instead of 70%."},
+	"hollow_echo": {"name": "Hollow Echo", "desc": "+0.2 Warden damage for every page in the Book of the Fallen."},
 }
 
 # --- acts & story ---

@@ -52,7 +52,8 @@ func spawn_party() -> void:
 	var names: Array = []
 	for i in size:
 		var cls := lured
-		if s.rng.randf() >= D.LURE_SHARE:
+		var share := D.LURE_SHARE_LANTERN if s.has_relic("lantern_of_lies") else D.LURE_SHARE
+		if s.rng.randf() >= share:
 			cls = D.HERO_CLASSES.keys()[s.rng.randi() % D.HERO_CLASSES.size()]
 		var hero_name: String = D.FIRST_NAMES[s.rng.randi() % D.FIRST_NAMES.size()]
 		make_hero(cls, hero_name, mult, pid, i)
@@ -182,10 +183,14 @@ func _on_lap(h: Dictionary) -> void:
 	if h["boss"]:
 		return  # the champion hunts the Warden, she does not leave
 	h["laps"] += 1
-	if h["laps"] >= D.ESCAPE_LAPS:
+	if h["laps"] >= escape_laps():
 		escape(h, "found the way out")
 	else:
-		s.add_log("%s is getting closer to the exit (%d/%d)." % [s.hero_name(h), h["laps"], D.ESCAPE_LAPS])
+		s.add_log("%s is getting closer to the exit (%d/%d)." % [s.hero_name(h), h["laps"], escape_laps()])
+
+
+func escape_laps() -> int:
+	return D.ESCAPE_LAPS + (1 if s.has_relic("patient_hunger") else 0)
 
 
 func escape(h: Dictionary, how: String) -> void:
@@ -260,8 +265,9 @@ func _kill(h: Dictionary) -> void:
 ## Every body is harvested according to who it was.
 func _harvest(h: Dictionary) -> void:
 	var drop: Dictionary = D.HERO_CLASSES[h["cls"]]["drop"]
+	var times := 2 if h.get("swallowed", false) else 1
 	for k in drop:
-		s.gain(k, int(drop[k]))
+		s.gain(k, int(drop[k]) * times)
 	if h["baited"] and s.has_relic("gilded_bait"):
 		s.gain("gold", 2)
 	if h["boss"]:
@@ -274,6 +280,7 @@ func _harvest(h: Dictionary) -> void:
 		relic_chance = D.MAGE_RELIC_CHANCE
 	if h["boss"] or s.rng.randf() < relic_chance:
 		_find_relic(h)
+	run.warden.recompute()  # the Mimic King grows with the gold
 
 
 func _find_relic(h: Dictionary) -> void:

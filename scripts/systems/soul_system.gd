@@ -20,14 +20,14 @@ func toggle_stance() -> void:
 
 
 func on_death(h: Dictionary) -> void:
-	if s.raise_souls and can_raise() and not h["boss"]:
+	if s.raise_souls and can_raise() and not h["boss"] and not h.get("swallowed", false):
 		_raise(h)
 	else:
 		run.warden.devour(h)
 
 
 func _raise(h: Dictionary) -> void:
-	var hp: float = round(h["max_hp"] * 0.8)
+	var hp: float = round(h["max_hp"] * (1.2 if run.warden.is_kind("saint") else 0.8))
 	var col: Color = h["color"]
 	var dark: String = D.HERO_CLASSES[h["cls"]]["dark"]
 	var unit := {

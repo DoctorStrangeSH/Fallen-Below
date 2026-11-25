@@ -73,6 +73,7 @@ func _process(delta: float) -> void:
 		_new_day()
 	heroes_sys.move(delta)
 	warden.move(delta)
+	warden.tick(delta)
 	state.combat_timer += delta
 	if state.combat_timer >= D.COMBAT_TICK:
 		state.combat_timer -= D.COMBAT_TICK
@@ -109,6 +110,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				set_speed(3.0)
 			KEY_R:
 				souls.toggle_stance()
+			KEY_Q:
+				warden.use_active()
 		return
 	var mb := event as InputEventMouseButton
 	if mb == null or not mb.pressed:

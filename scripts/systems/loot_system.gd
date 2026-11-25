@@ -23,7 +23,10 @@ func drop_from(h: Dictionary) -> void:
 
 
 func make_item(h: Dictionary) -> Dictionary:
-	var slots: Array = D.ITEM_SLOTS[h["cls"]]
+	# travelers carry what suits them, but only what this Warden can wear drops
+	var slots: Array = D.ITEM_SLOTS[h["cls"]].filter(func(x): return run.warden.can_wear(x))
+	if slots.is_empty():
+		slots = s.warden["slots"]
 	var slot: String = slots[s.rng.randi() % slots.size()]
 	var types: Array = D.ITEM_TYPES[slot]
 	var type_def: Dictionary = types[s.rng.randi() % types.size()]
@@ -66,6 +69,8 @@ func _roll_rarity(boss: bool) -> int:
 		var w: float = D.RARITIES[i]["weight"]
 		if i >= 1:
 			w *= 1.0 + 0.25 * (s.loop - 1)  # deeper loops, better loot
+		if i >= 2 and s.has_relic("gilded_cage"):
+			w *= 2.0
 		weights.append(w)
 		total += w
 	var roll := s.rng.randf() * total
@@ -100,6 +105,9 @@ func equip(i: int) -> void:
 	if s.game_over or i < 0 or i >= s.inventory.size():
 		return
 	var item: Dictionary = s.inventory[i]
+	if not run.warden.can_wear(item["slot"]):
+		s.add_log("%s cannot wear that." % s.warden["name"])
+		return
 	s.inventory.remove_at(i)
 	var old: Dictionary = run.warden.equip(item)
 	if not old.is_empty():

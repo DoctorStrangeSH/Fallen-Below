@@ -17,11 +17,14 @@ func setup(base_hp: float, base_dmg: float) -> void:
 		base[k] = 0.0
 	base["hp"] = base_hp
 	base["dmg"] = base_dmg
+	var def: Dictionary = Meta.warden_def()
 	s.warden = {
-		"name": Meta.warden_name(), "color": D.WARDEN["color"], "speed": D.WARDEN["speed"],
+		"id": Meta.warden_id, "name": Meta.warden_name(), "color": def["color"], "speed": def["speed"],
+		"slots": def["slots"].duplicate(),
 		"base": base, "diet": base.duplicate(), "stats": base.duplicate(),
 		"hp": base_hp, "max_hp": base_hp, "dmg": base_dmg,
 		"gear": {}, "eaten": {}, "cur": s.loop_size / 2, "prog": 0.0, "relic_used": false,
+		"cooldown": 0.0,
 	}
 	for k in s.warden["diet"]:
 		s.warden["diet"][k] = 0.0
@@ -31,6 +34,10 @@ func setup(base_hp: float, base_dmg: float) -> void:
 func stat(k: String) -> float:
 	var st: Dictionary = s.warden["stats"]
 	return float(st.get(k, 0.0))
+
+
+func is_kind(id: String) -> bool:
+	return s.warden.get("id", "") == id
 
 
 func alive() -> bool:
@@ -65,6 +72,9 @@ func next_tile() -> int:
 
 func _complete_loop() -> void:
 	s.loop += 1
+	if s.has_relic("deep_roots"):
+		s.warden["base"]["hp"] += 3.0
+		recompute()
 	heal_by(s.warden["max_hp"] * D.LOOP_HEAL)
 	s.add_log("Loop %d: the dungeon grows deeper. Travelers and their gear grow stronger." % s.loop)
 	run.beat("first_loop")
@@ -80,6 +90,8 @@ func strike(targets: Array) -> void:
 	var dmg: float = s.warden["dmg"]
 	run.heroes_sys.damage(h, dmg)
 	heal_by(dmg * stat("vamp") / 100.0)
+	if h["gone"] and is_kind("brood"):
+		run.cards.spawn_at(s.warden["cur"], "spider")
 
 
 ## A traveler hits the Warden: evasion, then defense; counter-attack chance.
@@ -124,9 +136,15 @@ func devour(h: Dictionary) -> void:
 	eaten[kind] = int(eaten.get(kind, 0)) + 1
 	var diet: Dictionary = D.DIET[kind]
 	var mult := 3.0 if h["boss"] else 1.0
+	if s.has_relic("ravenous_maw"):
+		mult *= 1.5
 	w["diet"][diet["stat"]] += float(diet["amount"]) * mult
 	recompute()
 	var heal: float = w["max_hp"] * D.DEVOUR_HEAL
+	if is_kind("bone"):
+		heal = w["max_hp"] * 0.4
+	elif is_kind("saint"):
+		heal *= 0.5
 	if s.has_relic("hungry_dark"):
 		heal *= 1.5
 		s.gain("blood", 2)
@@ -136,12 +154,36 @@ func devour(h: Dictionary) -> void:
 
 # ---------------------------------------------------------- gear
 
+## Can this Warden wear items of this slot type at all?
+func can_wear(slot_type: String) -> bool:
+	var slots: Array = s.warden["slots"]
+	return slots.has(slot_type)
+
+
+## Index of the gear slot an item goes to: the first free matching slot,
+## otherwise the first matching one (swap). -1 if the Warden has no such slot.
+func slot_for(slot_type: String) -> int:
+	var slots: Array = s.warden["slots"]
+	var gear: Dictionary = s.warden["gear"]
+	var first := -1
+	for i in slots.size():
+		if slots[i] != slot_type:
+			continue
+		if first < 0:
+			first = i
+		if not gear.has(i):
+			return i
+	return first
+
+
 ## Puts an item on the Warden. Returns the item it replaced (or {}).
 func equip(item: Dictionary) -> Dictionary:
+	var idx := slot_for(item["slot"])
+	if idx < 0:
+		return item  # cannot wear it: hand it straight back
 	var gear: Dictionary = s.warden["gear"]
-	var slot: String = item["slot"]
-	var old: Dictionary = gear.get(slot, {})
-	gear[slot] = item
+	var old: Dictionary = gear.get(idx, {})
+	gear[idx] = item
 	recompute()
 	return old
 
@@ -164,8 +206,86 @@ func recompute() -> void:
 		var def: Dictionary = D.STATS[k]
 		if def.has("cap"):
 			st[k] = minf(st[k], float(def["cap"]))
+	if is_kind("mimic"):
+		st["dmg"] += 0.2 * int(s.pouch.get("gold", 0))
 	w["stats"] = st
 	var gain: float = st["hp"] - w["max_hp"]
 	w["max_hp"] = st["hp"]
 	w["hp"] = clampf(w["hp"] + maxf(gain, 0.0), 0.0, w["max_hp"])
 	w["dmg"] = st["dmg"]
+
+
+# ---------------------------------------------------------- active ability
+
+func cooldown_max() -> float:
+	var cd: float = Meta.warden_def()["cooldown"]
+	if s.has_relic("cracked_hourglass"):
+		cd *= 0.7
+	return cd
+
+
+func tick(delta: float) -> void:
+	if alive() and s.warden["cooldown"] > 0.0:
+		s.warden["cooldown"] = maxf(0.0, s.warden["cooldown"] - delta)
+
+
+## Player-triggered ability. Not spent if there is nothing to use it on.
+func use_active() -> void:
+	if not alive() or s.is_blocked() or s.warden["cooldown"] > 0.0:
+		return
+	var used := false
+	match s.warden["id"]:
+		"bone":
+			used = _bone_storm()
+		"brood":
+			for k in 3:
+				run.cards.spawn_at(s.warden["cur"], "spider")
+			used = true
+		"mimic":
+			used = _swallow()
+		"saint":
+			used = _call_the_dead()
+	if used:
+		s.warden["cooldown"] = cooldown_max()
+		s.add_log("%s: %s!" % [s.warden["name"], Meta.warden_def()["active"]])
+
+
+func _bone_storm() -> bool:
+	var area: Array = [int(s.warden["cur"])]
+	area.append_array(s.path_neighbors(s.warden["cur"]))
+	var hit := false
+	for t in area:
+		for h in s.travelers_at(t):
+			run.heroes_sys.damage(h, s.warden["dmg"] * 2.0)
+			hit = true
+	if not hit:
+		s.add_log("Bone Storm: no travelers near the Warden.")
+	return hit
+
+
+func _swallow() -> bool:
+	var best = null
+	for h in s.travelers_at(s.warden["cur"]):
+		if h["boss"] or h["hp"] >= h["max_hp"] * 0.4:
+			continue
+		if best == null or h["hp"] < best["hp"]:
+			best = h
+	if best == null:
+		s.add_log("Swallow: no weakened traveler on the Mimic King's tile.")
+		return false
+	best["swallowed"] = true
+	run.heroes_sys.damage(best, best["hp"] + 1.0)
+	return true
+
+
+func _call_the_dead() -> bool:
+	var count := 0
+	for t in s.tiles.size():
+		for u in s.undead_at(t):
+			u["hp"] = minf(u["max_hp"], u["hp"] + u["max_hp"] * 0.5)
+			count += 1
+	if count == 0:
+		s.add_log("Call the Dead: you have no servants.")
+		return false
+	heal_by(s.warden["max_hp"] * 0.05 * count)
+	return true

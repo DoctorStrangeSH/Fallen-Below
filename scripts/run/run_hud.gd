@@ -18,6 +18,7 @@ var warden_label: Label
 var hp_bar: ProgressBar
 var warden_stats: Label
 var gear_label: Label
+var active_btn: Button
 var attention_bar: ProgressBar
 var lure_box: GridContainer
 var stance_btn: Button
@@ -100,9 +101,9 @@ func _build_panel() -> void:
 	v.add_theme_constant_override("separation", 4)
 	panel.add_child(v)
 
-	act_label = UI.label("", 15, Color(0.75, 0.55, 1.0))
+	act_label = UI.label("", 13, Color(0.75, 0.55, 1.0))
 	v.add_child(act_label)
-	day_label = UI.label("", 12)
+	day_label = UI.label("", 11)
 	v.add_child(day_label)
 	day_bar = _bar(D.DAY_LENGTH, Color(0.85, 0.75, 0.4), 8)
 	v.add_child(day_bar)
@@ -114,8 +115,12 @@ func _build_panel() -> void:
 	v.add_child(hp_bar)
 	warden_stats = _small("", 12, Color(1, 1, 1, 0.85))
 	v.add_child(warden_stats)
-	gear_label = _small("", 11, Color(1, 0.85, 0.55))
+	gear_label = _small("", 10, Color(1, 0.85, 0.55))
 	v.add_child(gear_label)
+	active_btn = UI.button("", Vector2(304, 28))
+	active_btn.add_theme_font_size_override("font_size", 12)
+	active_btn.pressed.connect(func(): run.warden.use_active())
+	v.add_child(active_btn)
 
 	# the dungeon
 	v.add_child(UI.label("Order's attention (champion at 100%)", 12, Color(1, 0.9, 0.6)))
@@ -302,7 +307,7 @@ func rebuild_lures() -> void:
 
 func refresh() -> void:
 	var s = run.state
-	day_label.text = "Loop %d   ·   Day %d   ·   week ends on day %d" % [s.loop, s.day, (s.day + D.SEAL_EVERY - 1) / D.SEAL_EVERY * D.SEAL_EVERY]
+	day_label.text = "Loop %d  ·  Day %d  ·  week ends day %d" % [s.loop, s.day, (s.day + D.SEAL_EVERY - 1) / D.SEAL_EVERY * D.SEAL_EVERY]
 	day_bar.value = s.day_timer
 
 	var w: Dictionary = s.warden
@@ -324,14 +329,21 @@ func refresh() -> void:
 	for kind in eaten:
 		diet_parts.append("%d %s" % [int(eaten[kind]), D.HERO_CLASSES[kind]["name"]])
 	warden_stats.text = "   ".join(parts) + "\nEaten: " + (", ".join(diet_parts) if not diet_parts.is_empty() else "nothing yet")
-	var gear_lines: Array = []
+	var gear_parts: Array = []
 	var gear: Dictionary = w["gear"]
-	for slot in D.GEAR_SLOTS:
-		if gear.has(slot):
-			gear_lines.append("%s: %s" % [str(slot).capitalize(), gear[slot]["name"]])
-		else:
-			gear_lines.append("%s: -" % str(slot).capitalize())
+	var slots: Array = w["slots"]
+	for i in slots.size():
+		var label := str(slots[i]).capitalize()
+		gear_parts.append("%s: %s" % [label, gear[i]["name"] if gear.has(i) else "-"])
+	var gear_lines: Array = []
+	for i in range(0, gear_parts.size(), 2):
+		gear_lines.append("   ".join(gear_parts.slice(i, i + 2)))
 	gear_label.text = "\n".join(gear_lines)
+	var wdef: Dictionary = Meta.warden_def()
+	var cd: float = w["cooldown"]
+	active_btn.text = "[Q] %s%s" % [wdef["active"], "" if cd <= 0.0 else "  (%ds)" % int(ceil(cd))]
+	active_btn.disabled = cd > 0.0 or s.game_over
+	active_btn.tooltip_text = "%s\n\nPassive, %s: %s" % [wdef["active_desc"], wdef["passive"], wdef["passive_desc"]]
 
 	attention_bar.value = s.threat
 	stance_btn.text = ("Souls: RAISE as servants (%d/%d)" % [s.undead_count(), s.jar_cap]) if s.raise_souls else "Souls: the Warden DEVOURS them"
@@ -426,10 +438,13 @@ func rebuild_trophies() -> void:
 
 
 func _worn_text(slot: String) -> String:
+	if not run.warden.can_wear(slot):
+		return "this Warden has no %s slot" % slot
+	var idx: int = run.warden.slot_for(slot)
 	var gear: Dictionary = run.state.warden["gear"]
-	if not gear.has(slot):
+	if not gear.has(idx):
 		return "nothing"
-	var it: Dictionary = gear[slot]
+	var it: Dictionary = gear[idx]
 	return "%s  %s" % [it["name"], LootSystem.describe(it)]
 
 
@@ -471,7 +486,7 @@ func _update_tooltip() -> void:
 			var trait_id: String = h["trait"]
 			var tr_txt := "" if trait_id == "" else "  [%s]" % D.TRAITS[trait_id]["name"]
 			lines.append("%s (%s)%s  %d/%d HP  lap %d/%d" % [s.hero_name(h), D.HERO_CLASSES[h["cls"]]["name"], tr_txt,
-				int(h["hp"]), int(h["max_hp"]), int(h["laps"]), D.ESCAPE_LAPS])
+				int(h["hp"]), int(h["max_hp"]), int(h["laps"]), run.heroes_sys.escape_laps()])
 	elif s.scenery.has(cell):
 		var id: String = s.scenery[cell]
 		lines.append("%s: %s" % [D.CARDS[id]["name"], D.CARDS[id]["desc"]])

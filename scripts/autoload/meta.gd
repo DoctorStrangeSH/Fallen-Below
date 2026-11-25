@@ -12,6 +12,7 @@ var relics := []         # owned relic ids
 var deck := []           # card ids chosen for the next run
 var loadout := []        # relic ids equipped for the next run
 var lure := "gold"       # last chosen lure
+var warden_id := "bone"  # chosen Warden
 var runs := 0
 var wins := 0
 var best_day := 0
@@ -132,6 +133,8 @@ func _sanitize_loadout() -> void:
 	loadout = loadout.filter(func(r): return relics.has(r))
 	if not available_lures().has(lure):
 		lure = "gold"
+	if not D.WARDENS.has(warden_id) or not warden_unlocked(warden_id):
+		warden_id = "bone"
 	while loadout.size() > relic_slots():
 		loadout.pop_back()
 
@@ -141,27 +144,63 @@ func card_weights() -> Dictionary:
 	var w := {}
 	for id in deck:
 		w[id] = D.CARD_WEIGHTS.get(id, 1)
+	if warden_id == "brood" and w.has("spider"):
+		w["spider"] = int(w["spider"]) * 2
+	if warden_id == "mimic" and w.has("chest"):
+		w["chest"] = int(w["chest"]) * 2
 	return w
 
 
 # ---------------------------------------------------------- run modifiers
 
+# ---------------------------------------------------------- wardens
+
+func warden_def() -> Dictionary:
+	return D.WARDENS[warden_id]
+
+
+func warden_unlocked(id: String) -> bool:
+	var def: Dictionary = D.WARDENS[id]
+	if def.has("unlock_building"):
+		return level(def["unlock_building"]) > 0
+	if def.has("unlock_pages"):
+		return fragment_count() >= int(def["unlock_pages"])
+	return true
+
+
+func unlock_text(id: String) -> String:
+	var def: Dictionary = D.WARDENS[id]
+	if def.has("unlock_building"):
+		return "Build the %s in the Lair." % D.BUILDINGS[def["unlock_building"]]["name"]
+	if def.has("unlock_pages"):
+		return "Collect %d pages of the Book of the Fallen." % int(def["unlock_pages"])
+	return ""
+
+
+func set_warden(id: String) -> void:
+	if D.WARDENS.has(id) and warden_unlocked(id):
+		warden_id = id
+		save_game()
+
+
 func warden_hp() -> float:
-	var hp: float = D.WARDEN["hp"] + 10.0 * level("den")
+	var hp: float = float(warden_def()["hp"]) + 10.0 * level("den")
 	if loadout.has("blood_price"):
 		hp -= 15.0
 	return hp
 
 
 func warden_dmg() -> float:
-	var dmg: float = D.WARDEN["dmg"] + level("forge")
+	var dmg: float = float(warden_def()["dmg"]) + level("forge")
 	if loadout.has("blood_price"):
 		dmg += 3.0
+	if loadout.has("hollow_echo"):
+		dmg += 0.2 * fragment_count()
 	return dmg
 
 
 func start_jars() -> int:
-	return 2 + level("jars") + (1 if loadout.has("mass_grave") else 0)
+	return 2 + level("jars") + (1 if loadout.has("mass_grave") else 0) + (2 if warden_id == "saint" else 0)
 
 
 func start_cards() -> int:
@@ -254,7 +293,9 @@ func pending_memory() -> String:
 
 
 func warden_name() -> String:
-	return D.WARDEN_TRUE_NAME if acts_cleared.has(1) else str(D.WARDEN["name"])
+	if warden_id == "bone" and acts_cleared.has(1):
+		return D.WARDEN_TRUE_NAME
+	return str(warden_def()["name"])
 
 
 ## Marks a combo as discovered. Returns true the first time.
@@ -299,7 +340,7 @@ func save_game() -> void:
 		"version": SAVE_VERSION, "res": res, "buildings": buildings, "relics": relics,
 		"deck": deck, "loadout": loadout, "runs": runs, "wins": wins, "best_day": best_day,
 		"total_kills": total_kills, "discovered": discovered, "seen_intro": seen_intro,
-		"acts_cleared": acts_cleared, "lure": lure, "fragments": fragments, "seen": seen,
+		"acts_cleared": acts_cleared, "lure": lure, "warden": warden_id, "fragments": fragments, "seen": seen,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -347,6 +388,7 @@ func load_game() -> void:
 	loadout = _str_list(d.get("loadout", []), D.RELICS)
 	deck = _str_list(d.get("deck", []), D.CARDS)
 	lure = str(d.get("lure", "gold"))
+	warden_id = str(d.get("warden", "bone"))
 	fragments = {}
 	var fr = d.get("fragments", {})
 	if fr is Dictionary:

@@ -107,6 +107,10 @@ func make_monster(id: String) -> Dictionary:
 		"color": m["color"], "undead": false, "party": -1, "affixes": []}
 
 
+func spawn_at(t: int, monster_id: String) -> void:
+	_spawn(t, monster_id)
+
+
 func _spawn(t: int, monster_id: String) -> void:
 	s.tiles[t]["units"].append(make_monster(monster_id))
 
