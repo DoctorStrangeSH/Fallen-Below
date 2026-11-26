@@ -46,6 +46,8 @@ func _ready() -> void:
 				shot_path = kv[1]
 			"shot_day":
 				shot_day = int(kv[1])
+			"shot_night":
+				shot_night = true
 			"noquench":
 				quench = false
 			"hover":
@@ -124,6 +126,16 @@ func _think(run) -> void:
 		run.warden.pick_ability(rng.randi() % s.level_choices.size())
 	_play_cards(run)
 	_manage_loot(run)
+	# Act IV: let the Night fall on the champion or on a big crowd
+	if s.night >= D.NIGHT_MAX and s.nightfall <= 0.0:
+		var boss_here := false
+		var alive := 0
+		for h in s.heroes:
+			if not h["gone"]:
+				alive += 1
+				boss_here = boss_here or h["boss"]
+		if boss_here or alive >= 5:
+			run.nightfall()
 	# put out fires on halls worth saving while there is Blood to spare
 	for t in (s.fires.keys() if quench else []):
 		if s.card_at(t) != "" and int(s.pouch["blood"]) >= D.QUENCH_BLOOD * 2:
@@ -231,6 +243,7 @@ func _manage_loot(run) -> void:
 var shot_wait := 0
 var hover := Vector2(-1, -1)
 var quench := true
+var shot_night := false
 
 
 ## Waits a few rendered frames, then saves a screenshot and quits.
@@ -244,6 +257,11 @@ func _take_shot() -> void:
 				r.cards.draw_card()
 			r.state.selected = 1
 			r.hud.rebuild_hand()
+			if shot_night:
+				r.state.night = D.NIGHT_MAX
+				r.nightfall()
+				for k in 30:
+					r._process(0.05)
 	if hover.x >= 0.0 and shot_wait < 5:
 		var ev := InputEventMouseMotion.new()
 		ev.position = hover

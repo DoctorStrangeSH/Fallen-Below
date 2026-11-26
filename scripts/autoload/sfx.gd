@@ -6,7 +6,7 @@ extends Node
 const POOL := 10
 const MIN_GAP := {"hit": 0.07, "warden_hit": 0.1, "click": 0.03, "death": 0.08, "place": 0.05}
 const VOLUME := {"hit": -8.0, "warden_hit": -5.0, "click": -10.0, "death": -4.0, "devour": -3.0,
-	"loot": -6.0, "place": -4.0, "level": -3.0, "combo": -3.0, "escape": -4.0, "ability": -2.0, "boss": 0.0, "blast": -1.0, "ignite": -3.0, "quench": -3.0}
+	"loot": -6.0, "place": -4.0, "level": -3.0, "combo": -3.0, "escape": -4.0, "ability": -2.0, "boss": 0.0, "blast": -1.0, "ignite": -3.0, "quench": -3.0, "nightfall": -1.0, "sunburst": -4.0}
 
 var players: Array = []
 var streams := {}

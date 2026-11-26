@@ -169,6 +169,8 @@ const DIET := {
 	"sapper": {"stat": "counter", "amount": 1.0, "desc": "Sappers make it quicker to strike back (+1% counter)"},
 	"zealot": {"stat": "dmg", "amount": 0.3, "desc": "Zealots feed its fury (+0.3 damage)"},
 	"censer": {"stat": "regen", "amount": 0.1, "desc": "Censer bearers soothe it (+0.1 regen)"},
+	"knight": {"stat": "hp", "amount": 3.0, "desc": "Dawn knights make it vast (+3 max HP)"},
+	"lamplighter": {"stat": "evade", "amount": 1.0, "desc": "Lamplighters make it elusive (+1% evasion)"},
 }
 
 # --- loop scaling (like Loop Hero): every patrol loop the Warden completes
@@ -210,6 +212,9 @@ const CARDS := {
 	"drowned": {"name": "Drowned Crypt", "kind": "path", "color": Color(0.3, 0.55, 0.65), "desc": "Room. 2 Drowned, tougher than skeletons. Respawn daily."},
 	# Act III cards
 	"pyre": {"name": "Pyre", "kind": "path", "color": Color(0.95, 0.45, 0.15), "desc": "Trap. 8 dmg, then the tile bursts into flame. Fire spreads to your halls too!"},
+	# Act IV cards
+	"nightshrine": {"name": "Night Shrine", "kind": "scenery", "color": Color(0.35, 0.3, 0.7), "desc": "Beside path. Every death next to it wakes the Night faster (+5)."},
+	"horror": {"name": "Chained Horror", "kind": "path", "color": Color(0.3, 0.2, 0.45), "desc": "Room. A Horror in chains: sluggish, but during Nightfall it breaks loose (x3 damage)."},
 	"ashcrypt": {"name": "Ash Crypt", "kind": "path", "color": Color(0.55, 0.52, 0.5), "desc": "Room. 2 Ashen, immune to fire. This hall never burns and stops the flames."},
 	"jar": {"name": "Soul Jar", "kind": "instant", "color": Color(0.3, 0.55, 0.8), "desc": "Instant. +1 undead servant slot."},
 }
@@ -226,7 +231,7 @@ const BASE_DECK_SLOTS := 5
 
 ## Draw weights for cards in the deck.
 const CARD_WEIGHTS := {"crypt": 3, "spider": 3, "spikes": 3, "altar": 2, "graveyard": 2, "chest": 2, "jar": 1,
-	"cavein": 2, "drowned": 2, "pyre": 2, "ashcrypt": 2}
+	"cavein": 2, "drowned": 2, "pyre": 2, "ashcrypt": 2, "nightshrine": 2, "horror": 2}
 
 ## Travelers the dungeon lures below. `drop` is what their bodies give you.
 const HERO_CLASSES := {
@@ -248,6 +253,11 @@ const HERO_CLASSES := {
 		"dark": "Burnt Martyr", "drop": {"blood": 3, "bones": 2}, "martyr": true, "act": 3},
 	"censer": {"name": "Censer Bearer", "hp": 34, "dmg": 3.5, "speed": 1.6, "color": Color(0.85, 0.85, 0.95),
 		"dark": "Smoke Wraith", "drop": {"bones": 3, "gold": 2}, "purifier": true, "act": 3},
+	# Act IV
+	"knight": {"name": "Dawn Knight", "hp": 30, "dmg": 5.0, "speed": 1.4, "color": Color(1.0, 0.95, 0.7),
+		"dark": "Fallen Knight", "drop": {"bones": 4, "gold": 3}, "armor": 2.0, "blessed": true, "act": 4},
+	"lamplighter": {"name": "Lamplighter", "hp": 22, "dmg": 4.0, "speed": 2.6, "color": Color(1.0, 0.85, 0.4),
+		"dark": "Hollow Lantern", "drop": {"blood": 3, "gold": 3}, "lantern": true, "act": 4},
 }
 const SAPPER_DISARM_CHANCE := 0.6
 
@@ -260,6 +270,8 @@ const LURES := {
 	"vein": {"name": "Rich Vein", "traveler": "miner", "desc": "Dwarf miners: armoured and slow, carry gold and bones.", "act": 2},
 	"shaft": {"name": "Open Shaft", "traveler": "sapper", "desc": "Sappers: disarm your traps, carry blood and gold.", "act": 2},
 	"martyr": {"name": "Martyr's Call", "traveler": "zealot", "desc": "Zealots: grow fiercer as companions fall, set their death place on fire. Carry blood.", "act": 3},
+	"oath": {"name": "Oath of Dawn", "traveler": "knight", "desc": "Dawn knights: heavily armoured, your undead deal them half damage. Carry bones, gold, good gear.", "act": 4},
+	"lastlight": {"name": "Last Light", "traveler": "lamplighter", "desc": "Lamplighters: fast, leave after 2 loops, but their death wakes the Night (+15). Carry blood and gold.", "act": 4},
 	"incense": {"name": "Burning Incense", "traveler": "censer", "desc": "Censer bearers: their smoke burns your undead nearby. Carry bones and gold.", "act": 3},
 }
 
@@ -270,6 +282,7 @@ const MONSTERS := {
 	"golem": {"name": "Bone Golem", "hp": 50, "dmg": 5.0, "color": Color(0.75, 0.95, 0.9)},
 	"mimic": {"name": "Mimic", "hp": 30, "dmg": 8.0, "color": Color(0.95, 0.55, 0.15)},
 	"drowned": {"name": "Drowned", "hp": 22, "dmg": 4.5, "color": Color(0.35, 0.6, 0.7)},
+	"horror": {"name": "Horror", "hp": 60, "dmg": 3.0, "color": Color(0.45, 0.3, 0.7)},
 	"ashen": {"name": "Ashen", "hp": 26, "dmg": 5.0, "color": Color(0.6, 0.57, 0.55), "fireproof": true},
 }
 
@@ -327,6 +340,8 @@ const ITEM_SLOTS := {
 	"sapper": ["weapon", "ring", "amulet"],
 	"zealot": ["weapon", "amulet", "ring"],
 	"censer": ["amulet", "armor", "shield"],
+	"knight": ["armor", "shield", "weapon"],
+	"lamplighter": ["ring", "amulet", "weapon"],
 }
 const RARITIES := [
 	{"name": "Common", "mult": 1.0, "extras": 0, "weight": 60, "color": Color(0.8, 0.8, 0.8)},
@@ -445,7 +460,26 @@ const ACTS := {
 	3: {"name": "Act III: The Ash Cathedral", "boss": "Vael", "boss_title": "the Inquisitor", "boss_cls": "zealot",
 		"intro_story": "act3_intro", "end_story": "act3_end", "power": 1.95, "boss_mult": 1.6, "harvest": 2.2, "item_bonus": 4,
 		"cards": ["pyre", "ashcrypt"]},
+	4: {"name": "Act IV: The Heart", "boss": "Aurem", "boss_title": "the Archon of Dawn", "boss_cls": "knight",
+		"intro_story": "act4_intro", "end_story": "", "power": 2.3, "boss_mult": 1.8, "harvest": 2.8, "item_bonus": 6,
+		"cards": ["nightshrine", "horror"]},
 }
+# Act IV: the Night wakes with every death; when full, the player lets it fall (Nightfall).
+const NIGHT_MAX := 100.0
+const NIGHT_PER_KILL := 7.0
+const NIGHT_LAMPLIGHTER := 15.0   # extra Night when a lamplighter's lantern breaks
+const NIGHT_SHRINE := 5.0         # extra Night per Night Shrine next to the death
+const NIGHTFALL_TIME := 8.0
+const NIGHTFALL_SLOW := 0.5       # travelers move at half speed in the dark
+const NIGHTFALL_DMG := 1.5        # ... and take 50% more damage
+const NIGHTFALL_BOSS_DMG := 2.0   # the Archon takes double damage
+const HORROR_NIGHT_MULT := 3.0
+const BLESSED_UNDEAD_MULT := 0.5  # undead hit dawn knights for half
+# The Archon: a sunburst every few seconds burns undead around him and sanctifies nearby halls.
+const SUNBURST_EVERY := 9.0
+const SUNBURST_DMG := 25.0
+const SUNBURST_RADIUS := 3
+const SANCTIFY_TIME := 5.0        # monsters on sanctified halls cannot strike
 const VAEL_IGNITE_EVERY := 7.0    # seconds between the halls Vael sets alight
 # Fire (Act III): burning halls hurt everyone on them, spread, then crumble to ash.
 const FIRE_BURN := 7.0            # seconds before a burning hall is destroyed
@@ -463,12 +497,37 @@ const BRANN_BLAST := 30.0         # damage to everything on the tile
 const WARDEN_TRUE_NAME := "Ren"
 
 const STORY := {
+	"ending_fallen": [
+		"Ren breaks the chains, and then does what no Warden has ever done. He turns to the dead he raised and says: come with me.",
+		"They climb the stairs together: seekers with their maps, hunters with their unpaid contracts, pilgrims, miners, zealots, a scholar with ink on his fingers.",
+		"At the door of the mountain they stop, and each of them tells the people waiting outside what they knew. Their page of the Book. Their name, and the price that was written beside it.",
+		"The Order does not fall to a sword. It falls the way a lie falls: all at once, when everyone has heard the truth.\n\nThat night the sky is dark and full of stars, and no one is afraid of it.",
+		"Lia's name is the first they carve on the new stone at the foot of the mountain. Ren's is the second.\n\nEnding: The Fallen Below.\n\nThank you for playing.",
+	],
+	"ending_night": [
+		"The key turns. The chains fall away link by link, and each one rings like a bell that has finally been allowed to stop.",
+		"Far above, the sun flickers, shrinks to a coal and goes out. For the first time in a thousand years the world sees the night: deep, enormous, full of stars no one remembered.",
+		"People are afraid. Then they light candles. Then they look up.\n\nRen sits at the open door of the mountain with Lia's wooden sword across his knees and waits for a morning no one has paid for.",
+		"Long before dawn, the sky in the east turns pale on its own.\n\nEnding: Night.",
+	],
+	"ending_hunger": [
+		"Ren opens his jaws, and the Archon's light pours into him like wine into a cracked cup.\n\nIt does not spill. It fills.",
+		"The bones burn white. The hollow where a heart once beat becomes a furnace, and the furnace rises through the rock, through the ash, through the white towers, into the sky.",
+		"The world has a new sun. It never sets. It is never quite warm.\n\nAnd every morning, somewhere in the mountains, a door appears that was not there yesterday.",
+		"Ending: Hunger.\n\nYou kept the light burning. Someone always has to be eaten.",
+	],
+	"act4_intro": [
+		"There is no cathedral any more. No saints, no miners, no inquisitors. The Order has only one thing left to send.\n\nItself.",
+		"Aurem, the Archon of Dawn, comes down with his last knights and his lamplighters, who carry the sun in glass so that no step of the way is ever dark.",
+		"But here, beneath every hall you have ever built, the Night has opened one eye. Every death wakes her a little more.\n\nWhen she is awake enough, you may let her fall over the dungeon.",
+		"In the dark, the Order's light is only glass.\n\nThe key to the chains hangs around the Archon's neck.",
+	],
 	"act3_end": [
 		"Vael falls on the burning stone and does not try to rise. The flames do not touch her; she has lived in them too long.",
 		"\"You think you are a monster,\" she says. \"You are a prisoner. Before the Founders, this world had no sun. It had the Night: vast, gentle, alive.\"",
 		"\"They chained her beneath the mountain and taught her hunger, because a starving thing eats, and what she eats becomes light.\"\n\nThe dungeon is not a beast. It is the Night, in chains.",
 		"\"I wanted to burn her out completely,\" Vael whispers. \"One last great fire, and then eternal day. No more hunger. No more of you.\"\n\nShe smiles with cracked lips. \"The Archon would not allow it. He needs you hungry forever.\"",
-		"Far above the ash, at the top of the whitest tower, the Archon of Dawn keeps the key to the chains.\n\nRen feels the whole dungeon turn toward it, the way a sleeper turns toward a voice.\n\n(Act IV: The Heart is coming soon.)",
+		"Far above the ash, at the top of the whitest tower, the Archon of Dawn keeps the key to the chains.\n\nRen feels the whole dungeon turn toward it, the way a sleeper turns toward a voice.",
 	],
 	"act3_intro": [
 		"The Order stopped sending people to be eaten. Now it sends people to burn.\n\nAbove your door they have raised a cathedral of ash, and its bells toll day and night.",
@@ -524,6 +583,8 @@ const MEMORIES := [
 
 ## One-time story moments during runs, shown as narration over the map.
 const BEATS := {
+	"night_ready": "The Night is awake. Click the heart or press N to let her fall over the dungeon.",
+	"first_nightfall": "The Night opens her eye. For a few breaths the dungeon is hers again: the living stumble, and their light is only glass.",
 	"first_fire": "Smoke crawls along the vault. A hall is burning: click it to pour Blood on the flames before it falls to ash.",
 	"first_kill": "The first one falls. Somewhere deep below, the dark grows still, almost content. Almost.",
 	"first_raise": "The dead traveler rises and looks at the Warden for a long time, as if straining to remember where it has seen that face before.",
@@ -594,8 +655,37 @@ const VAEL_LINES := {
 	],
 }
 
+const ARCHON_LINES := {
+	"arrive": [
+		"Light floods the stairs, so bright that the shadows of your halls run backwards.",
+		"Aurem: \"I have kept the dawn for a thousand years. I will not let a starving dog put it out.\"",
+		"Aurem: \"Kneel, Warden. You were made to kneel.\"",
+	],
+	"half": [
+		"Aurem: \"Do you know what is out there without the sun? Cold. The dark that swallowed my mother's village. I was there. I remember.\"",
+	],
+	"low": [
+		"Aurem: \"Every soul I fed you was a morning for a thousand others. Tell me it was not worth it.\"",
+	],
+	"death": [
+		"Aurem: \"Then... let it be night.\"",
+	],
+}
+
 ## The Book of the Fallen: raised travelers give these pages in order, 4 per kind.
 const FRAGMENTS := {
+	"lamplighter": [
+		"Our lanterns are lit from the great furnace itself. Each one holds a single soul's worth of morning. Mine held a girl named Ilse.",
+		"We walk ahead of the knights so they never step into shadow. The Archon says shadow is contagious. He says it like a man who caught it once.",
+		"When my lantern broke, the light did not rise. It sank down through the floor. Home.",
+		"The key on the Archon's neck is cold. Everything else about him is warm. That is how you know which part of him is true.",
+	],
+	"knight": [
+		"We swear our oath at noon, facing the sun. Squires who look away are sent home. I never looked away. I am nearly blind now.",
+		"The Archon has not aged a day in all the chronicles. The physicians say the light preserves him. I used to call it holiness.",
+		"The first knights of our order were the men in the mural, the ones holding the chains. We wear their crest. We polish it every morning.",
+		"I swore to guard the dawn. Nobody told me the dawn was a prisoner. An oath to a jailer is not the same oath.",
+	],
 	"censer": [
 		"The incense is ground from dawnstone that has gone dark. The dead burn twice: once for the sun, once for the smoke.",
 		"My censer's smoke makes your servants scream. I used to think it was purification. It is recognition. They remember being burned.",
@@ -648,6 +738,14 @@ const FRAGMENTS := {
 
 ## Once a kind's pages are all collected, raised travelers mutter one of these.
 const WHISPERS := {
+	"lamplighter": [
+		"The light went home.",
+		"Her name was Ilse.",
+	],
+	"knight": [
+		"An oath to a jailer is not an oath.",
+		"We polished their crest.",
+	],
 	"censer": [
 		"They painted over her face.",
 		"The smoke remembers.",

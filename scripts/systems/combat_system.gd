@@ -85,6 +85,8 @@ func _travelers_strike(t: int, hs: Array, units: Array, warden_here: bool) -> vo
 
 
 func _monsters_strike(t: int, hs: Array, units: Array, warden_here: bool) -> void:
+	if s.sanctified.has(t) and s.nightfall <= 0.0:
+		return  # the Archon's light holds them still
 	var bonus := 2.0 * s.scenery_near(t, "altar") + 5.0 * s.scenery_near(t, "spire")
 
 	for u in units:
@@ -93,6 +95,10 @@ func _monsters_strike(t: int, hs: Array, units: Array, warden_here: bool) -> voi
 			return
 		var target: Dictionary = alive_h[s.rng.randi() % alive_h.size()]
 		var dmg: float = u["dmg"] + bonus
+		if u.get("kind", "") == "horror" and s.nightfall > 0.0:
+			dmg *= D.HORROR_NIGHT_MULT
+		if u["undead"] and target.get("blessed", false):
+			dmg *= D.BLESSED_UNDEAD_MULT
 		if u["undead"] and s.has_relic("iron_chains"):
 			dmg *= 0.8
 		if warden_here and u["name"] == "Skeleton" and run.warden.has("grave_call"):

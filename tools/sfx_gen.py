@@ -159,6 +159,23 @@ def quench():
     return norm(hiss + drop, 0.7)
 
 
+def nightfall():
+    n = int(1.6 * SR)
+    t = np.arange(n) / SR
+    drone = sum(np.sin(2 * np.pi * f * t) * a for f, a in [(55, 1.0), (82.4, 0.6), (110, 0.4)])
+    env = np.minimum(t * 3, 1.0) * np.exp(-t * 1.6)
+    air = M.lowpass(M.noise(n), 600) * np.exp(-t * 2) * 0.6
+    return norm((drone * 0.6 + air) * env, 0.85)
+
+
+def sunburst():
+    n = int(1.0 * SR)
+    t = np.arange(n) / SR
+    chime = sum(np.sin(2 * np.pi * f * t) * np.exp(-t * d) for f, d in [(880, 3), (1320, 4), (1760, 5), (2640, 7)])
+    swell = M.highpass(M.noise(n), 2500) * np.exp(-t * 6) * 0.4
+    return norm(chime * 0.5 + swell, 0.75)
+
+
 def write(name, x):
     os.makedirs(OUT, exist_ok=True)
     from scipy.io import wavfile
@@ -174,5 +191,5 @@ def write(name, x):
 if __name__ == "__main__":
     for name, fn in [("hit", hit), ("warden_hit", warden_hit), ("death", death), ("devour", devour),
                      ("loot", loot), ("place", place), ("level", level), ("combo", combo),
-                     ("click", click), ("escape", escape), ("ability", ability), ("boss", boss), ("blast", blast), ("ignite", ignite), ("quench", quench)]:
+                     ("click", click), ("escape", escape), ("ability", ability), ("boss", boss), ("blast", blast), ("ignite", ignite), ("quench", quench), ("nightfall", nightfall), ("sunburst", sunburst)]:
         write(name, fn())

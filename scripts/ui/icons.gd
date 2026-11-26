@@ -119,6 +119,15 @@ static func paint(ci: CanvasItem, kind: String, c: Vector2, sz: float, col: Colo
 			ci.draw_line(c + Vector2(0, -1) * k, c + Vector2(0, -8) * k, col.darkened(0.3), 1.2 * k)
 			ci.draw_arc(c + Vector2(4, -4) * k, 3 * k, PI, TAU, 8, Color(col, 0.5), 1.2 * k)
 			ci.draw_arc(c + Vector2(6, -8) * k, 2 * k, 0, PI, 8, Color(col, 0.4), 1.2 * k)
+		"oath":
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-6, -7) * k, c + Vector2(6, -7) * k, c + Vector2(6, 0) * k,
+				c + Vector2(0, 7.5) * k, c + Vector2(-6, 0) * k]), col)
+			ci.draw_circle(c + Vector2(0, -1) * k, 2.6 * k, Color(1, 1, 0.8, col.a))
+		"lastlight":
+			ci.draw_rect(Rect2(c + Vector2(-4, -5) * k, Vector2(8, 10) * k), Color(col, 0.35))
+			ci.draw_rect(Rect2(c + Vector2(-4, -5) * k, Vector2(8, 10) * k), col, false, 1.4 * k)
+			ci.draw_circle(c, 2.4 * k, Color(1, 0.9, 0.5, col.a))
+			ci.draw_line(c + Vector2(0, -5) * k, c + Vector2(0, -8) * k, col, 1.4 * k)
 		"crystal", "vein":
 			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(0, -8) * k, c + Vector2(5, -1) * k, c + Vector2(0, 8) * k, c + Vector2(-5, -1) * k]), col)
 			ci.draw_line(c + Vector2(0, -8) * k, c + Vector2(0, 8) * k, col.lightened(0.4), 1.0 * k)
@@ -181,6 +190,18 @@ static func card_glyph(ci: CanvasItem, card: String, c: Vector2, t: float) -> vo
 			ci.draw_line(c + Vector2(-3, -4), c + Vector2(3, -4), Color(1, 0.55, 0.2), 1.5)
 			for k in 3:
 				ci.draw_circle(c + Vector2(-10 + k * 10, 10), 2.0, Color(0.7, 0.68, 0.65, 0.6))
+		"nightshrine":
+			ci.draw_rect(Rect2(c + Vector2(-10, 2), Vector2(20, 7)), Color(0.22, 0.2, 0.32))
+			ci.draw_circle(c + Vector2(0, -8), 8, col)
+			ci.draw_circle(c + Vector2(3, -10), 7, Color(0.06, 0.04, 0.1))
+			for k in 3:
+				ci.draw_circle(c + Vector2(-12 + k * 12, -16 + (k % 2) * 4), 1.2, Color(0.85, 0.85, 1.0, 0.6 + 0.4 * sin(t * 3.0 + k)))
+		"horror":
+			ci.draw_circle(c + Vector2(0, -5), 10, col)
+			for k in 3:
+				ci.draw_circle(c + Vector2(-4 + k * 4, -7), 1.6, Color(0.9, 0.5, 1.0))
+			ci.draw_arc(c + Vector2(0, -5), 12, 0.3, 2.8, 10, Color(0.65, 0.65, 0.7), 2.0)
+			ci.draw_arc(c + Vector2(0, -5), 12, 3.4, 6.0, 10, Color(0.65, 0.65, 0.7), 2.0)
 		"chest", "mimic":
 			ci.draw_rect(Rect2(c + Vector2(-11, -12), Vector2(22, 14)), col.darkened(0.2))
 			ci.draw_rect(Rect2(c + Vector2(-11, -12), Vector2(22, 4)), col.lightened(0.2))

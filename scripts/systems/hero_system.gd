@@ -22,6 +22,7 @@ func make_hero(cls: String, hero_name: String, mult: float, party: int, idx: int
 		"trait": "", "baited": false, "half_said": false, "poison": 0,
 		"armor": float(base.get("armor", 0.0)), "disarms": bool(base.get("disarms", false)),
 		"martyr": bool(base.get("martyr", false)), "purifier": bool(base.get("purifier", false)),
+		"blessed": bool(base.get("blessed", false)), "lantern": bool(base.get("lantern", false)),
 	}
 	if s.rng.randf() < D.TRAIT_CHANCE:
 		set_trait(h, D.TRAITS.keys()[s.rng.randi() % D.TRAITS.size()])
@@ -80,12 +81,15 @@ func spawn_boss() -> void:
 	h["dmg"] = (D.BOSS_DMG + s.loop * D.BOSS_DMG_PER_LOOP) * bm
 	h["disarms"] = false
 	h["martyr"] = false
+	h["lantern"] = false
 	h["speed"] = 1.3
 	h["color"] = Color(1, 1, 1)
 	for line in boss_lines()["arrive"]:
 		s.narrate.emit(Loc.t(line))
 	if s.act == 1:
 		s.add_log(Loc.t("%s descends. Her radiance burns undead nearby: meet her with the Warden and the living.") % s.hero_name(h))
+	elif s.act == 4:
+		s.add_log(Loc.t("%s descends. His sunbursts burn your undead and silence your halls: answer with Nightfall.") % s.hero_name(h))
 	elif s.act == 3:
 		s.add_log(Loc.t("%s descends. She sets your halls alight: click a burning hall to quench it with Blood.") % s.hero_name(h))
 	else:
@@ -113,6 +117,8 @@ func move(delta: float) -> void:
 		if _blocked(h["cur"]):
 			continue  # fighting
 		var speed: float = h["speed"]
+		if s.nightfall > 0.0:
+			speed *= D.NIGHTFALL_SLOW
 		if run.warden.has("silk_snare") and s.count_units(h["cur"], "Spider") > 0:
 			speed *= 0.65
 		h["prog"] += speed * delta
@@ -200,7 +206,7 @@ func _on_lap(h: Dictionary) -> void:
 	if h["boss"]:
 		return  # the champion hunts the Warden, she does not leave
 	h["laps"] += 1
-	if h["laps"] >= escape_laps():
+	if h["laps"] >= escape_laps() - (1 if h.get("lantern", false) else 0):
 		escape(h, Loc.t("found the way out"))
 	else:
 		s.add_log(Loc.t("%s is getting closer to the exit (%d/%d).") % [s.hero_name(h), h["laps"], escape_laps()])
@@ -258,6 +264,8 @@ func _on_enter_tile(h: Dictionary, t: int) -> void:
 func damage(h: Dictionary, amount: float) -> void:
 	if h["gone"]:
 		return
+	if s.nightfall > 0.0:
+		amount *= D.NIGHTFALL_BOSS_DMG if h["boss"] else D.NIGHTFALL_DMG
 	var armor: float = h.get("armor", 0.0)
 	if armor > 0.0:
 		amount = maxf(amount - armor, amount * 0.3)
@@ -294,6 +302,8 @@ func _kill(h: Dictionary) -> void:
 	run.loot.drop_from(h)
 	if h["martyr"] and not h["boss"]:
 		run.fire.ignite(h["death_tile"])
+	if s.act == 4 and not h["boss"]:
+		_wake_night(h)
 	for x in s.heroes:
 		if x["party"] == h["party"] and x["martyr"] and not x["gone"]:
 			x["dmg"] *= D.MARTYR_FURY
@@ -355,6 +365,8 @@ func boss_lines() -> Dictionary:
 			return D.BRANN_LINES
 		3:
 			return D.VAEL_LINES
+		4:
+			return D.ARCHON_LINES
 	return D.BOSS_LINES
 
 
@@ -363,6 +375,9 @@ func boss_lines() -> Dictionary:
 func boss_tick(delta: float) -> void:
 	if s.act == 3:
 		_vael_tick(delta)
+		return
+	if s.act == 4:
+		_archon_tick(delta)
 		return
 	if s.act != 2:
 		return
@@ -393,6 +408,51 @@ func boss_tick(delta: float) -> void:
 	var t: int = options[s.rng.randi() % options.size()]
 	s.charges.append({"tile": t, "fuse": D.BRANN_FUSE})
 	s.add_log(Loc.t("Brann plants a charge!"))
+
+
+## Act IV: every death wakes the Night a little; lanterns and Night Shrines wake it faster.
+func _wake_night(h: Dictionary) -> void:
+	var was_full: bool = s.night >= D.NIGHT_MAX
+	var gain: float = D.NIGHT_PER_KILL + D.NIGHT_SHRINE * s.scenery_near(h["death_tile"], "nightshrine")
+	if h.get("lantern", false):
+		gain += D.NIGHT_LAMPLIGHTER
+		s.add_log(Loc.t("%s's lantern breaks. Its light sinks into the floor.") % s.hero_name(h))
+	s.night = minf(D.NIGHT_MAX, s.night + gain)
+	if not was_full and s.night >= D.NIGHT_MAX:
+		s.add_log(Loc.t("The Night is awake. Press N or click the heart to let it fall."))
+		run.beat("night_ready")
+
+
+## Act IV champion: a sunburst every few seconds (silenced during Nightfall) burns the undead
+## around the Archon and sanctifies the halls next to him so their monsters cannot strike.
+func _archon_tick(delta: float) -> void:
+	var boss = null
+	for h in s.heroes:
+		if h["boss"] and not h["gone"] and h["delay"] <= 0.0:
+			boss = h
+	if boss == null or s.nightfall > 0.0:
+		return
+	s.charge_timer += delta
+	if s.charge_timer < D.SUNBURST_EVERY:
+		return
+	s.charge_timer = 0.0
+	var here: int = boss["cur"]
+	for i in s.loop_size:
+		var dist: int = mini(absi(i - here), s.loop_size - absi(i - here))
+		if dist > D.SUNBURST_RADIUS:
+			continue
+		var burned := false
+		for u in s.alive_units(i):
+			if u["undead"]:
+				u["hp"] -= D.SUNBURST_DMG
+				burned = true
+		s.tiles[i]["units"] = s.alive_units(i)
+		if burned:
+			s.fx.emit("purify", i, D.SUNBURST_DMG)
+		if dist <= 2 and s.card_at(i) != "":
+			s.sanctified[i] = D.SANCTIFY_TIME
+	s.fx.emit("sunburst", here, 0.0)
+	s.add_log(Loc.t("Aurem: \"Let there be light.\""))
 
 
 ## Act III champion: Vael sets a nearby hall on fire every few seconds.

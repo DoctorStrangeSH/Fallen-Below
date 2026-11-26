@@ -109,6 +109,11 @@ func add_fx(kind: String, target, amount: float) -> void:
 			_float(pos + Vector2(0, -14), "-%d" % D.QUENCH_BLOOD, Color(0.95, 0.25, 0.3), 13)
 		"ash":
 			_burst(pos, Color(0.5, 0.48, 0.45), 30.0)
+		"nightfall":
+			_burst(pos, Color(0.4, 0.35, 0.95), 160.0)
+		"sunburst":
+			_burst(pos, Color(1.0, 0.9, 0.5), 140.0)
+			_burst(pos, Color(1.0, 1.0, 0.85), 60.0)
 		"purify":
 			_float(pos, "%d" % int(round(amount)), Color(0.85, 0.85, 1.0), 10)
 
@@ -161,6 +166,7 @@ func _draw() -> void:
 	_draw_warden(s, font, t)
 	_draw_charges(s, font, t)
 	_draw_fires(s, font, t)
+	_draw_night(s, t)
 	if s.act == 3:
 		_draw_ashfall(t)
 	_draw_effects(font)
@@ -183,6 +189,8 @@ func _draw_floor(s) -> void:
 				base = Color(0.05, 0.07, 0.09).lerp(Color(0.07, 0.1, 0.12), n)
 			elif s.act == 3:
 				base = Color(0.07, 0.06, 0.06).lerp(Color(0.11, 0.09, 0.08), n)
+			elif s.act == 4:
+				base = Color(0.05, 0.04, 0.08).lerp(Color(0.08, 0.06, 0.12), n)
 			draw_rect(r, base)
 			if s.act == 2 and _hash(x, y, 9) > 0.78 and not s.path_lookup.has(c):
 				# black water pooling in the mines
@@ -243,6 +251,8 @@ func _draw_path(s, t: float) -> void:
 				slab = Color(0.17, 0.2, 0.24).lerp(Color(0.24, 0.28, 0.32), n * 0.6)
 			elif s.act == 3:
 				slab = Color(0.24, 0.22, 0.21).lerp(Color(0.32, 0.29, 0.27), n * 0.6)
+			elif s.act == 4:
+				slab = Color(0.3, 0.28, 0.26).lerp(Color(0.4, 0.37, 0.32), n * 0.6)  # white marble of the Order
 			if side:
 				slab = slab.darkened(0.25)
 			draw_rect(r, slab.darkened(0.35))
@@ -300,7 +310,7 @@ func _draw_scenery(s, t: float) -> void:
 					draw_circle(p + Vector2(0, -8), 4, Color(0.45, 0.47, 0.45))
 				draw_rect(Rect2(center + Vector2(-18, 8), Vector2(36, 4)), Color(0.4, 0.5, 0.45, 0.25))
 			_:
-				draw_rect(cell_rect(cell).grow(-8), col)
+				Icons.card_glyph(self, id, center + Vector2(0, 2), t)
 
 
 ## The dungeon's hungry heart. Beats faster the more travelers are inside.
@@ -310,7 +320,12 @@ func _draw_heart(s, t: float) -> void:
 		return
 	# it beats faster the more travelers are inside, and glows hotter as the Order closes in
 	var bpm: float = 52.0 + 10.0 * s.heroes.size()
-	Icons.heart(self, center, 1.2, t, bpm, clampf(s.threat / D.BOSS_THREAT, 0.0, 1.0))
+	var hunger := clampf(s.threat / D.BOSS_THREAT, 0.0, 1.0)
+	if s.act == 4:
+		hunger = s.night / D.NIGHT_MAX
+		if s.night >= D.NIGHT_MAX:  # ready: a pale ring calls for a click
+			draw_arc(center, 34.0 + 3.0 * sin(t * 4.0), 0, TAU, 40, Color(0.6, 0.55, 1.0, 0.8), 2.0)
+	Icons.heart(self, center, 1.2, t, bpm, hunger)
 
 
 func _draw_preview(s) -> void:
@@ -373,6 +388,15 @@ func _monster_shape(u: Dictionary, kind: String, p: Vector2, t: float) -> void:
 		"golem":
 			draw_rect(Rect2(p + Vector2(-7, -8), Vector2(14, 14)), BONE.darkened(0.2))
 			draw_circle(p + Vector2(0, -1), 3.0, Color(0.4, 1.0, 0.7, 0.7 + 0.3 * sin(t * 4.0)))
+		"horror":
+			var free: bool = run.state.nightfall > 0.0
+			var rad := 9.0 if free else 7.0
+			draw_circle(p, rad, Color(0.35, 0.22, 0.55) if free else Color(0.25, 0.18, 0.35))
+			for k in 3:
+				draw_circle(p + Vector2(-3 + k * 3, -2), 1.2, Color(0.9, 0.5, 1.0) if free else Color(0.6, 0.4, 0.7))
+			if not free:
+				draw_arc(p, 8.0, 0.3, 2.8, 8, Color(0.6, 0.6, 0.65), 1.5)
+				draw_arc(p, 8.0, 3.4, 6.0, 8, Color(0.6, 0.6, 0.65), 1.5)
 		"ashen":
 			draw_circle(p, 5.5, Color(0.5, 0.48, 0.46))
 			draw_circle(p + Vector2(-1.8, -1), 1.1, Color(1, 0.55, 0.2))
@@ -478,6 +502,24 @@ func _draw_fires(s, font: Font, t: float) -> void:
 		var frac := clampf(left / D.FIRE_BURN, 0.0, 1.0)
 		draw_rect(Rect2(c + Vector2(-20, 19), Vector2(40, 3)), Color(0, 0, 0, 0.6))
 		draw_rect(Rect2(c + Vector2(-20, 19), Vector2(40 * frac, 3)), Color(1, 0.6, 0.2))
+
+
+## Act IV: sanctified halls glow gold; during Nightfall the map sinks into starry dark.
+func _draw_night(s, t: float) -> void:
+	for key in s.sanctified:
+		var tile: int = key
+		var r := cell_rect(s.cell_of(tile))
+		draw_rect(r.grow(-3), Color(1.0, 0.9, 0.5, 0.18 + 0.08 * sin(t * 5.0)))
+		draw_rect(r.grow(-3), Color(1.0, 0.9, 0.55, 0.7), false, 2.0)
+	if s.nightfall <= 0.0:
+		return
+	var fade := clampf(minf(s.nightfall, D.NIGHTFALL_TIME - s.nightfall) * 2.0, 0.0, 1.0)
+	var area := Rect2(D.MAP_OFFSET, Vector2(D.GRID_W, D.GRID_H) * D.CELL)
+	draw_rect(area, Color(0.03, 0.02, 0.12, 0.45 * fade))
+	for i in 70:
+		var p := area.position + Vector2(_hash(i, 21) * area.size.x, _hash(i, 23) * area.size.y)
+		var tw := 0.5 + 0.5 * sin(t * (2.0 + _hash(i, 5) * 3.0) + i)
+		draw_circle(p, 1.0 + _hash(i, 9), Color(0.8, 0.85, 1.0, 0.7 * tw * fade))
 
 
 ## Act III: ash drifting down over the whole map.

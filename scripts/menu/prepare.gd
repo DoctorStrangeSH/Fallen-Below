@@ -9,6 +9,7 @@ const Icons = preload("res://scripts/ui/icons.gd")
 
 var tip: CanvasLayer
 var act_box: HBoxContainer
+var act_name: Label
 var warden_box: HBoxContainer
 var deck_title: Label
 var deck_box: GridContainer
@@ -26,10 +27,13 @@ func _ready() -> void:
 	add_child(title)
 
 	act_box = HBoxContainer.new()
-	act_box.position = Vector2(620, 26)
+	act_box.position = Vector2(740, 26)
 	act_box.add_theme_constant_override("separation", 6)
 	add_child(act_box)
 
+	act_name = UI.label("", 13, Color(0.85, 0.75, 1.0))
+	act_name.position = Vector2(740, 68)
+	add_child(act_name)
 	var wh := UI.header(Loc.t("Warden"))
 	wh.position = Vector2(40, 82)
 	add_child(wh)
@@ -110,13 +114,16 @@ func _rebuild() -> void:
 
 func _build_acts() -> void:
 	_clear(act_box)
+	var cur: Dictionary = D.ACTS[Meta.selected_act]
+	act_name.text = "%s  ·  %s" % [Loc.t(cur["name"]), Loc.t(cur["boss"])]
 	for a in D.ACTS:
 		var act_id: int = a
 		var open: bool = act_id <= Meta.max_act()
 		var on: bool = act_id == Meta.selected_act
-		var b := UI.button(Loc.t(D.ACTS[a]["name"]), Vector2(0, 38))
-		b.add_theme_font_size_override("font_size", 13)
-		b.custom_minimum_size.x = 204
+		const ROMAN := ["", "I", "II", "III", "IV"]
+		var b := UI.button(Loc.t("Act %s") % ROMAN[act_id], Vector2(0, 38))
+		b.add_theme_font_size_override("font_size", 14)
+		b.custom_minimum_size.x = 120
 		b.disabled = not open
 		if on:
 			_style(b, Color(0.25, 0.14, 0.34), UI.ACCENT)

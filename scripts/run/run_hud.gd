@@ -41,6 +41,8 @@ var xp_bar: ProgressBar
 var stat_labels := {}
 var gear_boxes: Array = []
 var active_btn: Button
+var night_btn: Button
+var night_bar: ProgressBar
 var loot_title: Label
 var loot_boxes: Array = []
 
@@ -348,6 +350,24 @@ func _build_warden(v: VBoxContainer) -> void:
 		var wdef: Dictionary = Meta.warden_def()
 		return Loc.t("%s\n%s\n\nPassive, %s: %s") % [Loc.t(wdef["active"]), Loc.t(wdef["active_desc"]), Loc.t(wdef["passive"]), Loc.t(wdef["passive_desc"])])
 	v.add_child(active_btn)
+
+	# Act IV: the Night, filled by deaths and released with N or a click on the heart
+	if run.state.act == 4:
+		var night_row := HBoxContainer.new()
+		night_row.add_theme_constant_override("separation", 6)
+		v.add_child(night_row)
+		night_btn = _small_button("", 150)
+		night_btn.custom_minimum_size.y = 30
+		night_btn.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		var moon := Icon.make("moon", 14)
+		moon.position = Vector2(8, 4)
+		moon.size = Vector2(20, 22)
+		night_btn.add_child(moon)
+		night_btn.pressed.connect(func(): run.nightfall())
+		night_row.add_child(night_btn)
+		night_bar = _bar(D.NIGHT_MAX, Color(0.45, 0.4, 0.95), 10)
+		night_row.add_child(night_bar)
+		_hint(night_btn, func(): return Loc.t("Nightfall [N]\nEvery death wakes the Night. When it is full, let it fall: for %d s travelers move at half speed and take 50%% more damage, the Archon takes double and his sunbursts fall silent.") % int(D.NIGHTFALL_TIME))
 
 	# loot bag
 	loot_title = _header("")
@@ -747,6 +767,15 @@ func refresh() -> void:
 	active_btn.text = (Loc.t("[Q] %s") % Loc.t(wdef["active"])) if cd <= 0.0 else (Loc.t("[Q] %s  %ds") % [Loc.t(wdef["active"]), int(ceil(cd))])
 	active_btn.disabled = cd > 0.0 or s.game_over
 
+	if night_btn != null:
+		night_bar.value = s.night
+		var full: bool = s.night >= D.NIGHT_MAX
+		if s.nightfall > 0.0:
+			night_btn.text = Loc.t("Night %ds") % int(ceil(s.nightfall))
+		else:
+			night_btn.text = Loc.t("[N] Nightfall") if full else "%d%%" % int(s.night)
+		night_btn.disabled = not full or s.nightfall > 0.0
+		night_btn.modulate = Color(1, 0.95, 0.6) if full and s.nightfall <= 0.0 else Color(1, 1, 1)
 	_style_slot(devour_btn, Color(0.35, 0.1, 0.12) if not s.raise_souls else SLOT_BG, Color(1, 0.45, 0.4) if not s.raise_souls else Color(0.3, 0.25, 0.38))
 	_style_slot(raise_btn, Color(0.12, 0.25, 0.2) if s.raise_souls else SLOT_BG, Color(0.5, 1, 0.75) if s.raise_souls else Color(0.3, 0.25, 0.38))
 	raise_btn.text = Loc.t("Raise %d/%d") % [s.undead_count(), s.jar_cap]
@@ -910,6 +939,8 @@ func _map_lines(s, lines: Array) -> void:
 			lines.append("%s: %s" % [Loc.t(D.CARDS[card]["name"]), Loc.t(D.CARDS[card]["desc"])])
 		elif t >= s.loop_size:
 			lines.append(Loc.t("Side passage (the Warden never walks here)"))
+		if s.sanctified.has(t):
+			lines.append(Loc.t("Sanctified by the Archon: its monsters cannot strike for %ds.") % int(ceil(s.sanctified[t])))
 		if s.fires.has(t):
 			lines.append(Loc.t("Burning: %ds left. Click to quench (%d Blood).") % [int(ceil(s.fires[t]["left"])), D.QUENCH_BLOOD])
 		if s.forks.has(t):
@@ -928,3 +959,5 @@ func _map_lines(s, lines: Array) -> void:
 		lines.append("%s: %s" % [Loc.t(D.CARDS[id]["name"]), Loc.t(D.CARDS[id]["desc"])])
 	elif cell == s.heart_cell:
 		lines.append(Loc.t("The dungeon's heart. It hungers."))
+		if s.act == 4:
+			lines.append(Loc.t("Night: %d%%. Click when full to let it fall.") % int(s.night))

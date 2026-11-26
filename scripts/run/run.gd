@@ -66,7 +66,8 @@ func _ready() -> void:
 
 const FX_SOUND := {"hit_hero": "hit", "hit_unit": "hit", "hit_warden": "warden_hit", "death": "death",
 	"devour": "devour", "loot": "loot", "place": "place", "level": "level", "combo": "combo",
-	"escape": "escape", "ability": "ability", "boss": "boss", "blast": "blast", "disarm": "click", "ignite": "ignite", "quench": "quench", "ash": "death"}
+	"escape": "escape", "ability": "ability", "boss": "boss", "blast": "blast", "disarm": "click", "ignite": "ignite", "quench": "quench", "ash": "death",
+	"nightfall": "nightfall", "sunburst": "sunburst"}
 
 
 func _on_fx(kind: String, target, amount: float) -> void:
@@ -94,6 +95,7 @@ func _process(delta: float) -> void:
 	heroes_sys.move(delta)
 	heroes_sys.boss_tick(delta)
 	fire.tick(delta)
+	_tick_night(delta)
 	warden.move(delta)
 	warden.tick(delta)
 	state.combat_timer += delta
@@ -150,6 +152,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				souls.toggle_stance()
 			KEY_Q:
 				warden.use_active()
+			KEY_N:
+				nightfall()
 			KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5:
 				_debug_key(key.keycode)
 		return
@@ -165,6 +169,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		# a click on a burning hall quenches it; otherwise it places the selected card
 		var cell: Vector2i = view.mouse_cell()
 		if state.path_lookup.has(cell) and fire.quench(state.path_lookup[cell]):
+			return
+		if cell == state.heart_cell and state.act == 4:
+			nightfall()
 			return
 		cards.place_selected(cell)
 
@@ -271,8 +278,31 @@ func _finish(outcome: String, pct: float) -> void:
 
 ## After the act's champion dies, play the act's ending, then go to the Lair.
 func continue_after_victory() -> void:
+	if state.act == 4:
+		go_to("res://scenes/ending.tscn")  # the chains are in Ren's hands: choose the ending
+		return
 	var act: Dictionary = D.ACTS[state.act]
 	Meta.play_story(act["end_story"], "res://scenes/lair.tscn")
+
+
+## Act IV: let the Night fall over the dungeon when it is fully awake.
+func nightfall() -> void:
+	if state.act != 4 or state.is_blocked() or state.night < D.NIGHT_MAX or state.nightfall > 0.0:
+		return
+	state.night = 0.0
+	state.nightfall = D.NIGHTFALL_TIME
+	state.add_log(Loc.t("Nightfall! The living stumble in the dark."))
+	state.fx.emit("nightfall", state.heart_cell, 0.0)
+	beat("first_nightfall")
+
+
+func _tick_night(delta: float) -> void:
+	if state.nightfall > 0.0:
+		state.nightfall = maxf(0.0, state.nightfall - delta)
+	for t in state.sanctified.keys():
+		state.sanctified[t] -= delta
+		if state.sanctified[t] <= 0.0:
+			state.sanctified.erase(t)
 
 
 func go_to(scene_path: String) -> void:
