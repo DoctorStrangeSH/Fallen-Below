@@ -100,3 +100,7 @@ crisp pixels, no anti-aliasing, 1px dark outline, transparent background, single
 - Анимации: 2–4 кадра ходьбы и атаки.
 - Иконки вещей по типам.
 - Рамки интерфейса в стиле «живого подземелья»: кость, вены, камень.
+
+## Значки интерфейса
+
+Рисуются кодом в `scripts/ui/icons.gd`; спрайт `art/icon_<id>.png` заменяет рисунок. Id: `dmg hp def regen vamp evade counter bones blood gold sun moon pause play skull raise devour weapon shield armor amulet ring rumors holy arcane vein shaft lock relic ability`. Значок приманки «Блеск золота» — `icon_gold`.

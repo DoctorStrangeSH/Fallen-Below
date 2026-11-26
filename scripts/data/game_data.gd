@@ -6,11 +6,11 @@ extends RefCounted
 
 # --- layout ---
 const CELL := 48
-const MAP_OFFSET := Vector2(16, 16)
+const MAP_OFFSET := Vector2(16, 52)  # top bar above the map
 const GRID_W := 19
 const GRID_H := 11
-const PANEL_X := 945.0            # right-hand panel starts here
-const HAND_Y := 556.0
+const PANEL_X := 940.0            # right-hand panel starts here
+const HAND_Y := 588.0
 
 # --- pacing ---
 const DAY_LENGTH := 20.0

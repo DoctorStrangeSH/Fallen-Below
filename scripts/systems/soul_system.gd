@@ -31,7 +31,7 @@ func _raise(h: Dictionary) -> void:
 	var col: Color = h["color"]
 	var dark: String = D.HERO_CLASSES[h["cls"]]["dark"]
 	var unit := {
-		"name": "%s %s" % [dark, h["name"]], "hp": hp, "max_hp": hp,
+		"name": "%s %s" % [Loc.t(dark), h["name"]], "hp": hp, "max_hp": hp,
 		"dmg": h["dmg"] * 1.1, "color": col.darkened(0.55),
 		"undead": true, "party": h["party"], "cls": h["cls"],
 	}

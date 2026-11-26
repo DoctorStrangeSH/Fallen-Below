@@ -46,6 +46,9 @@ func _ready() -> void:
 				shot_path = kv[1]
 			"shot_day":
 				shot_day = int(kv[1])
+			"hover":
+				var xy: PackedStringArray = kv[1].split(",")
+				hover = Vector2(float(xy[0]), float(xy[1]))
 			"growth":
 				Meta.buildings["pit"] = int(kv[1])
 			"lair":
@@ -219,11 +222,26 @@ func _manage_loot(run) -> void:
 
 
 var shot_wait := 0
+var hover := Vector2(-1, -1)
 
 
 ## Waits a few rendered frames, then saves a screenshot and quits.
 func _take_shot() -> void:
 	shot_wait += 1
+	if shot_wait == 1:
+		# show a full hand in the screenshot (the bot normally plays cards at once)
+		var r = current
+		if r.get("state") != null:
+			while r.state.hand.size() < 5:
+				r.cards.draw_card()
+			r.state.selected = 1
+			r.hud.rebuild_hand()
+	if hover.x >= 0.0 and shot_wait < 5:
+		var ev := InputEventMouseMotion.new()
+		ev.position = hover
+		ev.global_position = hover
+		Input.warp_mouse(hover)
+		get_viewport().push_input(ev)
 	if shot_wait < 5:
 		return
 	var img := get_viewport().get_texture().get_image()

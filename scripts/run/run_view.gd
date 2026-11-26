@@ -4,6 +4,7 @@ extends Node2D
 ## Uses sprites from res://art/ when they exist (see docs/ART.md), drawn shapes otherwise.
 
 const D = preload("res://scripts/data/game_data.gd")
+const Icons = preload("res://scripts/ui/icons.gd")
 const Art = preload("res://scripts/ui/art.gd")
 
 const STONE := Color(0.2, 0.17, 0.22)
@@ -257,47 +258,7 @@ func _draw_door(center: Vector2, t: float) -> void:
 
 ## Simple drawn icons for cards (used until sprites exist).
 func _glyph(card: String, c: Vector2, t: float) -> void:
-	var col: Color = D.CARDS[card]["color"]
-	match card:
-		"crypt", "catacomb", "necropolis":
-			var n := 1 if card == "crypt" else 2
-			for k in n:
-				var o := Vector2((k - (n - 1) * 0.5) * 14, -4)
-				draw_colored_polygon(PackedVector2Array([c + o + Vector2(-5, -9), c + o + Vector2(5, -9), c + o + Vector2(7, 9), c + o + Vector2(-7, 9)]), col.darkened(0.2))
-				draw_line(c + o + Vector2(-3, -2), c + o + Vector2(3, -2), BONE, 1.5)
-			if card == "necropolis":
-				draw_arc(c + Vector2(0, -2), 16, PI, TAU, 16, Color(0.5, 1, 0.8), 2.0)
-		"spider", "queen":
-			draw_circle(c + Vector2(0, -6), 9 if card == "queen" else 6, col.darkened(0.3))
-			for k in 6:
-				var a := TAU * k / 6.0
-				draw_line(c + Vector2(0, -6), c + Vector2(0, -6) + Vector2(cos(a), sin(a)) * 15, Color(0.85, 0.85, 0.85, 0.5), 1.0)
-		"spikes", "grinder":
-			for k in 3:
-				var x := (k - 1) * 10.0
-				var tip := c + Vector2(x, -15)
-				draw_colored_polygon(PackedVector2Array([tip, c + Vector2(x - 4, -2), c + Vector2(x + 4, -2)]), Color(0.75, 0.72, 0.7))
-			if card == "grinder":
-				draw_arc(c + Vector2(0, -6), 13, t * 4.0, t * 4.0 + PI * 1.5, 12, Color(0.9, 0.2, 0.2), 2.5)
-		"cavein":
-			for k in 4:
-				var o := Vector2((k % 2) * 10 - 5, (k / 2) * 8 - 10)
-				draw_colored_polygon(PackedVector2Array([c + o + Vector2(-6, 3), c + o + Vector2(0, -5), c + o + Vector2(6, 3)]), col.lightened(0.1 * k))
-			draw_line(c + Vector2(-14, -14), c + Vector2(14, -14), Color(0.4, 0.3, 0.2), 3.0)
-		"drowned":
-			draw_colored_polygon(PackedVector2Array([c + Vector2(-6, -11), c + Vector2(6, -11), c + Vector2(8, 7), c + Vector2(-8, 7)]), col.darkened(0.3))
-			var wave := sin(t * 2.0) * 2.0
-			draw_rect(Rect2(c + Vector2(-14, 2 + wave), Vector2(28, 6)), Color(0.15, 0.4, 0.55, 0.7))
-		"chest", "mimic":
-			draw_rect(Rect2(c + Vector2(-11, -12), Vector2(22, 14)), col.darkened(0.2))
-			draw_rect(Rect2(c + Vector2(-11, -12), Vector2(22, 4)), col.lightened(0.2))
-			if card == "mimic":
-				for k in 4:
-					draw_colored_polygon(PackedVector2Array([c + Vector2(-9 + k * 6, -8), c + Vector2(-6 + k * 6, -8), c + Vector2(-7.5 + k * 6, -3)]), BONE)
-			else:
-				draw_circle(c + Vector2(0, -5), 2, Color(1, 0.9, 0.4))
-	# a thin colour bar so the card type is readable at a glance
-	draw_rect(Rect2(c + Vector2(-20, 17), Vector2(40, 3)), col)
+	Icons.card_glyph(self, card, c, t)
 
 
 func _draw_scenery(s, t: float) -> void:

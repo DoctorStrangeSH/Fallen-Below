@@ -1,41 +1,63 @@
 extends CanvasLayer
-## Run HUD: map on the left, the Warden / dungeon panel on the right,
-## hand of cards at the bottom, modal choices centred over the map.
+## Run HUD, split by purpose so nothing competes for the same corner:
+##   top bar    — time (act, loop, day), the Order's attention, pause/speed/sleep
+##   right side — the Warden sheet: health, stats, gear, ability, loot bag,
+##                then the dungeon's own levers: lure, souls, harvest, relics, a short log
+##   bottom     — the hand of cards (picture + name, details on hover)
+## Labels are replaced by icons wherever possible; every icon explains itself on hover.
 
 const D = preload("res://scripts/data/game_data.gd")
 const UI = preload("res://scripts/ui/ui_style.gd")
 const LootSystem = preload("res://scripts/systems/loot_system.gd")
-const Art = preload("res://scripts/ui/art.gd")
+const Icon = preload("res://scripts/ui/icon.gd")
+const Icons = preload("res://scripts/ui/icons.gd")
 
-const MAP_CENTER := Vector2(16 + 19 * 48 / 2.0, 16 + 11 * 48 / 2.0)
+const MAP_CENTER := Vector2(D.MAP_OFFSET.x + D.GRID_W * D.CELL / 2.0, D.MAP_OFFSET.y + D.GRID_H * D.CELL / 2.0)
+const PANEL_W := 1272.0 - D.PANEL_X
+const INNER_W := PANEL_W - 20.0
+const MUTED := Color(0.72, 0.66, 0.82, 0.75)
+const PANEL_BG := Color(0.08, 0.06, 0.11)
+const SLOT_BG := Color(0.11, 0.08, 0.15)
 
 var run  # run.gd
 
-# right panel
+# top bar
 var act_label: Label
 var day_label: Label
 var day_bar: ProgressBar
-var warden_label: Label
-var hp_bar: ProgressBar
-var xp_bar: ProgressBar
-var level_panel: PanelContainer
-var level_box: HBoxContainer
-var warden_stats: Label
-var gear_label: Label
-var active_btn: Button
 var attention_bar: ProgressBar
-var lure_box: GridContainer
-var stance_btn: Button
-var harvest_label: Label
+var attention_label: Label
 var pause_btn: Button
+var pause_icon: Control
 var speed_btn: Button
 var sleep_btn: Button
-var trophy_title: Label
-var trophy_box: VBoxContainer
+
+# Warden sheet
+var warden_label: Label
+var level_label: Label
+var hp_bar: ProgressBar
+var hp_text: Label
+var xp_bar: ProgressBar
+var stat_labels := {}
+var gear_boxes: Array = []
+var active_btn: Button
+var loot_title: Label
+var loot_boxes: Array = []
+
+# dungeon levers
+var lure_buttons := {}
+var lure_name: Label
+var devour_btn: Button
+var raise_btn: Button
+var pouch_labels := {}
+var relic_box: HBoxContainer
+var relic_count := -1
 var log_label: Label
 
 # bottom & overlays
 var hand_box: HBoxContainer
+var level_panel: PanelContainer
+var level_box: HBoxContainer
 var end_panel: PanelContainer
 var end_label: Label
 var end_buttons: VBoxContainer
@@ -47,11 +69,16 @@ var narration_label: Label
 var narration_queue: Array = []
 var narration_time := 0.0
 
+# hover hints: whichever control the mouse is over supplies the tooltip text
+var hint_owner: Control = null
+var hint_text: Callable
+
 
 func _ready() -> void:
+	_build_top_bar()
 	_build_panel()
 	hand_box = HBoxContainer.new()
-	hand_box.position = Vector2(16, D.HAND_Y)
+	hand_box.position = Vector2(D.MAP_OFFSET.x, D.HAND_Y)
 	hand_box.add_theme_constant_override("separation", 6)
 	add_child(hand_box)
 	_build_end_panel()
@@ -73,7 +100,7 @@ func _ready() -> void:
 	refresh()
 
 
-# ============================================================ build
+# ============================================================ small builders
 
 func _bar(max_value: float, color: Color, height: float = 14.0) -> ProgressBar:
 	var b := ProgressBar.new()
@@ -81,6 +108,8 @@ func _bar(max_value: float, color: Color, height: float = 14.0) -> ProgressBar:
 	b.show_percentage = false
 	b.custom_minimum_size = Vector2(0, height)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	b.mouse_filter = Control.MOUSE_FILTER_PASS
 	var bg := UI.box(Color(0.12, 0.1, 0.15), Color(0, 0, 0, 0), 3)
 	bg.set_content_margin_all(0)
 	b.add_theme_stylebox_override("background", bg)
@@ -90,108 +119,341 @@ func _bar(max_value: float, color: Color, height: float = 14.0) -> ProgressBar:
 	return b
 
 
-func _small(text: String, size: int, color: Color = Color(1, 1, 1)) -> Label:
-	var l := UI.label(text, size, color)
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(300, 0)
+func _header(text: String) -> Label:
+	var l := UI.label(text.to_upper(), 10, MUTED)
+	l.add_theme_constant_override("outline_size", 0)
 	return l
 
+
+## A flat square button with an icon inside (no text).
+func _icon_button(kind: String, sz: Vector2, icon_px: float = 18.0) -> Button:
+	var b := Button.new()
+	b.custom_minimum_size = sz
+	b.focus_mode = Control.FOCUS_NONE
+	b.pressed.connect(func(): Sfx.play("click"))
+	_style_slot(b, SLOT_BG, Color(0.35, 0.26, 0.45))
+	var ic := Icon.make(kind, icon_px)
+	ic.set_anchors_preset(Control.PRESET_FULL_RECT)
+	b.add_child(ic)
+	return b
+
+
+func _style_slot(b: Control, bg: Color, border: Color) -> void:
+	var n := UI.box(bg, border, 4)
+	n.set_border_width_all(2)
+	n.set_content_margin_all(2)
+	var h := UI.box(bg.lightened(0.12), Color(1, 1, 1, 0.8), 4)
+	h.set_border_width_all(2)
+	h.set_content_margin_all(2)
+	if b is Button:
+		b.add_theme_stylebox_override("normal", n)
+		b.add_theme_stylebox_override("hover", h)
+		b.add_theme_stylebox_override("pressed", h)
+		b.add_theme_stylebox_override("disabled", n)
+	else:
+		b.add_theme_stylebox_override("panel", n)
+
+
+func _hint(c: Control, text: Callable) -> void:
+	c.mouse_entered.connect(func():
+		hint_owner = c
+		hint_text = text
+	)
+	c.mouse_exited.connect(func():
+		if hint_owner == c:
+			hint_owner = null
+	)
+
+
+func _small_button(text: String, w: float) -> Button:
+	var b := UI.button(text, Vector2(w, 30))
+	b.add_theme_font_size_override("font_size", 13)
+	b.clip_text = true
+	for st in ["normal", "hover", "pressed", "disabled"]:
+		var sb: StyleBoxFlat = b.get_theme_stylebox(st).duplicate()
+		sb.set_content_margin_all(4)
+		sb.set_border_width_all(2)
+		b.add_theme_stylebox_override(st, sb)
+	return b
+
+
+# ============================================================ top bar
+
+func _build_top_bar() -> void:
+	var bar := PanelContainer.new()
+	bar.position = Vector2(D.MAP_OFFSET.x, 8)
+	bar.custom_minimum_size = Vector2(D.GRID_W * D.CELL, 38)
+	var sb := UI.box(PANEL_BG, Color(0.3, 0.22, 0.4), 6)
+	sb.set_border_width_all(2)
+	sb.content_margin_top = 3
+	sb.content_margin_bottom = 3
+	bar.add_theme_stylebox_override("panel", sb)
+	add_child(bar)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	bar.add_child(row)
+
+	act_label = UI.label("", 14, Color(0.78, 0.6, 1.0))
+	act_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(act_label)
+	day_label = UI.label("", 13, Color(1, 1, 1, 0.85))
+	day_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(day_label)
+	day_bar = _bar(D.DAY_LENGTH, Color(0.85, 0.75, 0.4), 6)
+	day_bar.custom_minimum_size.x = 70
+	day_bar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	row.add_child(day_bar)
+	day_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	_hint(day_label, func():
+		var s = run.state
+		var week_end: int = (s.day + D.SEAL_EVERY - 1) / D.SEAL_EVERY * D.SEAL_EVERY
+		return Loc.t("Loop %d, day %d.\nThe week ends on day %d: sleeping then keeps the whole harvest.") % [s.loop, s.day, week_end])
+
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(spacer)
+
+	var att := HBoxContainer.new()
+	att.add_theme_constant_override("separation", 6)
+	att.mouse_filter = Control.MOUSE_FILTER_STOP
+	row.add_child(att)
+	att.add_child(Icon.make("sun", 18))
+	attention_bar = _bar(D.BOSS_THREAT, Color(1.0, 0.8, 0.4), 10)
+	attention_bar.custom_minimum_size.x = 190
+	att.add_child(attention_bar)
+	attention_label = UI.label("", 12, Color(1, 0.85, 0.55))
+	attention_label.custom_minimum_size.x = 36
+	attention_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	att.add_child(attention_label)
+	_hint(att, func():
+		var s = run.state
+		var act: Dictionary = D.ACTS[s.act]
+		return Loc.t("The Order's attention.\nKills, escapes and new halls raise it. At 100%% the champion comes: %s, %s.") % [Loc.t(act["boss"]), Loc.t(act["boss_title"])])
+
+	var spacer2 := Control.new()
+	spacer2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(spacer2)
+
+	pause_btn = _small_button("", 36)
+	pause_icon = Icon.make("pause", 14, Color(1, 1, 1, 0.9))
+	pause_icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pause_btn.add_child(pause_icon)
+	pause_btn.pressed.connect(func(): run.toggle_pause())
+	_hint(pause_btn, func(): return Loc.t("Pause (Space)"))
+	row.add_child(pause_btn)
+	speed_btn = _small_button("x1", 40)
+	speed_btn.pressed.connect(func(): run.cycle_speed())
+	_hint(speed_btn, func(): return Loc.t("Speed (1, 2, 3)"))
+	row.add_child(speed_btn)
+	sleep_btn = _small_button("", 96)
+	sleep_btn.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	var moon := Icon.make("moon", 14)
+	moon.position = Vector2(6, 4)
+	moon.size = Vector2(20, 22)
+	sleep_btn.add_child(moon)
+	sleep_btn.pressed.connect(func(): run.sleep())
+	_hint(sleep_btn, func(): return Loc.t("Sleep: end the run and keep the harvest.\n100% at the end of each week, 60% otherwise."))
+	row.add_child(sleep_btn)
+
+
+# ============================================================ right panel
 
 func _build_panel() -> void:
 	var panel := PanelContainer.new()
 	panel.position = Vector2(D.PANEL_X, 8)
-	panel.custom_minimum_size = Vector2(1272 - D.PANEL_X, 704)
-	panel.add_theme_stylebox_override("panel", UI.box(Color(0.08, 0.06, 0.11), Color(0.3, 0.22, 0.4)))
+	panel.custom_minimum_size = Vector2(PANEL_W, 704)
+	panel.size = Vector2(PANEL_W, 704)
+	panel.add_theme_stylebox_override("panel", UI.box(PANEL_BG, Color(0.3, 0.22, 0.4)))
 	panel.clip_contents = true
 	add_child(panel)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 4)
-	v.custom_minimum_size = Vector2(1272 - D.PANEL_X - 20, 0)
+	v.add_theme_constant_override("separation", 6)
+	v.custom_minimum_size = Vector2(INNER_W, 0)
 	panel.add_child(v)
 
-	act_label = UI.label("", 13, Color(0.75, 0.55, 1.0))
-	v.add_child(act_label)
-	day_label = UI.label("", 11)
-	v.add_child(day_label)
-	day_bar = _bar(D.DAY_LENGTH, Color(0.85, 0.75, 0.4), 8)
-	v.add_child(day_bar)
+	_build_warden(v)
+	v.add_child(HSeparator.new())
+	_build_dungeon(v)
 
-	# the Warden
-	warden_label = UI.label("", 15, Color(0.6, 0.9, 1.0))
-	v.add_child(warden_label)
-	hp_bar = _bar(100, Color(0.4, 0.85, 1.0), 14)
+
+func _build_warden(v: VBoxContainer) -> void:
+	# name + level
+	var head := HBoxContainer.new()
+	head.mouse_filter = Control.MOUSE_FILTER_STOP
+	v.add_child(head)
+	warden_label = UI.label("", 16, Color(0.6, 0.9, 1.0))
+	warden_label.clip_text = true
+	warden_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(warden_label)
+	level_label = UI.label("", 13, Color(0.8, 0.65, 1.0))
+	head.add_child(level_label)
+	_hint(head, _warden_hint)
+
+	# health bar with the numbers inside it, thin XP bar under it
+	hp_bar = _bar(100, Color(0.3, 0.75, 0.95), 20)
 	v.add_child(hp_bar)
-	xp_bar = _bar(100, Color(0.75, 0.55, 1.0), 5)
+	hp_text = UI.label("", 12, Color(1, 1, 1))
+	hp_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hp_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hp_text.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hp_text.add_theme_constant_override("outline_size", 3)
+	hp_text.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	hp_bar.add_child(hp_text)
+	xp_bar = _bar(100, Color(0.75, 0.55, 1.0), 4)
 	v.add_child(xp_bar)
-	warden_stats = _small("", 12, Color(1, 1, 1, 0.85))
-	v.add_child(warden_stats)
-	gear_label = _small("", 10, Color(1, 0.85, 0.55))
-	v.add_child(gear_label)
-	active_btn = UI.button("", Vector2(304, 28))
-	active_btn.add_theme_font_size_override("font_size", 12)
+
+	# stats: icon + number, name on hover
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 2)
+	v.add_child(grid)
+	for k in ["dmg", "def", "regen", "vamp", "evade", "counter"]:
+		var cell := HBoxContainer.new()
+		cell.custom_minimum_size = Vector2(INNER_W / 3.0 - 6, 22)
+		cell.mouse_filter = Control.MOUSE_FILTER_STOP
+		cell.add_theme_constant_override("separation", 4)
+		cell.add_child(Icon.make(k, 15))
+		var l := UI.label("", 14)
+		l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		cell.add_child(l)
+		stat_labels[k] = l
+		var stat_id: String = k
+		_hint(cell, func(): return _stat_hint(stat_id))
+		grid.add_child(cell)
+
+	# gear slots
+	v.add_child(_header(Loc.t("Gear")))
+	var gear_row := HBoxContainer.new()
+	gear_row.add_theme_constant_override("separation", 6)
+	v.add_child(gear_row)
+	var slots: Array = run.state.warden["slots"]
+	for i in slots.size():
+		var box := PanelContainer.new()
+		box.custom_minimum_size = Vector2(54, 50)
+		box.mouse_filter = Control.MOUSE_FILTER_STOP
+		_style_slot(box, SLOT_BG, Color(0.3, 0.25, 0.38))
+		var ic := Icon.make(str(slots[i]), 24, Color(1, 1, 1, 0.15))
+		box.add_child(ic)
+		gear_row.add_child(box)
+		gear_boxes.append(box)
+		var idx: int = i
+		_hint(box, func(): return _gear_hint(idx))
+
+	# active ability
+	active_btn = _small_button("", INNER_W)
+	active_btn.custom_minimum_size.y = 34
 	active_btn.pressed.connect(func(): run.warden.use_active())
-	active_btn.clip_text = true
-	active_btn.add_theme_font_size_override("font_size", 12)
+	_hint(active_btn, func():
+		var wdef: Dictionary = Meta.warden_def()
+		return Loc.t("%s\n%s\n\nPassive, %s: %s") % [Loc.t(wdef["active"]), Loc.t(wdef["active_desc"]), Loc.t(wdef["passive"]), Loc.t(wdef["passive_desc"])])
 	v.add_child(active_btn)
 
-	# the dungeon
-	v.add_child(UI.label(Loc.t("Order's attention (champion at 100%)"), 12, Color(1, 0.9, 0.6)))
-	attention_bar = _bar(D.BOSS_THREAT, Color(1.0, 0.85, 0.5), 8)
-	v.add_child(attention_bar)
-	v.add_child(UI.label(Loc.t("Lure: who answers the call tomorrow"), 12, Color(1, 0.8, 0.5)))
-	lure_box = GridContainer.new()
-	lure_box.columns = 2
-	lure_box.add_theme_constant_override("h_separation", 4)
-	lure_box.add_theme_constant_override("v_separation", 4)
-	v.add_child(lure_box)
-	stance_btn = UI.button("", Vector2(304, 28))
-	stance_btn.pressed.connect(func(): run.souls.toggle_stance())
-	stance_btn.clip_text = true
-	stance_btn.add_theme_font_size_override("font_size", 12)
-	v.add_child(stance_btn)
-	harvest_label = _small("", 12, Color(1, 1, 1, 0.85))
-	v.add_child(harvest_label)
+	# loot bag
+	loot_title = _header("")
+	v.add_child(loot_title)
+	var loot_row := HBoxContainer.new()
+	loot_row.add_theme_constant_override("separation", 4)
+	v.add_child(loot_row)
+	for i in D.INVENTORY_MAX:
+		var b := _icon_button("", Vector2(47, 44), 22)
+		var idx: int = i
+		b.pressed.connect(func(): run.loot.equip(idx))
+		b.gui_input.connect(func(ev: InputEvent):
+			var mb := ev as InputEventMouseButton
+			if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
+				run.loot.discard(idx)
+		)
+		_hint(b, func(): return _loot_hint(idx))
+		loot_row.add_child(b)
+		loot_boxes.append(b)
 
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
-	v.add_child(row)
-	pause_btn = UI.button(Loc.t("Pause"), Vector2(70, 28))
-	pause_btn.pressed.connect(func(): run.toggle_pause())
-	pause_btn.clip_text = true
-	pause_btn.add_theme_font_size_override("font_size", 12)
-	row.add_child(pause_btn)
-	speed_btn = UI.button(Loc.t("x1"), Vector2(60, 28))
-	speed_btn.pressed.connect(func(): run.cycle_speed())
-	speed_btn.clip_text = true
-	speed_btn.add_theme_font_size_override("font_size", 12)
-	row.add_child(speed_btn)
-	sleep_btn = UI.button(Loc.t("Sleep"), Vector2(166, 28))
-	sleep_btn.tooltip_text = Loc.t("End the run and keep the harvest. 100% at the end of each week (every 5th day), 60% otherwise.")
-	sleep_btn.pressed.connect(func(): run.sleep())
-	sleep_btn.clip_text = true
-	sleep_btn.add_theme_font_size_override("font_size", 12)
-	row.add_child(sleep_btn)
 
-	trophy_title = _small("", 11, Color(1, 0.85, 0.5))
-	v.add_child(trophy_title)
-	trophy_box = VBoxContainer.new()
-	trophy_box.add_theme_constant_override("separation", 2)
-	v.add_child(trophy_box)
+func _build_dungeon(v: VBoxContainer) -> void:
+	# lure: one icon per traveler kind
+	var lure_head := HBoxContainer.new()
+	v.add_child(lure_head)
+	lure_head.add_child(_header(Loc.t("Lure")))
+	lure_name = UI.label("", 11, Color(1, 0.8, 0.5))
+	lure_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lure_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	lure_name.clip_text = true
+	lure_head.add_child(lure_name)
+	var lure_row := HBoxContainer.new()
+	lure_row.add_theme_constant_override("separation", 4)
+	v.add_child(lure_row)
+	for id in D.LURES:
+		var lure_id: String = id
+		var b := _icon_button(lure_id, Vector2(47, 36), 18)
+		b.pressed.connect(func():
+			run.set_lure(lure_id)
+			rebuild_lures()
+		)
+		_hint(b, func(): return _lure_hint(lure_id))
+		lure_row.add_child(b)
+		lure_buttons[lure_id] = b
 
-	log_label = UI.label("", 11, Color(1, 1, 1, 0.75))
+	# souls: two halves of one switch
+	v.add_child(_header(Loc.t("Souls of the fallen  [R]")))
+	var souls := HBoxContainer.new()
+	souls.add_theme_constant_override("separation", 4)
+	v.add_child(souls)
+	devour_btn = _small_button(Loc.t("Devour"), INNER_W / 2.0 - 2)
+	raise_btn = _small_button("", INNER_W / 2.0 - 2)
+	for pair in [[devour_btn, "devour", false], [raise_btn, "raise", true]]:
+		var b: Button = pair[0]
+		var want: bool = pair[2]
+		b.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		var ic := Icon.make(pair[1], 15)
+		ic.position = Vector2(8, 6)
+		ic.size = Vector2(20, 20)
+		b.add_child(ic)
+		b.pressed.connect(func():
+			if run.state.raise_souls != want:
+				run.souls.toggle_stance()
+		)
+		souls.add_child(b)
+	_hint(devour_btn, func(): return Loc.t("Devour: the Warden eats the fallen, heals, gains XP and grows by its diet."))
+	_hint(raise_btn, func(): return Loc.t("Raise: the fallen stand up as your servants, and whisper pages of the Book of the Fallen."))
+
+	# harvest and relics on one line
+	v.add_child(_header(Loc.t("Harvest and relics")))
+	var pouch := HBoxContainer.new()
+	pouch.add_theme_constant_override("separation", 4)
+	v.add_child(pouch)
+	for r in ["bones", "blood", "gold"]:
+		var cell := HBoxContainer.new()
+		cell.mouse_filter = Control.MOUSE_FILTER_STOP
+		cell.add_theme_constant_override("separation", 2)
+		cell.add_child(Icon.make(r, 15))
+		var l := UI.label("0", 14, Icons.color_of(r))
+		l.custom_minimum_size.x = 34
+		cell.add_child(l)
+		pouch_labels[r] = l
+		var res: String = r
+		_hint(cell, func(): return Loc.t("%s in this run's harvest. Kept when you sleep; lost in part if the Warden falls.") % Loc.t(D.RESOURCES[res]["name"]))
+		pouch.add_child(cell)
+	relic_box = HBoxContainer.new()
+	relic_box.add_theme_constant_override("separation", 2)
+	pouch.add_child(relic_box)
+
+	# a short log at the bottom
+	log_label = UI.label("", 11, Color(1, 1, 1, 0.55))
 	log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	log_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	log_label.clip_text = true
 	log_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	log_label.custom_minimum_size = Vector2(300, 40)
+	log_label.custom_minimum_size = Vector2(INNER_W, 40)
 	v.add_child(log_label)
 
+
+# ============================================================ modals & overlays
 
 func _modal(width: float, border: Color) -> PanelContainer:
 	var p := PanelContainer.new()
 	p.add_theme_stylebox_override("panel", UI.box(Color(0.07, 0.04, 0.11, 0.97), border))
 	p.custom_minimum_size = Vector2(width, 0)
-	p.position = Vector2(MAP_CENTER.x - width / 2.0, 120)
+	p.position = Vector2(MAP_CENTER.x - width / 2.0, 140)
 	p.visible = false
 	add_child(p)
 	return p
@@ -252,24 +514,27 @@ func _build_end_panel() -> void:
 
 func _build_overlays() -> void:
 	tooltip = PanelContainer.new()
-	tooltip.add_theme_stylebox_override("panel", UI.box(Color(0.04, 0.03, 0.06, 0.93), Color(0.4, 0.3, 0.5), 4))
+	tooltip.add_theme_stylebox_override("panel", UI.box(Color(0.04, 0.03, 0.06, 0.95), Color(0.45, 0.35, 0.58), 4))
 	tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tooltip.visible = false
 	add_child(tooltip)
-	tooltip_label = UI.label("", 12)
+	tooltip_label = UI.label("", 13)
+	tooltip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tooltip.add_child(tooltip_label)
 
 	banner = UI.label("", 28, Color(1, 0.8, 0.3))
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	banner.position = Vector2(D.MAP_OFFSET.x, 60)
+	banner.position = Vector2(D.MAP_OFFSET.x, D.MAP_OFFSET.y + 40)
 	banner.size = Vector2(D.GRID_W * D.CELL, 50)
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner.add_theme_constant_override("outline_size", 6)
+	banner.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	banner.modulate.a = 0.0
 	add_child(banner)
 
 	# story narration over the bottom of the map
 	narration = PanelContainer.new()
-	narration.add_theme_stylebox_override("panel", UI.box(Color(0.02, 0.01, 0.04, 0.88), Color(0.55, 0.45, 0.7, 0.6), 4))
+	narration.add_theme_stylebox_override("panel", UI.box(Color(0.02, 0.01, 0.04, 0.9), Color(0.55, 0.45, 0.7, 0.6), 4))
 	narration.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	narration.position = Vector2(D.MAP_OFFSET.x + 60, 452)
 	narration.custom_minimum_size = Vector2(D.GRID_W * D.CELL - 120, 0)
@@ -309,27 +574,33 @@ func _process(delta: float) -> void:
 			_next_narration()
 
 
-# ============================================================ cards & choices
+# ============================================================ cards
 
-func _card_button(id: String, highlighted: bool, min_size: Vector2) -> Button:
+func _card_button(id: String, highlighted: bool) -> Button:
 	var def: Dictionary = D.CARDS[id]
 	var btn := Button.new()
-	btn.text = Loc.t("%s\n\n%s") % [Loc.t(def["name"]), Loc.t(def["desc"])]
-	btn.custom_minimum_size = min_size
-	btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	btn.custom_minimum_size = Vector2(112, 120)
 	btn.focus_mode = Control.FOCUS_NONE
-	btn.add_theme_font_size_override("font_size", 12)
-	var icon := Art.tex("card_" + id)
-	if icon != null:
-		btn.icon = icon
-		btn.expand_icon = true
-		btn.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 	var base: Color = def["color"]
-	var col := base.darkened(0.45)
-	var border := Color(1, 1, 1) if highlighted else col.lightened(0.3)
-	btn.add_theme_stylebox_override("normal", UI.box(col, border))
-	btn.add_theme_stylebox_override("hover", UI.box(col.lightened(0.15), Color(1, 1, 1, 0.8)))
-	btn.add_theme_stylebox_override("pressed", UI.box(col.lightened(0.25), Color(1, 1, 1)))
+	var col := base.darkened(0.55)
+	var border := Color(1, 1, 1) if highlighted else base.darkened(0.1)
+	for st in ["normal", "hover", "pressed"]:
+		var sb := UI.box(col if st == "normal" else col.lightened(0.12), border if st == "normal" else Color(1, 1, 1, 0.85), 6)
+		sb.set_border_width_all(3 if highlighted else 2)
+		btn.add_theme_stylebox_override(st, sb)
+	var glyph := Icon.make("card:" + id, 40)
+	glyph.position = Vector2(16, 10)
+	glyph.size = Vector2(80, 56)
+	glyph.animated = id == "grinder" or id == "drowned" or id == "jar"
+	btn.add_child(glyph)
+	var name := UI.label(Loc.t(def["name"]), 13, Color(1, 1, 1, 0.95))
+	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name.position = Vector2(4, 70)
+	name.size = Vector2(104, 44)
+	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	btn.add_child(name)
+	_hint(btn, func(): return "%s\n%s" % [Loc.t(def["name"]), Loc.t(def["desc"])])
 	return btn
 
 
@@ -338,45 +609,108 @@ func rebuild_hand() -> void:
 	for c in hand_box.get_children():
 		c.queue_free()
 	for i in s.hand.size():
-		var btn := _card_button(s.hand[i], i == s.selected, Vector2(126, 140))
+		var btn := _card_button(s.hand[i], i == s.selected)
 		btn.pressed.connect(func(): run.cards.use_card(i))
 		hand_box.add_child(btn)
 
 
+# ============================================================ lures, loot, relics
+
 func rebuild_lures() -> void:
 	var s = run.state
-	for c in lure_box.get_children():
-		c.queue_free()
 	var available: Array = Meta.available_lures(s.act)
-	for id in D.LURES:
-		var def: Dictionary = D.LURES[id]
-		var btn := UI.button(Loc.t(def["name"]), Vector2(150, 26))
-		btn.add_theme_font_size_override("font_size", 11)
-		var lure_id: String = id
-		if not available.has(lure_id):
-			btn.disabled = true
-			btn.tooltip_text = Loc.t("Locked. Build it in the Lair.")
+	for id in lure_buttons:
+		var b: Button = lure_buttons[id]
+		var open: bool = available.has(id)
+		var picked: bool = id == s.lure
+		b.disabled = not open
+		var ic: Control = b.get_child(0)
+		if not open:
+			ic.set_icon("lock", Color(1, 1, 1, 0.25))
 		else:
-			btn.tooltip_text = Loc.t(def["desc"])
-			if lure_id == s.lure:
-				btn.add_theme_stylebox_override("normal", UI.box(Color(0.35, 0.22, 0.08), Color(1, 0.8, 0.4)))
-			btn.pressed.connect(func():
-				run.set_lure(lure_id)
-				rebuild_lures()
-			)
-		lure_box.add_child(btn)
+			ic.set_icon(id, Icons.color_of(id) if picked else Color(0.85, 0.8, 0.95, 0.65))
+		_style_slot(b, Color(0.3, 0.2, 0.08) if picked else SLOT_BG, Color(1, 0.8, 0.4) if picked else Color(0.3, 0.25, 0.38))
+	lure_name.text = Loc.t(D.LURES[s.lure]["name"]) if D.LURES.has(s.lure) else ""
+
+
+func _lure_hint(id: String) -> String:
+	var def: Dictionary = D.LURES[id]
+	if not Meta.available_lures(run.state.act).has(id):
+		if int(def.get("act", 1)) > run.state.act:
+			return Loc.t("%s\nOnly in the Drowned Mines (Act II).") % Loc.t(def["name"])
+		return Loc.t("%s\nLocked. Build it in the Lair.") % Loc.t(def["name"])
+	return Loc.t("%s\n%s\n\nDecides who comes down tomorrow.") % [Loc.t(def["name"]), Loc.t(def["desc"])]
+
+
+func rebuild_trophies() -> void:
+	var s = run.state
+	loot_title.text = (Loc.t("Loot %d/%d  ·  click: wear  ·  RMB: throw away") % [s.inventory.size(), D.INVENTORY_MAX]).to_upper()
+	for i in loot_boxes.size():
+		var b: Button = loot_boxes[i]
+		var ic: Control = b.get_child(0)
+		if i < s.inventory.size():
+			var item: Dictionary = s.inventory[i]
+			var col: Color = D.RARITIES[item["rarity"]]["color"]
+			var wearable: bool = run.warden.can_wear(item["slot"])
+			ic.set_icon(item["slot"], col if wearable else Color(col, 0.35))
+			_style_slot(b, Color(col, 0.12), Color(col, 0.7))
+		else:
+			ic.set_icon("", Color(1, 1, 1))
+			_style_slot(b, Color(0.07, 0.05, 0.1), Color(0.2, 0.17, 0.26))
+
+
+func _loot_hint(i: int) -> String:
+	var s = run.state
+	if i >= s.inventory.size():
+		return Loc.t("Empty. Gear drops from the travelers you kill.")
+	var item: Dictionary = s.inventory[i]
+	return Loc.t("%s  (%s, level %d)\n%s\n\nWearing now: %s\n\nClick: wear  ·  RMB: throw away") % [item["name"], Loc.t(str(item["slot"]).capitalize()),
+		int(item["level"]), LootSystem.describe(item).replace(", ", "\n"), _worn_text(item["slot"])]
+
+
+func _rebuild_relics() -> void:
+	var s = run.state
+	for c in relic_box.get_children():
+		c.queue_free()
+	var all: Array = []
+	for r in s.relics:
+		all.append([r, false])
+	for r in s.found_relics:
+		all.append([r, true])
+	for pair in all:
+		var id: String = pair[0]
+		var found: bool = pair[1]
+		var cell := Control.new()
+		cell.custom_minimum_size = Vector2(18, 22)
+		cell.mouse_filter = Control.MOUSE_FILTER_STOP
+		var ic := Icon.make("relic", 13, Color(0.6, 1.0, 0.8) if found else Color(0.85, 0.6, 1.0))
+		ic.set_anchors_preset(Control.PRESET_FULL_RECT)
+		cell.add_child(ic)
+		_hint(cell, func():
+			var t := "%s\n%s" % [Loc.t(D.RELICS[id]["name"]), Loc.t(D.RELICS[id]["desc"])]
+			return t + (Loc.t("\n\nFound in this run: survive to keep it.") if found else ""))
+		relic_box.add_child(cell)
 
 
 # ============================================================ update
 
 func refresh() -> void:
 	var s = run.state
-	day_label.text = Loc.t("Loop %d  ·  Day %d  ·  week ends day %d") % [s.loop, s.day, (s.day + D.SEAL_EVERY - 1) / D.SEAL_EVERY * D.SEAL_EVERY]
+	day_label.text = Loc.t("Loop %d · Day %d") % [s.loop, s.day]
 	day_bar.value = s.day_timer
+	attention_bar.value = s.threat
+	attention_label.text = "%d%%" % int(s.threat * 100.0 / D.BOSS_THREAT)
+	pause_icon.set_icon("play" if s.paused else "pause", Color(1, 1, 1, 0.9))
+	speed_btn.text = "x%d" % int(s.time_scale)
+	var pct: float = s.seal_pct()
+	sleep_btn.text = "%d%%" % int(pct * 100.0)
+	sleep_btn.disabled = s.game_over
+	sleep_btn.modulate = Color(1, 0.9, 0.4) if pct >= 1.0 else Color(1, 1, 1)
 
 	var w: Dictionary = s.warden
 	var growth: bool = w.get("growth", false)
-	warden_label.text = Loc.t("%s, %s%s") % [w["name"], w["title"], (Loc.t("   Lv %d") % int(w["level"])) if growth else ""]
+	warden_label.text = "%s, %s" % [w["name"], w["title"]]
+	level_label.text = (Loc.t("Lv %d") % int(w["level"])) if growth else ""
 	xp_bar.visible = growth
 	if growth:
 		var need: int = run.warden.xp_to_next()
@@ -384,65 +718,83 @@ func refresh() -> void:
 		xp_bar.value = float(w["xp"]) if need > 0 else xp_bar.max_value
 	hp_bar.max_value = w["max_hp"]
 	hp_bar.value = w["hp"]
+	hp_text.text = "%d / %d" % [int(w["hp"]), int(w["max_hp"])]
 	var st: Dictionary = w["stats"]
-	var parts: Array = [Loc.t("HP %d/%d") % [int(w["hp"]), int(w["max_hp"])], Loc.t("DMG %.1f") % st["dmg"]]
-	for k in ["def", "regen", "vamp", "evade", "counter"]:
-		var v: float = st[k]
-		if v > 0.0:
-			var def: Dictionary = D.STATS[k]
-			if def["pct"]:
-				parts.append("%s %d%%" % [Loc.t(def["name"]), int(v)])
-			else:
-				parts.append("%s %.1f" % [Loc.t(def["name"]), v])
+	for k in stat_labels:
+		var val: float = st.get(k, 0.0)
+		var l: Label = stat_labels[k]
+		l.text = ("%d%%" % int(val)) if D.STATS[k]["pct"] else ("%.1f" % val)
+		l.add_theme_color_override("font_color", Color(1, 1, 1, 0.95) if val > 0.0 else Color(1, 1, 1, 0.3))
+
+	var gear: Dictionary = w["gear"]
+	var slots: Array = w["slots"]
+	for i in gear_boxes.size():
+		var box: PanelContainer = gear_boxes[i]
+		var ic: Control = box.get_child(0)
+		if gear.has(i):
+			var col: Color = D.RARITIES[gear[i]["rarity"]]["color"]
+			ic.set_icon(str(slots[i]), col)
+			_style_slot(box, Color(col, 0.12), Color(col, 0.6))
+		else:
+			ic.set_icon(str(slots[i]), Color(1, 1, 1, 0.15))
+			_style_slot(box, SLOT_BG, Color(0.3, 0.25, 0.38))
+
+	var wdef: Dictionary = Meta.warden_def()
+	var cd: float = w["cooldown"]
+	active_btn.text = (Loc.t("[Q] %s") % Loc.t(wdef["active"])) if cd <= 0.0 else (Loc.t("[Q] %s  %ds") % [Loc.t(wdef["active"]), int(ceil(cd))])
+	active_btn.disabled = cd > 0.0 or s.game_over
+
+	_style_slot(devour_btn, Color(0.35, 0.1, 0.12) if not s.raise_souls else SLOT_BG, Color(1, 0.45, 0.4) if not s.raise_souls else Color(0.3, 0.25, 0.38))
+	_style_slot(raise_btn, Color(0.12, 0.25, 0.2) if s.raise_souls else SLOT_BG, Color(0.5, 1, 0.75) if s.raise_souls else Color(0.3, 0.25, 0.38))
+	raise_btn.text = Loc.t("Raise %d/%d") % [s.undead_count(), s.jar_cap]
+	for r in pouch_labels:
+		pouch_labels[r].text = str(int(s.pouch[r]))
+	var rc: int = s.relics.size() * 100 + s.found_relics.size()
+	if rc != relic_count:
+		relic_count = rc
+		_rebuild_relics()
+	_update_tooltip()
+
+
+func _warden_hint() -> String:
+	var s = run.state
+	var w: Dictionary = s.warden
 	var eaten: Dictionary = w["eaten"]
-	var diet_parts: Array = []
+	var diet: Array = []
 	for kind in eaten:
-		diet_parts.append("%d %s" % [int(eaten[kind]), Loc.t(D.HERO_CLASSES[kind]["name"])])
+		diet.append("%d %s" % [int(eaten[kind]), Loc.t(D.HERO_CLASSES[kind]["name"])])
 	var abil: Array = []
 	for a in w.get("abilities", []):
 		abil.append(Loc.t(run.warden.ability_def(a)["name"]))
-	warden_stats.text = "   ".join(parts) + Loc.t("\nEaten: ") + (", ".join(diet_parts) if not diet_parts.is_empty() else Loc.t("nothing yet"))
+	var t := "%s, %s\n%s" % [w["name"], w["title"], Loc.t("If the Warden falls, the run is over.")]
+	t += Loc.t("\n\nEaten: ") + (", ".join(diet) if not diet.is_empty() else Loc.t("nothing yet"))
 	if not abil.is_empty():
-		warden_stats.text += Loc.t("\nAbilities: ") + ", ".join(abil)
-	var gear_parts: Array = []
+		t += Loc.t("\nAbilities: ") + ", ".join(abil)
+	if w.get("growth", false):
+		t += Loc.t("\nXP: %d / %d") % [int(w["xp"]), run.warden.xp_to_next()]
+	return t
+
+
+func _stat_hint(k: String) -> String:
+	const DESC := {
+		"dmg": "Damage dealt with every blow.",
+		"def": "Removed from every hit the Warden takes.",
+		"regen": "Health restored every second.",
+		"vamp": "Share of dealt damage returned as health.",
+		"evade": "Chance to avoid a blow completely.",
+		"counter": "Chance to strike back when hit.",
+	}
+	return "%s\n%s" % [Loc.t(D.STATS[k]["name"]), Loc.t(DESC[k])]
+
+
+func _gear_hint(i: int) -> String:
+	var w: Dictionary = run.state.warden
+	var slot: String = str(w["slots"][i])
 	var gear: Dictionary = w["gear"]
-	var slots: Array = w["slots"]
-	for i in slots.size():
-		var label := Loc.t(str(slots[i]).capitalize())
-		gear_parts.append("%s: %s" % [label, gear[i]["name"] if gear.has(i) else "-"])
-	var gear_lines: Array = []
-	for i in range(0, gear_parts.size(), 2):
-		gear_lines.append("   ".join(gear_parts.slice(i, i + 2)))
-	gear_label.text = "\n".join(gear_lines)
-	var wdef: Dictionary = Meta.warden_def()
-	var cd: float = w["cooldown"]
-	active_btn.text = Loc.t("[Q] %s%s") % [Loc.t(wdef["active"]), "" if cd <= 0.0 else "  (%ds)" % int(ceil(cd))]
-	active_btn.disabled = cd > 0.0 or s.game_over
-	active_btn.tooltip_text = Loc.t("%s\n\nPassive, %s: %s") % [Loc.t(wdef["active_desc"]), Loc.t(wdef["passive"]), Loc.t(wdef["passive_desc"])]
-
-	attention_bar.value = s.threat
-	stance_btn.text = (Loc.t("Souls: RAISE as servants (%d/%d)") % [s.undead_count(), s.jar_cap]) if s.raise_souls else Loc.t("Souls: the Warden DEVOURS them")
-	stance_btn.tooltip_text = Loc.t("Devour heals the Warden and gives XP. Raise makes an undead servant where the traveler fell. Hotkey: R")
-	var pct: float = s.seal_pct()
-	var relic_names: Array = []
-	for r in s.relics:
-		relic_names.append(Loc.t(D.RELICS[r]["name"]))
-	var found: Array = []
-	for r in s.found_relics:
-		found.append(Loc.t(D.RELICS[r]["name"]))
-	var txt := Loc.t("Harvest: %d Bones  %d Blood  %d Gold") % [s.pouch["bones"], s.pouch["blood"], s.pouch["gold"]]
-	if not relic_names.is_empty():
-		txt += Loc.t("\nRelics: ") + ", ".join(relic_names)
-	if not found.is_empty():
-		txt += Loc.t("\nFound (survive to keep): ") + ", ".join(found)
-	harvest_label.text = txt
-
-	pause_btn.text = Loc.t("Play") if s.paused else Loc.t("Pause")
-	speed_btn.text = Loc.t("x%d") % int(s.time_scale)
-	sleep_btn.text = Loc.t("Sleep (keep %d%%)") % int(pct * 100.0)
-	sleep_btn.disabled = s.game_over
-	sleep_btn.modulate = Color(1, 0.9, 0.4) if pct >= 1.0 else Color(1, 1, 1)
-	_update_tooltip()
+	if not gear.has(i):
+		return Loc.t("%s: empty") % Loc.t(slot.capitalize())
+	var it: Dictionary = gear[i]
+	return "%s  (%s)\n%s" % [it["name"], Loc.t(slot.capitalize()), LootSystem.describe(it).replace(", ", "\n")]
 
 
 func show_end(outcome: String, payout: Dictionary, pct: float, kept: Array, lost: Array) -> void:
@@ -452,7 +804,7 @@ func show_end(outcome: String, payout: Dictionary, pct: float, kept: Array, lost
 	var head := ""
 	match outcome:
 		"victory":
-			head = Loc.t("ACT CLEARED\n%s has been devoured.") % D.ACTS[s.act]["boss"]
+			head = Loc.t("ACT CLEARED\n%s has been devoured.") % Loc.t(D.ACTS[s.act]["boss"])
 		"sleep":
 			head = Loc.t("THE DUNGEON SLEEPS\nYou keep %d%% of the harvest.") % int(pct * 100.0)
 		_:
@@ -481,38 +833,6 @@ func show_end(outcome: String, payout: Dictionary, pct: float, kept: Array, lost
 	end_panel.visible = true
 
 
-func rebuild_trophies() -> void:
-	var s = run.state
-	trophy_title.text = Loc.t("Loot %d/%d   (click: the Warden wears it · RMB: throw away)") % [s.inventory.size(), D.INVENTORY_MAX]
-	for c in trophy_box.get_children():
-		c.queue_free()
-	for i in s.inventory.size():
-		var item: Dictionary = s.inventory[i]
-		var rar: Dictionary = D.RARITIES[item["rarity"]]
-		var col: Color = rar["color"]
-		var btn := Button.new()
-		btn.text = Loc.t("%s  %s") % [item["name"], LootSystem.describe(item)]
-		btn.tooltip_text = Loc.t("%s  (%s, level %d)\n%s\n\nWearing now: %s") % [item["name"], Loc.t(str(item["slot"]).capitalize()),
-			int(item["level"]), LootSystem.describe(item).replace(", ", "\n"), _worn_text(item["slot"])]
-		btn.focus_mode = Control.FOCUS_NONE
-		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		btn.custom_minimum_size = Vector2(300, 20)
-		btn.clip_text = true
-		btn.add_theme_font_size_override("font_size", 11)
-		btn.add_theme_color_override("font_color", col)
-		btn.add_theme_color_override("font_hover_color", col.lightened(0.3))
-		var border := Color(col, 0.4)
-		btn.add_theme_stylebox_override("normal", UI.box(Color(0.07, 0.05, 0.1, 0.9), border, 3))
-		btn.add_theme_stylebox_override("hover", UI.box(Color(0.12, 0.09, 0.16, 0.95), Color(1, 1, 1), 3))
-		btn.pressed.connect(func(): run.loot.equip(i))
-		btn.gui_input.connect(func(ev: InputEvent):
-			var mb := ev as InputEventMouseButton
-			if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
-				run.loot.discard(i)
-		)
-		trophy_box.add_child(btn)
-
-
 func _worn_text(slot: String) -> String:
 	if not run.warden.can_wear(slot):
 		return Loc.t("this Warden has no %s slot") % Loc.t(slot.capitalize())
@@ -533,16 +853,51 @@ func show_banner(text: String) -> void:
 
 
 func _on_log() -> void:
-	log_label.text = Loc.t("\n").join(run.state.log_lines)
+	var lines: Array = run.state.log_lines
+	log_label.text = "\n".join(lines.slice(maxi(0, lines.size() - 5)))
 
+
+# ============================================================ tooltip
 
 func _update_tooltip() -> void:
 	var s = run.state
 	if s.game_over or level_panel.visible:
 		tooltip.visible = false
 		return
-	var cell: Vector2i = run.view.mouse_cell()
 	var lines: Array = []
+	if hint_owner != null and is_instance_valid(hint_owner) and hint_owner.is_visible_in_tree():
+		lines.append(str(hint_text.call()))
+	else:
+		hint_owner = null
+		_map_lines(s, lines)
+	if lines.is_empty():
+		tooltip.visible = false
+		return
+	var text := "\n".join(lines)
+	if text != tooltip_label.text:
+		# measure on one line first; wrap only long hints
+		tooltip_label.text = text
+		tooltip_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+		tooltip_label.custom_minimum_size.x = 0
+		tooltip.size = Vector2.ZERO
+		tooltip.reset_size()
+		if tooltip.size.x > 360:
+			tooltip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			tooltip_label.custom_minimum_size.x = 340
+			tooltip.size = Vector2.ZERO
+			tooltip.reset_size()
+	tooltip.visible = true
+	var mp: Vector2 = get_viewport().get_mouse_position() + Vector2(16, 16)
+	var vp := get_viewport().get_visible_rect().size
+	if mp.x + tooltip.size.x > vp.x - 4:
+		mp.x = get_viewport().get_mouse_position().x - tooltip.size.x - 12
+	if mp.y + tooltip.size.y > vp.y - 4:
+		mp.y = get_viewport().get_mouse_position().y - tooltip.size.y - 12
+	tooltip.position = mp
+
+
+func _map_lines(s, lines: Array) -> void:
+	var cell: Vector2i = run.view.mouse_cell()
 	if s.path_lookup.has(cell):
 		var t: int = s.path_lookup[cell]
 		var card: String = s.card_at(t)
@@ -561,21 +916,10 @@ func _update_tooltip() -> void:
 		for h in s.travelers_at(t):
 			var trait_id: String = h["trait"]
 			var tr_txt := "" if trait_id == "" else "  [%s]" % Loc.t(D.TRAITS[trait_id]["name"])
-			lines.append(Loc.t("%s (%s)%s  %d/%d HP  lap %d/%d") % [s.hero_name(h), D.HERO_CLASSES[h["cls"]]["name"], tr_txt,
+			lines.append(Loc.t("%s (%s)%s  %d/%d HP  lap %d/%d") % [s.hero_name(h), Loc.t(D.HERO_CLASSES[h["cls"]]["name"]), tr_txt,
 				int(h["hp"]), int(h["max_hp"]), int(h["laps"]), run.heroes_sys.escape_laps()])
 	elif s.scenery.has(cell):
 		var id: String = s.scenery[cell]
 		lines.append("%s: %s" % [Loc.t(D.CARDS[id]["name"]), Loc.t(D.CARDS[id]["desc"])])
 	elif cell == s.heart_cell:
 		lines.append(Loc.t("The dungeon's heart. It hungers."))
-	if lines.is_empty():
-		tooltip.visible = false
-		return
-	tooltip_label.text = Loc.t("\n").join(lines)
-	tooltip.visible = true
-	tooltip.reset_size()
-	var mp: Vector2 = get_viewport().get_mouse_position() + Vector2(16, 16)
-	var vp := get_viewport().get_visible_rect().size
-	mp.x = minf(mp.x, vp.x - tooltip.size.x - 4)
-	mp.y = minf(mp.y, vp.y - tooltip.size.y - 4)
-	tooltip.position = mp
