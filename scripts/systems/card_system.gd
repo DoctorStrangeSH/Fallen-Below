@@ -94,6 +94,10 @@ func place_selected(cell: Vector2i) -> void:
 		elif id == "drowned":
 			for k in 2:
 				_spawn(idx, "drowned")
+		elif id == "ashcrypt":
+			for k in 2:
+				_spawn(idx, "ashen")
+		s.ash.erase(idx)
 		_check_path_combos(idx, id)
 	else:
 		s.scenery[cell] = id
@@ -147,6 +151,9 @@ func respawn_rooms() -> void:
 		if card == "drowned":
 			while s.count_units(i, "Drowned") < 2 + s.scenery_near(i, "graveyard"):
 				_spawn(i, "drowned")
+		if card == "ashcrypt":
+			while s.count_units(i, "Ashen") < 2 + s.scenery_near(i, "graveyard"):
+				_spawn(i, "ashen")
 		if card == "necropolis" and s.count_units(i, "Bone Golem") == 0:
 			_spawn(i, "golem")
 		elif card == "mimic" and s.count_units(i, "Mimic") == 0:

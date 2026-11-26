@@ -171,9 +171,9 @@ func card_weights() -> Dictionary:
 	var w := {}
 	for id in deck:
 		w[id] = D.CARD_WEIGHTS.get(id, 1)
-	if selected_act >= 2:  # the Drowned Mines add their own memories to every deck
-		w["cavein"] = D.CARD_WEIGHTS["cavein"]
-		w["drowned"] = D.CARD_WEIGHTS["drowned"]
+	# every act adds its own memories to the deck
+	for id in D.ACTS[selected_act].get("cards", []):
+		w[id] = D.CARD_WEIGHTS[id]
 	if warden_id == "brood" and w.has("spider"):
 		w["spider"] = int(w["spider"]) * 2
 	if warden_id == "mimic" and w.has("chest"):
@@ -247,7 +247,8 @@ func available_lures(act: int = 0) -> Array:
 		var b: String = def.get("building", "")
 		if b != "" and level(b) <= 0:
 			continue
-		if int(def.get("act", 1)) > act:
+		var lure_act := int(def.get("act", 0))
+		if lure_act != 0 and lure_act != act:  # act lures only work in their own act
 			continue
 		out.append(id)
 	return out

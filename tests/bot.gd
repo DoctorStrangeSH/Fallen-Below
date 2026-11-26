@@ -46,6 +46,8 @@ func _ready() -> void:
 				shot_path = kv[1]
 			"shot_day":
 				shot_day = int(kv[1])
+			"noquench":
+				quench = false
 			"hover":
 				var xy: PackedStringArray = kv[1].split(",")
 				hover = Vector2(float(xy[0]), float(xy[1]))
@@ -56,8 +58,9 @@ func _ready() -> void:
 			"lang":
 				Loc.set_language(kv[1], false)
 			"act":
-				if not Meta.acts_cleared.has(1):
-					Meta.acts_cleared.append(1)
+				for a in range(1, int(kv[1])):
+					if not Meta.acts_cleared.has(a):
+						Meta.acts_cleared.append(a)
 				Meta.selected_act = int(kv[1])
 	rng.seed = 12345
 	Meta.no_save = true
@@ -121,6 +124,10 @@ func _think(run) -> void:
 		run.warden.pick_ability(rng.randi() % s.level_choices.size())
 	_play_cards(run)
 	_manage_loot(run)
+	# put out fires on halls worth saving while there is Blood to spare
+	for t in (s.fires.keys() if quench else []):
+		if s.card_at(t) != "" and int(s.pouch["blood"]) >= D.QUENCH_BLOOD * 2:
+			run.fire.quench(t)
 	# raise while there are free servant slots and the Warden is healthy, otherwise devour
 	var healthy: bool = s.warden["hp"] > s.warden["max_hp"] * 0.6
 	var free_slot: bool = s.undead_count() < s.jar_cap
@@ -223,6 +230,7 @@ func _manage_loot(run) -> void:
 
 var shot_wait := 0
 var hover := Vector2(-1, -1)
+var quench := true
 
 
 ## Waits a few rendered frames, then saves a screenshot and quits.

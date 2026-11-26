@@ -102,6 +102,15 @@ func add_fx(kind: String, target, amount: float) -> void:
 			_burst(pos, Color(1.0, 0.85, 0.4), 26.0)
 		"disarm":
 			_float(pos, Loc.t("disarmed"), Color(1, 0.7, 0.3), 12)
+		"ignite":
+			_burst(pos, Color(1.0, 0.5, 0.1), 34.0)
+		"quench":
+			_burst(pos, Color(0.85, 0.15, 0.25), 30.0)
+			_float(pos + Vector2(0, -14), "-%d" % D.QUENCH_BLOOD, Color(0.95, 0.25, 0.3), 13)
+		"ash":
+			_burst(pos, Color(0.5, 0.48, 0.45), 30.0)
+		"purify":
+			_float(pos, "%d" % int(round(amount)), Color(0.85, 0.85, 1.0), 10)
 
 
 func _fx_pos(target) -> Vector2:
@@ -151,6 +160,9 @@ func _draw() -> void:
 	_draw_heroes(s, font, t)
 	_draw_warden(s, font, t)
 	_draw_charges(s, font, t)
+	_draw_fires(s, font, t)
+	if s.act == 3:
+		_draw_ashfall(t)
 	_draw_effects(font)
 	_draw_vignette()
 	if s.paused and not s.game_over:
@@ -169,6 +181,8 @@ func _draw_floor(s) -> void:
 			var base := Color(0.07, 0.06, 0.08).lerp(Color(0.1, 0.085, 0.11), n)
 			if s.act == 2:
 				base = Color(0.05, 0.07, 0.09).lerp(Color(0.07, 0.1, 0.12), n)
+			elif s.act == 3:
+				base = Color(0.07, 0.06, 0.06).lerp(Color(0.11, 0.09, 0.08), n)
 			draw_rect(r, base)
 			if s.act == 2 and _hash(x, y, 9) > 0.78 and not s.path_lookup.has(c):
 				# black water pooling in the mines
@@ -227,6 +241,8 @@ func _draw_path(s, t: float) -> void:
 			var slab := STONE.lerp(STONE_LIGHT, n * 0.6)
 			if s.act == 2:
 				slab = Color(0.17, 0.2, 0.24).lerp(Color(0.24, 0.28, 0.32), n * 0.6)
+			elif s.act == 3:
+				slab = Color(0.24, 0.22, 0.21).lerp(Color(0.32, 0.29, 0.27), n * 0.6)
 			if side:
 				slab = slab.darkened(0.25)
 			draw_rect(r, slab.darkened(0.35))
@@ -357,6 +373,10 @@ func _monster_shape(u: Dictionary, kind: String, p: Vector2, t: float) -> void:
 		"golem":
 			draw_rect(Rect2(p + Vector2(-7, -8), Vector2(14, 14)), BONE.darkened(0.2))
 			draw_circle(p + Vector2(0, -1), 3.0, Color(0.4, 1.0, 0.7, 0.7 + 0.3 * sin(t * 4.0)))
+		"ashen":
+			draw_circle(p, 5.5, Color(0.5, 0.48, 0.46))
+			draw_circle(p + Vector2(-1.8, -1), 1.1, Color(1, 0.55, 0.2))
+			draw_circle(p + Vector2(1.8, -1), 1.1, Color(1, 0.55, 0.2))
 		"drowned":
 			draw_circle(p, 5.5, Color(0.3, 0.5, 0.55))
 			draw_circle(p + Vector2(-1.8, -1), 1.1, Color(0.6, 1, 0.9))
@@ -431,6 +451,45 @@ func _draw_warden(s, font: Font, t: float) -> void:
 	draw_rect(Rect2(p + Vector2(-18, -26), Vector2(36, 4)), Color(0.1, 0.1, 0.15))
 	draw_rect(Rect2(p + Vector2(-18, -26), Vector2(36 * frac, 4)), Color(0.4, 0.85, 1.0))
 	draw_string(font, p + Vector2(-30, 28), Loc.t("WARDEN"), HORIZONTAL_ALIGNMENT_CENTER, 60, 9, col)
+
+
+## Act III: flames on burning halls (with the time left), ash where halls burned down.
+func _draw_fires(s, font: Font, t: float) -> void:
+	for key in s.ash:
+		var tile: int = key
+		if s.card_at(tile) == "" and not s.fires.has(tile):
+			var r := cell_rect(s.cell_of(tile)).grow(-6)
+			draw_rect(r, Color(0.12, 0.11, 0.1, 0.8))
+			for k in 5:
+				var p := r.position + Vector2(_hash(tile, k) * r.size.x, _hash(k, tile) * r.size.y)
+				draw_circle(p, 1.5, Color(0.9, 0.4, 0.15, 0.25 + 0.2 * sin(t * 2.0 + k)))
+	for key in s.fires:
+		var tile: int = key
+		var f: Dictionary = s.fires[tile]
+		var c := cell_center(s.cell_of(tile))
+		draw_rect(cell_rect(s.cell_of(tile)).grow(-2), Color(1.0, 0.35, 0.05, 0.12 + 0.06 * sin(t * 9.0 + tile)))
+		for k in 5:
+			var x := (k - 2) * 8.0
+			var h := 14.0 + 8.0 * sin(t * (7.0 + k) + tile * 1.7 + k)
+			var base := c + Vector2(x, 14)
+			draw_colored_polygon(PackedVector2Array([base + Vector2(-5, 0), base + Vector2(0, -h), base + Vector2(5, 0)]), Color(1.0, 0.45, 0.1, 0.8))
+			draw_colored_polygon(PackedVector2Array([base + Vector2(-2.5, 0), base + Vector2(0, -h * 0.55), base + Vector2(2.5, 0)]), Color(1.0, 0.85, 0.4, 0.9))
+		var left: float = f["left"]
+		var frac := clampf(left / D.FIRE_BURN, 0.0, 1.0)
+		draw_rect(Rect2(c + Vector2(-20, 19), Vector2(40, 3)), Color(0, 0, 0, 0.6))
+		draw_rect(Rect2(c + Vector2(-20, 19), Vector2(40 * frac, 3)), Color(1, 0.6, 0.2))
+
+
+## Act III: ash drifting down over the whole map.
+func _draw_ashfall(t: float) -> void:
+	var area := Vector2(D.GRID_W, D.GRID_H) * D.CELL
+	for i in 60:
+		var sx := _hash(i, 3) * area.x
+		var speed := 12.0 + _hash(i, 5) * 18.0
+		var y := fmod(_hash(i, 7) * area.y + t * speed, area.y)
+		var x := sx + sin(t * 0.8 + i) * 10.0
+		var glow := _hash(i, 11) > 0.85
+		draw_circle(D.MAP_OFFSET + Vector2(x, y), 1.6 if glow else 1.2, Color(1.0, 0.5, 0.2, 0.6) if glow else Color(0.7, 0.68, 0.65, 0.35))
 
 
 ## Brann's planted charges: a pulsing ring and a countdown, so the player can react.

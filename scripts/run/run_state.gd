@@ -375,6 +375,8 @@ func gain(resource: String, amount: int) -> void:
 	pouch[resource] = int(pouch.get(resource, 0)) + int(round(amount * mult))
 
 
+var fires := {}                # Act III: tile -> {"left": float, "spread": float}
+var ash := {}                  # tiles that burned down (visual only)
 var charges := []             # Brann's planted charges: {"tile": int, "fuse": float}
 var charge_timer := 0.0
 var threat_from := {}         # source -> attention gained (for balancing)

@@ -143,6 +143,22 @@ def blast():
     return norm(np.tanh((boom + debris + crack) * 2.0), 0.9)
 
 
+def ignite():
+    n = int(0.7 * SR)
+    t = np.arange(n) / SR
+    roar = M.lowpass(M.noise(n), 1800) * np.minimum(t * 12, 1.0) * np.exp(-t * 3.5)
+    crackle = (np.random.rand(n) > 0.995) * np.random.rand(n) * np.exp(-t * 4)
+    return norm(roar + crackle * 0.8, 0.8)
+
+
+def quench():
+    n = int(0.6 * SR)
+    t = np.arange(n) / SR
+    hiss = M.highpass(M.noise(n), 3500) * np.exp(-t * 5)
+    drop = np.sin(2 * np.pi * np.cumsum(500 * np.exp(-t * 8) + 120) / SR) * np.exp(-t * 14) * 0.5
+    return norm(hiss + drop, 0.7)
+
+
 def write(name, x):
     os.makedirs(OUT, exist_ok=True)
     from scipy.io import wavfile
@@ -158,5 +174,5 @@ def write(name, x):
 if __name__ == "__main__":
     for name, fn in [("hit", hit), ("warden_hit", warden_hit), ("death", death), ("devour", devour),
                      ("loot", loot), ("place", place), ("level", level), ("combo", combo),
-                     ("click", click), ("escape", escape), ("ability", ability), ("boss", boss), ("blast", blast)]:
+                     ("click", click), ("escape", escape), ("ability", ability), ("boss", boss), ("blast", blast), ("ignite", ignite), ("quench", quench)]:
         write(name, fn())

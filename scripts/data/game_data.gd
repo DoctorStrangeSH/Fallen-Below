@@ -73,7 +73,7 @@ const WARDENS := {
 		"xp_source": "Learns from every coin of gold harvested.",
 		"hp": 70.0, "dmg": 5.0, "def": 0.0, "speed": 1.5,
 		"slots": ["weapon", "weapon", "ring", "ring", "ring"],
-		"passive": "Hoard", "passive_desc": "+0.05 damage for every Gold in this run's harvest. Cursed Chests come twice as often.",
+		"passive": "Hoard", "passive_desc": "+0.03 damage for every Gold in this run's harvest. Cursed Chests come twice as often.",
 		"active": "Swallow", "active_desc": "Swallows a weakened traveler (below 40% HP) whole: devoured at once, double harvest.",
 		"cooldown": 18.0,
 		"style": "Two weapons, three rings. Grows rich, then grows cruel.",
@@ -125,7 +125,7 @@ const ABILITIES := {
 		"queens_blood": {"name": "Queen's Blood", "desc": "All her spiders are 50% stronger."},
 	},
 	"mimic": {
-		"gilded_teeth": {"name": "Gilded Teeth", "desc": "Hoard gives 50% more damage per Gold."},
+		"gilded_teeth": {"name": "Gilded Teeth", "desc": "Hoard gives 66% more damage per Gold."},
 		"wide_jaw": {"name": "Wide Jaw", "desc": "Swallow works on travelers below 60% HP."},
 		"coin_armor": {"name": "Coin Armor", "desc": "+1 defense for every 20 Gold harvested."},
 		"golden_bait": {"name": "Golden Bait", "desc": "Cursed Chests and Mimics deal double damage."},
@@ -167,6 +167,8 @@ const DIET := {
 	"mage": {"stat": "dmg", "amount": 0.3, "desc": "Arcanists make it crueler (+0.3 damage)"},
 	"miner": {"stat": "def", "amount": 0.15, "desc": "Miners make it harder (+0.15 defense)"},
 	"sapper": {"stat": "counter", "amount": 1.0, "desc": "Sappers make it quicker to strike back (+1% counter)"},
+	"zealot": {"stat": "dmg", "amount": 0.3, "desc": "Zealots feed its fury (+0.3 damage)"},
+	"censer": {"stat": "regen", "amount": 0.1, "desc": "Censer bearers soothe it (+0.1 regen)"},
 }
 
 # --- loop scaling (like Loop Hero): every patrol loop the Warden completes
@@ -206,11 +208,14 @@ const CARDS := {
 	# Act II cards (added to every deck in the Drowned Mines)
 	"cavein": {"name": "Cave-in", "kind": "path", "color": Color(0.55, 0.45, 0.35), "desc": "Trap. Collapses once: 15 dmg to the traveler and 2s stun. Then rubble."},
 	"drowned": {"name": "Drowned Crypt", "kind": "path", "color": Color(0.3, 0.55, 0.65), "desc": "Room. 2 Drowned, tougher than skeletons. Respawn daily."},
+	# Act III cards
+	"pyre": {"name": "Pyre", "kind": "path", "color": Color(0.95, 0.45, 0.15), "desc": "Trap. 8 dmg, then the tile bursts into flame. Fire spreads to your halls too!"},
+	"ashcrypt": {"name": "Ash Crypt", "kind": "path", "color": Color(0.55, 0.52, 0.5), "desc": "Room. 2 Ashen, immune to fire. This hall never burns and stops the flames."},
 	"jar": {"name": "Soul Jar", "kind": "instant", "color": Color(0.3, 0.55, 0.8), "desc": "Instant. +1 undead servant slot."},
 }
 ## Skeleton cap per room card (graveyards nearby add +1 each).
 const SKELETON_CAP := {"crypt": 2, "catacomb": 3, "necropolis": 4}
-const TRAP_DMG := {"spikes": 5.0, "grinder": 14.0, "chest": 6.0, "cavein": 15.0}
+const TRAP_DMG := {"spikes": 5.0, "grinder": 14.0, "chest": 6.0, "cavein": 15.0, "pyre": 8.0}
 const CAVEIN_STUN := 2.0
 const BAIT_CARDS := ["chest", "mimic"]
 const LURE_SHARE_LANTERN := 0.9
@@ -221,7 +226,7 @@ const BASE_DECK_SLOTS := 5
 
 ## Draw weights for cards in the deck.
 const CARD_WEIGHTS := {"crypt": 3, "spider": 3, "spikes": 3, "altar": 2, "graveyard": 2, "chest": 2, "jar": 1,
-	"cavein": 2, "drowned": 2}
+	"cavein": 2, "drowned": 2, "pyre": 2, "ashcrypt": 2}
 
 ## Travelers the dungeon lures below. `drop` is what their bodies give you.
 const HERO_CLASSES := {
@@ -238,6 +243,11 @@ const HERO_CLASSES := {
 		"dark": "Drowned Miner", "drop": {"gold": 3, "bones": 3}, "armor": 2.0, "act": 2},
 	"sapper": {"name": "Sapper", "hp": 22, "dmg": 6.0, "speed": 2.2, "color": Color(0.95, 0.45, 0.25),
 		"dark": "Blast Wraith", "drop": {"blood": 2, "gold": 2}, "disarms": true, "act": 2},
+	# Act III
+	"zealot": {"name": "Zealot", "hp": 30, "dmg": 6.0, "speed": 2.0, "color": Color(0.95, 0.75, 0.35),
+		"dark": "Burnt Martyr", "drop": {"blood": 3, "bones": 2}, "martyr": true, "act": 3},
+	"censer": {"name": "Censer Bearer", "hp": 34, "dmg": 3.5, "speed": 1.6, "color": Color(0.85, 0.85, 0.95),
+		"dark": "Smoke Wraith", "drop": {"bones": 3, "gold": 2}, "purifier": true, "act": 3},
 }
 const SAPPER_DISARM_CHANCE := 0.6
 
@@ -249,6 +259,8 @@ const LURES := {
 	"arcane": {"name": "Arcane Signs", "traveler": "mage", "desc": "Arcanists: deadly, may carry relics.", "building": "stones"},
 	"vein": {"name": "Rich Vein", "traveler": "miner", "desc": "Dwarf miners: armoured and slow, carry gold and bones.", "act": 2},
 	"shaft": {"name": "Open Shaft", "traveler": "sapper", "desc": "Sappers: disarm your traps, carry blood and gold.", "act": 2},
+	"martyr": {"name": "Martyr's Call", "traveler": "zealot", "desc": "Zealots: grow fiercer as companions fall, set their death place on fire. Carry blood.", "act": 3},
+	"incense": {"name": "Burning Incense", "traveler": "censer", "desc": "Censer bearers: their smoke burns your undead nearby. Carry bones and gold.", "act": 3},
 }
 
 const MONSTERS := {
@@ -258,6 +270,7 @@ const MONSTERS := {
 	"golem": {"name": "Bone Golem", "hp": 50, "dmg": 5.0, "color": Color(0.75, 0.95, 0.9)},
 	"mimic": {"name": "Mimic", "hp": 30, "dmg": 8.0, "color": Color(0.95, 0.55, 0.15)},
 	"drowned": {"name": "Drowned", "hp": 22, "dmg": 4.5, "color": Color(0.35, 0.6, 0.7)},
+	"ashen": {"name": "Ashen", "hp": 26, "dmg": 5.0, "color": Color(0.6, 0.57, 0.55), "fireproof": true},
 }
 
 # --- loot: gear for the Warden (Loop Hero style) ---
@@ -312,6 +325,8 @@ const ITEM_SLOTS := {
 	"mage": ["amulet", "ring", "weapon"],
 	"miner": ["armor", "shield", "weapon"],
 	"sapper": ["weapon", "ring", "amulet"],
+	"zealot": ["weapon", "amulet", "ring"],
+	"censer": ["amulet", "armor", "shield"],
 }
 const RARITIES := [
 	{"name": "Common", "mult": 1.0, "extras": 0, "weight": 60, "color": Color(0.8, 0.8, 0.8)},
@@ -425,8 +440,21 @@ const ACTS := {
 	1: {"name": "Act I: The Crypts", "boss": "Aurelia", "boss_title": "the Lightbringer", "boss_cls": "pilgrim",
 		"end_story": "act1_end", "power": 1.0, "boss_mult": 1.0, "harvest": 1.0, "item_bonus": 0},
 	2: {"name": "Act II: The Drowned Mines", "boss": "Brann", "boss_title": "the Delver King", "boss_cls": "miner",
-		"intro_story": "act2_intro", "end_story": "act2_end", "power": 1.45, "boss_mult": 1.3, "harvest": 1.6, "item_bonus": 2},
+		"intro_story": "act2_intro", "end_story": "act2_end", "power": 1.45, "boss_mult": 1.3, "harvest": 1.6, "item_bonus": 2,
+		"cards": ["cavein", "drowned"]},
+	3: {"name": "Act III: The Ash Cathedral", "boss": "Vael", "boss_title": "the Inquisitor", "boss_cls": "zealot",
+		"intro_story": "act3_intro", "end_story": "act3_end", "power": 1.95, "boss_mult": 1.6, "harvest": 2.2, "item_bonus": 4,
+		"cards": ["pyre", "ashcrypt"]},
 }
+const VAEL_IGNITE_EVERY := 7.0    # seconds between the halls Vael sets alight
+# Fire (Act III): burning halls hurt everyone on them, spread, then crumble to ash.
+const FIRE_BURN := 7.0            # seconds before a burning hall is destroyed
+const FIRE_SPREAD := 3.0          # after this long a fire may jump to the neighbouring halls
+const FIRE_SPREAD_CHANCE := 0.5
+const FIRE_DPS := 3.0             # damage per second to everyone on a burning tile
+const QUENCH_BLOOD := 3           # Blood from this run's harvest to put out one fire
+const PURIFY_DMG := 2.5           # censer smoke: damage to undead nearby per combat tick
+const MARTYR_FURY := 1.2          # zealots' damage multiplier when a companion falls
 const BRANN_CHARGE_EVERY := 6.0   # seconds between Brann's charges
 const BRANN_FUSE := 2.0           # warning time before a charge goes off
 const BRANN_BLAST := 30.0         # damage to everything on the tile
@@ -435,6 +463,19 @@ const BRANN_BLAST := 30.0         # damage to everything on the tile
 const WARDEN_TRUE_NAME := "Ren"
 
 const STORY := {
+	"act3_end": [
+		"Vael falls on the burning stone and does not try to rise. The flames do not touch her; she has lived in them too long.",
+		"\"You think you are a monster,\" she says. \"You are a prisoner. Before the Founders, this world had no sun. It had the Night: vast, gentle, alive.\"",
+		"\"They chained her beneath the mountain and taught her hunger, because a starving thing eats, and what she eats becomes light.\"\n\nThe dungeon is not a beast. It is the Night, in chains.",
+		"\"I wanted to burn her out completely,\" Vael whispers. \"One last great fire, and then eternal day. No more hunger. No more of you.\"\n\nShe smiles with cracked lips. \"The Archon would not allow it. He needs you hungry forever.\"",
+		"Far above the ash, at the top of the whitest tower, the Archon of Dawn keeps the key to the chains.\n\nRen feels the whole dungeon turn toward it, the way a sleeper turns toward a voice.\n\n(Act IV: The Heart is coming soon.)",
+	],
+	"act3_intro": [
+		"The Order stopped sending people to be eaten. Now it sends people to burn.\n\nAbove your door they have raised a cathedral of ash, and its bells toll day and night.",
+		"Its mistress is Inquisitor Vael. She has read Brann's ledgers to the last line and drawn the only conclusion a true believer could:\n\nif souls make the sun, then the more souls, the brighter the day.",
+		"Her zealots come down singing. When one falls, the others sing louder, and where he fell, the stone catches fire.",
+		"Fire spreads from hall to hall. Blood puts it out.\n\nDecide what you are willing to pay to keep your halls.",
+	],
 	"intro": [
 		"There is a door in the mountainside. Yesterday it was not there.\n\nIt never is, until the morning someone finds it.",
 		"Beyond it, steps worn hollow by a thousand feet. Below, the glint of gold and the rustle of a rumour: treasure, or a beast whose head is worth a fortune.\n\nTravelers always go down. No one ever climbs back up.",
@@ -471,7 +512,7 @@ const STORY := {
 		"Brann the Delver King sinks beneath the black water, his last charge clenched in his fist, the fuse never lit.",
 		"His pockets are full of dawnstone. In the dark it glows, and in the glow there are faces.\n\nPilgrims. Hunters. Children who followed a map with a little sun in the corner.",
 		"The sun of this world is not a star. It is a furnace. And every soul the dungeon has swallowed is coal the Order mines, weighs, and throws on the fire.",
-		"Far above, Inquisitor Vael turns the last page of the mine ledgers. She does not want to put out the furnace.\n\nShe wants to feed it everything beneath the mountain.\n\n(Act III: The Ash Cathedral is coming soon.)",
+		"Far above, Inquisitor Vael turns the last page of the mine ledgers. She does not want to put out the furnace.\n\nShe wants to feed it everything beneath the mountain.",
 	],
 }
 
@@ -483,6 +524,7 @@ const MEMORIES := [
 
 ## One-time story moments during runs, shown as narration over the map.
 const BEATS := {
+	"first_fire": "Smoke crawls along the vault. A hall is burning: click it to pour Blood on the flames before it falls to ash.",
 	"first_kill": "The first one falls. Somewhere deep below, the dark grows still, almost content. Almost.",
 	"first_raise": "The dead traveler rises and looks at the Warden for a long time, as if straining to remember where it has seen that face before.",
 	"first_escape": "One got away. Tonight a tavern will hear his tale. By morning, so will the Order.",
@@ -535,8 +577,37 @@ const BRANN_LINES := {
 	],
 }
 
+const VAEL_LINES := {
+	"arrive": [
+		"The bells fall silent all at once. In the silence, someone is singing.",
+		"Vael: \"I have read every ledger, beast. I know what you are worth to the sun.\"",
+		"Vael: \"Burn, my children. Let the light have all of it.\"",
+	],
+	"half": [
+		"Vael: \"You bleed darkness. How much of it is left in you? How much longer can you hold?\"",
+	],
+	"low": [
+		"Vael: \"Strange. I always pictured the end of the night as a victory. It feels like a funeral.\"",
+	],
+	"death": [
+		"Vael: \"Then let the Archon finish what I could not... or let you finish him.\"",
+	],
+}
+
 ## The Book of the Fallen: raised travelers give these pages in order, 4 per kind.
 const FRAGMENTS := {
+	"censer": [
+		"The incense is ground from dawnstone that has gone dark. The dead burn twice: once for the sun, once for the smoke.",
+		"My censer's smoke makes your servants scream. I used to think it was purification. It is recognition. They remember being burned.",
+		"In the oldest chapel there is a mural of the Founding: a woman made of stars, kneeling, and men with chains. They painted over her face.",
+		"The Archon has never seen the sun set. His tower is built so that it never can. He is afraid of what comes after evening.",
+	],
+	"zealot": [
+		"We sang the hymn of the Dawn all the way down. Nobody told us the hymn has a last verse that is only ever sung below.",
+		"The Inquisitor blessed us with ash on the forehead. Ash, she said, is what is left when something has given everything.",
+		"When my brother fell beside me, I felt nothing but joy. They had trained the grief out of us. I feel it now. It is very late.",
+		"Vael does not want to win. She wants it to be over. There is a difference, and the Archon knows it.",
+	],
 	"seeker": [
 		"I bought the map from a priest for three silver. It never crossed my mind to ask why a servant of the sun would sell the way to treasure.",
 		"Every map has a little sun drawn in the corner. I took it for the mapmaker's mark. Now I think it is the seal on a bill of sale.",
@@ -577,6 +648,14 @@ const FRAGMENTS := {
 
 ## Once a kind's pages are all collected, raised travelers mutter one of these.
 const WHISPERS := {
+	"censer": [
+		"They painted over her face.",
+		"The smoke remembers.",
+	],
+	"zealot": [
+		"The last verse is sung down here.",
+		"I feel it now.",
+	],
 	"seeker": [
 		"Ask who sells the maps up there.",
 		"I chose the wrong door. Then again, there was no other.",

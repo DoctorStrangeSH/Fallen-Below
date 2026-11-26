@@ -26,7 +26,7 @@ func _ready() -> void:
 	add_child(title)
 
 	act_box = HBoxContainer.new()
-	act_box.position = Vector2(700, 26)
+	act_box.position = Vector2(620, 26)
 	act_box.add_theme_constant_override("separation", 6)
 	add_child(act_box)
 
@@ -116,7 +116,7 @@ func _build_acts() -> void:
 		var on: bool = act_id == Meta.selected_act
 		var b := UI.button(Loc.t(D.ACTS[a]["name"]), Vector2(0, 38))
 		b.add_theme_font_size_override("font_size", 13)
-		b.custom_minimum_size.x = 260
+		b.custom_minimum_size.x = 204
 		b.disabled = not open
 		if on:
 			_style(b, Color(0.25, 0.14, 0.34), UI.ACCENT)

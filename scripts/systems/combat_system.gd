@@ -12,6 +12,7 @@ var s: RunState
 func tick() -> void:
 	_radiance()
 	_poison()
+	_purify()
 	run.warden.tick_regen(D.COMBAT_TICK)
 	var by_tile := {}
 	for h in s.heroes:
@@ -125,6 +126,24 @@ func _radiance() -> void:
 			for u in s.undead_at(a):
 				u["hp"] -= D.RADIANCE_DMG
 			s.tiles[a]["units"] = s.alive_units(a)
+
+
+## Act III censer bearers: their smoke burns undead on their tile and the tiles next to it.
+func _purify() -> void:
+	for h in s.heroes:
+		if h["gone"] or h["delay"] > 0.0 or not h.get("purifier", false):
+			continue
+		var t := s.tile_of(h)
+		var tiles: Array = [t] + s.path_neighbors(t)
+		for tt in tiles:
+			var hit := false
+			for u in s.alive_units(tt):
+				if u["undead"]:
+					u["hp"] -= D.PURIFY_DMG
+					hit = true
+			if hit:
+				s.tiles[tt]["units"] = s.alive_units(tt)
+				s.fx.emit("purify", tt, D.PURIFY_DMG)
 
 
 ## Vesh'ka's venom: poisoned travelers take 2 damage per tick.

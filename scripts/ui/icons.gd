@@ -109,6 +109,16 @@ static func paint(ci: CanvasItem, kind: String, c: Vector2, sz: float, col: Colo
 				var r := 8.0 if i % 2 == 0 else 3.0
 				pts.append(c + Vector2(cos(a), sin(a)) * r * k)
 			ci.draw_colored_polygon(pts, col)
+		"martyr":
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(0, -8) * k, c + Vector2(5, 1) * k, c + Vector2(3, 6) * k,
+				c + Vector2(-3, 6) * k, c + Vector2(-5, 1) * k]), Color(1.0, 0.4, 0.15, col.a))
+			ci.draw_line(c + Vector2(0, -6) * k, c + Vector2(0, 7) * k, col, 1.6 * k)
+			ci.draw_line(c + Vector2(-4, -2) * k, c + Vector2(4, -2) * k, col, 1.6 * k)
+		"incense":
+			ci.draw_circle(c + Vector2(0, 3) * k, 4.5 * k, col)
+			ci.draw_line(c + Vector2(0, -1) * k, c + Vector2(0, -8) * k, col.darkened(0.3), 1.2 * k)
+			ci.draw_arc(c + Vector2(4, -4) * k, 3 * k, PI, TAU, 8, Color(col, 0.5), 1.2 * k)
+			ci.draw_arc(c + Vector2(6, -8) * k, 2 * k, 0, PI, 8, Color(col, 0.4), 1.2 * k)
 		"crystal", "vein":
 			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(0, -8) * k, c + Vector2(5, -1) * k, c + Vector2(0, 8) * k, c + Vector2(-5, -1) * k]), col)
 			ci.draw_line(c + Vector2(0, -8) * k, c + Vector2(0, 8) * k, col.lightened(0.4), 1.0 * k)
@@ -160,6 +170,17 @@ static func card_glyph(ci: CanvasItem, card: String, c: Vector2, t: float) -> vo
 			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-6, -11), c + Vector2(6, -11), c + Vector2(8, 7), c + Vector2(-8, 7)]), col.darkened(0.3))
 			var wave := sin(t * 2.0) * 2.0
 			ci.draw_rect(Rect2(c + Vector2(-14, 2 + wave), Vector2(28, 6)), Color(0.15, 0.4, 0.55, 0.7))
+		"pyre":
+			for k in 3:
+				ci.draw_line(c + Vector2(-12, 6 - k * 4), c + Vector2(12, 2 - k * 4), Color(0.45, 0.3, 0.18), 3.0)
+			var fl := 4.0 * sin(t * 8.0)
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-8, -4), c + Vector2(0, -18 - fl), c + Vector2(8, -4)]), Color(1.0, 0.45, 0.1))
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-4, -4), c + Vector2(0, -12 - fl * 0.5), c + Vector2(4, -4)]), Color(1.0, 0.85, 0.4))
+		"ashcrypt":
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-6, -11), c + Vector2(6, -11), c + Vector2(8, 7), c + Vector2(-8, 7)]), col.darkened(0.2))
+			ci.draw_line(c + Vector2(-3, -4), c + Vector2(3, -4), Color(1, 0.55, 0.2), 1.5)
+			for k in 3:
+				ci.draw_circle(c + Vector2(-10 + k * 10, 10), 2.0, Color(0.7, 0.68, 0.65, 0.6))
 		"chest", "mimic":
 			ci.draw_rect(Rect2(c + Vector2(-11, -12), Vector2(22, 14)), col.darkened(0.2))
 			ci.draw_rect(Rect2(c + Vector2(-11, -12), Vector2(22, 4)), col.lightened(0.2))

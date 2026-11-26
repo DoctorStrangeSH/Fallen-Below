@@ -62,7 +62,7 @@ func _ready() -> void:
 			else:
 				v.add_child(UI.label("· · ·", 14, Color(1, 1, 1, 0.2)))
 		if have == 0 and int(cls.get("act", 1)) > 1:
-			v.add_child(UI.label(Loc.t("They only come down in the Drowned Mines (Act II)."), 12, Color(1, 0.6, 0.4, 0.7)))
+			v.add_child(UI.label(Loc.t("They only come down in %s.") % Loc.t(D.ACTS[int(cls["act"])]["name"]), 12, Color(1, 0.6, 0.4, 0.7)))
 		elif have == 0 and D.LURES.values().any(func(lu): return lu["traveler"] == kind and lu.has("building")):
 			v.add_child(UI.label(Loc.t("Lure them first: build their shrine in the Lair."), 12, Color(1, 0.6, 0.4, 0.7)))
 

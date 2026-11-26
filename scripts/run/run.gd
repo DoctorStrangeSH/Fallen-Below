@@ -9,6 +9,7 @@ const CombatSystem = preload("res://scripts/systems/combat_system.gd")
 const CardSystem = preload("res://scripts/systems/card_system.gd")
 const SoulSystem = preload("res://scripts/systems/soul_system.gd")
 const LootSystem = preload("res://scripts/systems/loot_system.gd")
+const FireSystem = preload("res://scripts/systems/fire_system.gd")
 const RunView = preload("res://scripts/run/run_view.gd")
 const RunHud = preload("res://scripts/run/run_hud.gd")
 
@@ -19,6 +20,7 @@ var combat: CombatSystem
 var cards: CardSystem
 var souls: SoulSystem
 var loot: LootSystem
+var fire: FireSystem
 var view: RunView
 var hud: RunHud
 
@@ -40,6 +42,8 @@ func _ready() -> void:
 	_add_system(souls, "Souls")
 	loot = LootSystem.new()
 	_add_system(loot, "Loot")
+	fire = FireSystem.new()
+	_add_system(fire, "Fire")
 	warden.setup(Meta.warden_hp(), Meta.warden_dmg())
 
 	view = RunView.new()
@@ -62,7 +66,7 @@ func _ready() -> void:
 
 const FX_SOUND := {"hit_hero": "hit", "hit_unit": "hit", "hit_warden": "warden_hit", "death": "death",
 	"devour": "devour", "loot": "loot", "place": "place", "level": "level", "combo": "combo",
-	"escape": "escape", "ability": "ability", "boss": "boss", "blast": "blast", "disarm": "click"}
+	"escape": "escape", "ability": "ability", "boss": "boss", "blast": "blast", "disarm": "click", "ignite": "ignite", "quench": "quench", "ash": "death"}
 
 
 func _on_fx(kind: String, target, amount: float) -> void:
@@ -89,6 +93,7 @@ func _process(delta: float) -> void:
 		_new_day()
 	heroes_sys.move(delta)
 	heroes_sys.boss_tick(delta)
+	fire.tick(delta)
 	warden.move(delta)
 	warden.tick(delta)
 	state.combat_timer += delta
@@ -157,7 +162,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif mb.button_index == MOUSE_BUTTON_LEFT:
 		if state.is_blocked():
 			return
-		cards.place_selected(view.mouse_cell())
+		# a click on a burning hall quenches it; otherwise it places the selected card
+		var cell: Vector2i = view.mouse_cell()
+		if state.path_lookup.has(cell) and fire.quench(state.path_lookup[cell]):
+			return
+		cards.place_selected(cell)
 
 
 ## One-time story moment (saved across runs).

@@ -383,6 +383,9 @@ func _build_dungeon(v: VBoxContainer) -> void:
 	lure_row.add_theme_constant_override("separation", 4)
 	v.add_child(lure_row)
 	for id in D.LURES:
+		var lure_act := int(D.LURES[id].get("act", 0))
+		if lure_act != 0 and lure_act != run.state.act:
+			continue  # other acts' lures never show up here
 		var lure_id: String = id
 		var b := _icon_button(lure_id, Vector2(47, 36), 18)
 		b.pressed.connect(func():
@@ -636,8 +639,8 @@ func rebuild_lures() -> void:
 func _lure_hint(id: String) -> String:
 	var def: Dictionary = D.LURES[id]
 	if not Meta.available_lures(run.state.act).has(id):
-		if int(def.get("act", 1)) > run.state.act:
-			return Loc.t("%s\nOnly in the Drowned Mines (Act II).") % Loc.t(def["name"])
+		if def.has("act") and int(def["act"]) != run.state.act:
+			return Loc.t("%s\nOnly in %s.") % [Loc.t(def["name"]), Loc.t(D.ACTS[int(def["act"])]["name"])]
 		return Loc.t("%s\nLocked. Build it in the Lair.") % Loc.t(def["name"])
 	return Loc.t("%s\n%s\n\nDecides who comes down tomorrow.") % [Loc.t(def["name"]), Loc.t(def["desc"])]
 
@@ -907,6 +910,8 @@ func _map_lines(s, lines: Array) -> void:
 			lines.append("%s: %s" % [Loc.t(D.CARDS[card]["name"]), Loc.t(D.CARDS[card]["desc"])])
 		elif t >= s.loop_size:
 			lines.append(Loc.t("Side passage (the Warden never walks here)"))
+		if s.fires.has(t):
+			lines.append(Loc.t("Burning: %ds left. Click to quench (%d Blood).") % [int(ceil(s.fires[t]["left"])), D.QUENCH_BLOOD])
 		if s.forks.has(t):
 			lines.append(Loc.t("Fork: each traveler picks a branch by personality."))
 		if s.warden_at(t):

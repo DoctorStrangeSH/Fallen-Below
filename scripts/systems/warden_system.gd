@@ -247,9 +247,10 @@ func recompute() -> void:
 		var def: Dictionary = D.STATS[k]
 		if def.has("cap"):
 			st[k] = minf(st[k], float(def["cap"]))
-	var gold := int(s.pouch.get("gold", 0))
+	# the hoard counts gold as Act I would: richer acts do not snowball the Mimic
+	var gold: float = float(s.pouch.get("gold", 0)) / float(s.act_def()["harvest"])
 	if is_kind("mimic"):
-		st["dmg"] += (0.08 if has("gilded_teeth") else 0.05) * gold
+		st["dmg"] += (0.05 if has("gilded_teeth") else 0.03) * gold
 	st["dmg"] += float(w.get("bonus_dmg", 0.0))
 	if has("thick_marrow"):
 		st["hp"] *= 1.25

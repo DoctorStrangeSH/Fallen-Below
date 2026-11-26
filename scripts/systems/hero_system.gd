@@ -21,6 +21,7 @@ func make_hero(cls: String, hero_name: String, mult: float, party: int, idx: int
 		"laps": 0, "revenge": false, "boss": false, "gone": false, "death_tile": 0,
 		"trait": "", "baited": false, "half_said": false, "poison": 0,
 		"armor": float(base.get("armor", 0.0)), "disarms": bool(base.get("disarms", false)),
+		"martyr": bool(base.get("martyr", false)), "purifier": bool(base.get("purifier", false)),
 	}
 	if s.rng.randf() < D.TRAIT_CHANCE:
 		set_trait(h, D.TRAITS.keys()[s.rng.randi() % D.TRAITS.size()])
@@ -49,7 +50,9 @@ func spawn_party() -> void:
 	s.next_party_id += 1
 	var size := party_size(s.day)
 	var mult: float = (1.0 + D.LOOP_POWER * (s.loop - 1)) * float(s.act_def()["power"])
-	var wanderers: Array = D.HERO_CLASSES.keys().filter(func(c): return int(D.HERO_CLASSES[c].get("act", 1)) <= s.act)
+	var wanderers: Array = D.HERO_CLASSES.keys().filter(func(c):
+		var a := int(D.HERO_CLASSES[c].get("act", 0))
+		return a == 0 or a == s.act)
 	var lured: String = D.LURES[s.lure]["traveler"]
 	var names: Array = []
 	for i in size:
@@ -76,12 +79,15 @@ func spawn_boss() -> void:
 	h["max_hp"] = h["hp"]
 	h["dmg"] = (D.BOSS_DMG + s.loop * D.BOSS_DMG_PER_LOOP) * bm
 	h["disarms"] = false
+	h["martyr"] = false
 	h["speed"] = 1.3
 	h["color"] = Color(1, 1, 1)
 	for line in boss_lines()["arrive"]:
 		s.narrate.emit(Loc.t(line))
 	if s.act == 1:
 		s.add_log(Loc.t("%s descends. Her radiance burns undead nearby: meet her with the Warden and the living.") % s.hero_name(h))
+	elif s.act == 3:
+		s.add_log(Loc.t("%s descends. She sets your halls alight: click a burning hall to quench it with Blood.") % s.hero_name(h))
 	else:
 		s.add_log(Loc.t("%s descends. He plants charges on your halls: watch for the red marks and rebuild.") % s.hero_name(h))
 	s.combo_found.emit(Loc.t("%s DESCENDS") % s.hero_name(h).to_upper())
@@ -235,6 +241,9 @@ func _on_enter_tile(h: Dictionary, t: int) -> void:
 	elif card == "chest":
 		h["stun"] = D.CHEST_STUN
 		h["baited"] = true
+	elif card == "pyre":
+		s.tiles[t]["card"] = ""
+		run.fire.ignite(t)
 	elif card == "cavein":
 		h["stun"] = D.CAVEIN_STUN
 		s.tiles[t]["card"] = ""  # the tunnel is spent
@@ -283,7 +292,11 @@ func _kill(h: Dictionary) -> void:
 	_harvest(h)
 	run.cards.draw_card()
 	run.loot.drop_from(h)
+	if h["martyr"] and not h["boss"]:
+		run.fire.ignite(h["death_tile"])
 	for x in s.heroes:
+		if x["party"] == h["party"] and x["martyr"] and not x["gone"]:
+			x["dmg"] *= D.MARTYR_FURY
 		if x["party"] == h["party"] and x["trait"] == "loyal":
 			x["dmg"] += 2.0
 			x["revenge"] = true
@@ -337,12 +350,20 @@ func _find_relic(h: Dictionary) -> void:
 
 
 func boss_lines() -> Dictionary:
-	return D.BRANN_LINES if s.act == 2 else D.BOSS_LINES
+	match s.act:
+		2:
+			return D.BRANN_LINES
+		3:
+			return D.VAEL_LINES
+	return D.BOSS_LINES
 
 
 ## Act II champion: Brann plants charges on nearby halls; after a short fuse they blow up
 ## the card, the monsters on it, and anyone standing there (the Warden too).
 func boss_tick(delta: float) -> void:
+	if s.act == 3:
+		_vael_tick(delta)
+		return
 	if s.act != 2:
 		return
 	var boss = null
@@ -372,6 +393,30 @@ func boss_tick(delta: float) -> void:
 	var t: int = options[s.rng.randi() % options.size()]
 	s.charges.append({"tile": t, "fuse": D.BRANN_FUSE})
 	s.add_log(Loc.t("Brann plants a charge!"))
+
+
+## Act III champion: Vael sets a nearby hall on fire every few seconds.
+func _vael_tick(delta: float) -> void:
+	var boss = null
+	for h in s.heroes:
+		if h["boss"] and not h["gone"] and h["delay"] <= 0.0:
+			boss = h
+	if boss == null:
+		return
+	s.charge_timer += delta
+	if s.charge_timer < D.VAEL_IGNITE_EVERY:
+		return
+	s.charge_timer = 0.0
+	var here: int = boss["cur"]
+	var options: Array = []
+	for i in s.loop_size:
+		var dist: int = mini(absi(i - here), s.loop_size - absi(i - here))
+		if dist <= 4 and run.fire.can_burn(i) and s.card_at(i) != "":
+			options.append(i)
+	if options.is_empty():
+		return
+	run.fire.ignite(options[s.rng.randi() % options.size()])
+	s.add_log(Loc.t("Vael: \"Burn.\""))
 
 
 func _detonate(t: int, boss) -> void:
