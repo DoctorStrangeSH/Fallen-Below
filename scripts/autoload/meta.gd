@@ -26,6 +26,9 @@ var seen := []           # one-time story beats and memories already shown
 
 var music_volume := 0.7
 var sfx_volume := 0.8
+var lure_level := 0      # last loudness used (0 Whisper, 1 Call, 2 Feast)
+var auto_pause := true   # planning mode: time stops while holding a card or an item
+var fullscreen := false
 var language := ""
 var no_save := false     # set by the test bot so it never touches the real save
 
@@ -427,7 +430,7 @@ func save_game() -> void:
 		"version": SAVE_VERSION, "res": res, "buildings": buildings, "relics": relics,
 		"deck": deck, "loadout": loadout, "runs": runs, "wins": wins, "best_day": best_day,
 		"total_kills": total_kills, "discovered": discovered, "seen_intro": seen_intro,
-		"acts_cleared": acts_cleared, "lure": lure, "warden": warden_id, "act": selected_act, "music_volume": music_volume, "sfx_volume": sfx_volume, "language": language, "fragments": fragments, "seen": seen,
+		"acts_cleared": acts_cleared, "lure": lure, "warden": warden_id, "act": selected_act, "music_volume": music_volume, "sfx_volume": sfx_volume, "auto_pause": auto_pause, "lure_level": lure_level, "fullscreen": fullscreen, "language": language, "fragments": fragments, "seen": seen,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -479,6 +482,10 @@ func load_game() -> void:
 	selected_act = int(d.get("act", 1))
 	music_volume = clampf(float(d.get("music_volume", 0.7)), 0.0, 1.0)
 	sfx_volume = clampf(float(d.get("sfx_volume", 0.8)), 0.0, 1.0)
+	auto_pause = bool(d.get("auto_pause", true))
+	lure_level = int(d.get("lure_level", 0))
+	fullscreen = bool(d.get("fullscreen", false))
+	apply_window()
 	language = str(d.get("language", ""))
 	fragments = {}
 	var fr = d.get("fragments", {})
@@ -516,3 +523,20 @@ func reset_save() -> void:
 	seen = []
 	_sanitize_loadout()
 	save_game()
+
+
+func apply_window() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
+
+
+## Whisper and Call are always there; the Feast needs the Bait Workshop at level 2.
+func max_lure_level() -> int:
+	return 2 if level("bait_workshop") >= 2 else 1
+
+
+## Harvest a lure loudness costs per day (the Bait Workshop at level 3 cuts it by 30%).
+func lure_cost(lv: int) -> int:
+	var base: int = D.LURE_LEVELS[lv]["cost"]
+	return int(ceil(base * (0.7 if level("bait_workshop") >= 3 else 1.0)))

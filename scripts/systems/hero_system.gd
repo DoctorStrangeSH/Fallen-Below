@@ -10,7 +10,7 @@ var run  # run.gd
 var s: RunState
 
 
-func make_hero(cls: String, hero_name: String, mult: float, party: int, idx: int) -> Dictionary:
+func make_hero(cls: String, hero_name: String, mult: float, party: int, idx: int, roll_trait: bool = true) -> Dictionary:
 	var base: Dictionary = D.HERO_CLASSES[cls]
 	var hp: float = round(base["hp"] * mult)
 	var h := {
@@ -23,8 +23,9 @@ func make_hero(cls: String, hero_name: String, mult: float, party: int, idx: int
 		"armor": float(base.get("armor", 0.0)), "disarms": bool(base.get("disarms", false)),
 		"martyr": bool(base.get("martyr", false)), "purifier": bool(base.get("purifier", false)),
 		"blessed": bool(base.get("blessed", false)), "lantern": bool(base.get("lantern", false)),
+		"loot": 1.0,
 	}
-	if s.rng.randf() < D.TRAIT_CHANCE:
+	if roll_trait and s.rng.randf() < D.TRAIT_CHANCE:
 		set_trait(h, D.TRAITS.keys()[s.rng.randi() % D.TRAITS.size()])
 	h["nxt"] = choose_next(h, 0)
 	s.next_hero_id += 1
@@ -45,26 +46,63 @@ static func party_size(day: int) -> int:
 	return clampi(1 + day / 3, 1, 4)
 
 
-## Most of each party answers your lure; the rest are random wanderers.
-func spawn_party() -> void:
-	var pid := s.next_party_id
-	s.next_party_id += 1
-	var size := party_size(s.day)
-	var mult: float = (1.0 + D.LOOP_POWER * (s.loop - 1)) * float(s.act_def()["power"])
+## Tomorrow's party, rolled from a fixed seed so it only changes when the lure changes.
+## Shown at the door and in the HUD; spawn_party() brings exactly these travelers.
+func roll_forecast(for_day: int = -1) -> void:
+	if for_day < 0:
+		for_day = s.day + 1
+	var lv: Dictionary = D.LURE_LEVELS[s.lure_level]
+	var r := RandomNumberGenerator.new()
+	r.seed = hash([s.forecast_seed, for_day, s.lure, s.lure_level])
 	var wanderers: Array = D.HERO_CLASSES.keys().filter(func(c):
 		var a := int(D.HERO_CLASSES[c].get("act", 0))
 		return a == 0 or a == s.act)
 	var lured: String = D.LURES[s.lure]["traveler"]
-	var names: Array = []
-	for i in size:
+	var share: float = lv["share"] + (D.LURE_SHARE_BONUS_LANTERN if s.has_relic("lantern_of_lies") else 0.0)
+	s.forecast = []
+	for i in party_size(for_day) + int(lv["extra"]):
 		var cls := lured
-		var share := D.LURE_SHARE_LANTERN if s.has_relic("lantern_of_lies") else D.LURE_SHARE
-		if s.rng.randf() >= share:
-			cls = wanderers[s.rng.randi() % wanderers.size()]
+		if cls == "" or r.randf() >= share:
+			cls = wanderers[r.randi() % wanderers.size()]
+		var tr := ""
+		if r.randf() < D.TRAIT_CHANCE:
+			tr = D.TRAITS.keys()[r.randi() % D.TRAITS.size()]
+		s.forecast.append({"cls": cls, "trait": tr})
+
+
+## The dungeon calls: pay for the lure's loudness, then tomorrow's forecast comes down.
+func spawn_party() -> void:
+	var pid := s.next_party_id
+	s.next_party_id += 1
+	var cost: int = Meta.lure_cost(s.lure_level)
+	var price: String = D.LURES[s.lure]["price"]
+	var chosen: int = s.lure_level
+	if cost > 0:
+		if int(s.pouch[price]) >= cost:
+			s.pouch[price] = int(s.pouch[price]) - cost
+			s.fx.emit("lure_paid", 0, float(cost))
+		else:  # cannot pay today: whisper just this once, keep the choice for tomorrow
+			s.add_log(Loc.t("Not enough %s for the %s: the dungeon only whispers today.") % [
+				Loc.t(D.RESOURCES[price]["name"]), Loc.t(D.LURE_LEVELS[s.lure_level]["name"])])
+			s.lure_level = 0
+	roll_forecast(s.day)
+	var lv: Dictionary = D.LURE_LEVELS[s.lure_level]
+	var mult: float = (1.0 + D.LOOP_POWER * (s.loop - 1)) * float(s.act_def()["power"]) * float(lv["power"])
+	var wounded: bool = D.LURES[s.lure].get("wounded", false)
+	var names: Array = []
+	for i in s.forecast.size():
+		var f: Dictionary = s.forecast[i]
 		var hero_name: String = Loc.t(D.FIRST_NAMES[s.rng.randi() % D.FIRST_NAMES.size()])
-		make_hero(cls, hero_name, mult, pid, i)
-		names.append(Loc.t(D.HERO_CLASSES[cls]["name"]))
+		var h := make_hero(f["cls"], hero_name, mult, pid, i, false)
+		if f["trait"] != "":
+			set_trait(h, f["trait"])
+		h["loot"] = float(lv["loot"]) * (D.WOUNDED_LOOT if wounded else 1.0)
+		if wounded:
+			h["hp"] = round(h["max_hp"] * D.WOUNDED_HP)
+		names.append(Loc.t(D.HERO_CLASSES[f["cls"]]["name"]))
 	s.add_log(Loc.t("Day %d (loop %d): lured below: %s.") % [s.day, s.loop, ", ".join(names)])
+	s.lure_level = chosen
+	roll_forecast()
 
 
 func spawn_boss() -> void:
@@ -328,7 +366,7 @@ func _harvest(h: Dictionary) -> void:
 	var times := 2 if h.get("swallowed", false) else 1
 	var gold_before := int(s.pouch.get("gold", 0))
 	for k in drop:
-		s.gain(k, int(drop[k]) * times)
+		s.gain(k, int(round(int(drop[k]) * times * float(h.get("loot", 1.0)))))
 	if h["baited"] and s.has_relic("gilded_bait"):
 		s.gain("gold", 2)
 	if h["boss"]:

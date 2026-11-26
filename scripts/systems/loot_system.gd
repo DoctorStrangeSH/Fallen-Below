@@ -103,18 +103,31 @@ static func describe(item: Dictionary) -> String:
 # ---------------------------------------------------------- inventory actions
 
 ## Click a trophy: the Warden puts it on. Whatever it wore in that slot goes back to the bag.
-func equip(i: int) -> void:
+func equip(i: int, at: int = -1) -> void:
 	if s.game_over or i < 0 or i >= s.inventory.size():
 		return
 	var item: Dictionary = s.inventory[i]
 	if not run.warden.can_wear(item["slot"]):
 		s.add_log(Loc.t("%s cannot wear that.") % s.warden["name"])
 		return
+	if at >= 0 and str(s.warden["slots"][at]) != str(item["slot"]):
+		return  # dropped on a slot of another kind
 	s.inventory.remove_at(i)
-	var old: Dictionary = run.warden.equip(item)
+	var old: Dictionary = run.warden.equip(item, at)
 	if not old.is_empty():
 		s.inventory.append(old)
 	s.add_log(Loc.t("The Warden takes %s.") % item["name"])
+	s.inventory_changed.emit()
+
+
+## Drag a worn item back into the bag.
+func unequip(idx: int) -> void:
+	if s.game_over or s.inventory.size() >= D.INVENTORY_MAX:
+		return
+	var item: Dictionary = run.warden.unequip(idx)
+	if item.is_empty():
+		return
+	s.inventory.append(item)
 	s.inventory_changed.emit()
 
 

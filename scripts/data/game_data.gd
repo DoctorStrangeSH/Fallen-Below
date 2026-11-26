@@ -23,7 +23,7 @@ const TRAIT_CHANCE := 0.6
 const ITEM_DROP_CHANCE := 0.45
 const INVENTORY_MAX := 6
 const CHEST_STUN := 1.5
-const LURE_SHARE := 0.7           # share of each party that follows your lure
+const LURE_SHARE_BONUS_LANTERN := 0.2  # Lantern of Lies: more of each party follows the lure
 const RADIANCE_DMG := 4.0         # Champion burns undead nearby each combat tick
 const BOSS_HP := 420.0            # tuned with tests/bot.gd (lair none/mid/full)
 const BOSS_HP_PER_LOOP := 60.0
@@ -223,7 +223,7 @@ const SKELETON_CAP := {"crypt": 2, "catacomb": 3, "necropolis": 4}
 const TRAP_DMG := {"spikes": 5.0, "grinder": 14.0, "chest": 6.0, "cavein": 15.0, "pyre": 8.0}
 const CAVEIN_STUN := 2.0
 const BAIT_CARDS := ["chest", "mimic"]
-const LURE_SHARE_LANTERN := 0.9
+
 
 ## Deck building: cards known from the start; the rest are unlocked in the Lair.
 const START_CARDS := ["crypt", "spider", "spikes", "altar", "jar"]
@@ -262,18 +262,34 @@ const HERO_CLASSES := {
 const SAPPER_DISARM_CHANCE := 0.6
 
 ## Lures decide who answers the dungeon's call. Some are unlocked in the Lair.
+## `price` is what a louder lure costs per day, paid from this run's harvest.
 const LURES := {
-	"gold": {"name": "Glint of Gold", "traveler": "seeker", "desc": "Treasure seekers: fast and greedy, carry gold."},
-	"rumors": {"name": "Monster Rumors", "traveler": "hunter", "desc": "Monster hunters: tough, carry bones and good gear."},
-	"holy": {"name": "Holy Fire", "traveler": "pilgrim", "desc": "Pilgrims: heal each other, burn undead, carry blood.", "building": "shrine"},
-	"arcane": {"name": "Arcane Signs", "traveler": "mage", "desc": "Arcanists: deadly, may carry relics.", "building": "stones"},
-	"vein": {"name": "Rich Vein", "traveler": "miner", "desc": "Dwarf miners: armoured and slow, carry gold and bones.", "act": 2},
-	"shaft": {"name": "Open Shaft", "traveler": "sapper", "desc": "Sappers: disarm your traps, carry blood and gold.", "act": 2},
-	"martyr": {"name": "Martyr's Call", "traveler": "zealot", "desc": "Zealots: grow fiercer as companions fall, set their death place on fire. Carry blood.", "act": 3},
-	"oath": {"name": "Oath of Dawn", "traveler": "knight", "desc": "Dawn knights: heavily armoured, your undead deal them half damage. Carry bones, gold, good gear.", "act": 4},
-	"lastlight": {"name": "Last Light", "traveler": "lamplighter", "desc": "Lamplighters: fast, leave after 2 loops, but their death wakes the Night (+15). Carry blood and gold.", "act": 4},
-	"incense": {"name": "Burning Incense", "traveler": "censer", "desc": "Censer bearers: their smoke burns your undead nearby. Carry bones and gold.", "act": 3},
+	"gold": {"name": "Glint of Gold", "traveler": "seeker", "price": "gold", "desc": "Treasure seekers: fast and greedy, carry gold."},
+	"rumors": {"name": "Monster Rumors", "traveler": "hunter", "price": "bones", "desc": "Monster hunters: tough, carry bones and good gear."},
+	"trail": {"name": "Blood Trail", "traveler": "", "price": "blood", "wounded": true, "building": "bait_workshop",
+		"desc": "Anyone may follow the trail, but they arrive wounded (60% HP) and carry half as much."},
+	"holy": {"name": "Holy Fire", "traveler": "pilgrim", "price": "blood", "desc": "Pilgrims: heal each other, burn undead, carry blood.", "building": "shrine"},
+	"arcane": {"name": "Arcane Signs", "traveler": "mage", "price": "blood", "desc": "Arcanists: deadly, may carry relics.", "building": "stones"},
+	"vein": {"name": "Rich Vein", "traveler": "miner", "price": "gold", "desc": "Dwarf miners: armoured and slow, carry gold and bones.", "act": 2},
+	"shaft": {"name": "Open Shaft", "traveler": "sapper", "price": "blood", "desc": "Sappers: disarm your traps, carry blood and gold.", "act": 2},
+	"martyr": {"name": "Martyr's Call", "traveler": "zealot", "price": "blood", "desc": "Zealots: grow fiercer as companions fall, set their death place on fire. Carry blood.", "act": 3},
+	"oath": {"name": "Oath of Dawn", "traveler": "knight", "price": "gold", "desc": "Dawn knights: heavily armoured, your undead deal them half damage. Carry bones, gold, good gear.", "act": 4},
+	"lastlight": {"name": "Last Light", "traveler": "lamplighter", "price": "blood", "desc": "Lamplighters: fast, leave after 2 loops, but their death wakes the Night (+15). Carry blood and gold.", "act": 4},
+	"incense": {"name": "Burning Incense", "traveler": "censer", "price": "bones", "desc": "Censer bearers: their smoke burns your undead nearby. Carry bones and gold.", "act": 3},
 }
+
+## How loudly the dungeon calls. Louder costs harvest every day, brings more and richer prey,
+## and makes them stronger. `need` is the Bait Workshop level that unlocks it.
+const LURE_LEVELS := [
+	{"name": "Whisper", "share": 0.5, "extra": 0, "power": 1.0, "loot": 1.0, "cost": 0, "need": 0,
+		"desc": "Free. Half of tomorrow's party follows the lure."},
+	{"name": "Call", "share": 0.85, "extra": 0, "power": 1.0, "loot": 1.25, "cost": 4, "need": 0,
+		"desc": "Nearly everyone follows the lure, and they carry a quarter more."},
+	{"name": "Feast", "share": 1.0, "extra": 1, "power": 1.1, "loot": 1.6, "cost": 10, "need": 2,
+		"desc": "Everyone follows the lure and one more comes. They are stronger, but carry 60% more."},
+]
+const WOUNDED_HP := 0.6
+const WOUNDED_LOOT := 0.5
 
 const MONSTERS := {
 	"skeleton": {"name": "Skeleton", "hp": 12, "dmg": 3.0, "color": Color(0.85, 0.85, 0.78)},
@@ -417,6 +433,9 @@ const BUILDINGS := {
 	"stones": {"name": "Whispering Stones", "desc": "Unlocks the Arcane Signs lure (arcanists).", "pos": Vector2(0.16, 0.1),
 		"requires": {"shrine": 1},
 		"cost": [{"blood": 25, "gold": 25}]},
+	"bait_workshop": {"name": "Bait Workshop", "desc": "Lv1: Blood Trail lure. Lv2: the Feast. Lv3: louder lures cost 30% less, and the forecast shows travelers' traits.",
+		"pos": Vector2(0.72, 0.9), "requires": {"den": 1},
+		"cost": [{"gold": 20, "bones": 15}, {"gold": 40, "blood": 30}, {"gold": 70, "bones": 40, "blood": 40}]},
 	"jars": {"name": "Trophy Hall", "desc": "+1 undead servant slot per level.", "pos": Vector2(0.5, 0.86),
 		"requires": {"den": 1},
 		"cost": [{"bones": 25, "blood": 5}, {"bones": 60, "blood": 25}]},
@@ -445,7 +464,7 @@ const RELICS := {
 	"gilded_cage": {"name": "Gilded Cage", "desc": "Epic and Legendary gear drops twice as often."},
 	"patient_hunger": {"name": "Patient Hunger", "desc": "Travelers need 4 loops instead of 3 to find the way out."},
 	"sweet_rot": {"name": "Sweet Rot", "desc": "Your undead servants burst when they fall: 6 damage to travelers on their tile."},
-	"lantern_of_lies": {"name": "Lantern of Lies", "desc": "90% of each party follows your lure instead of 70%."},
+	"lantern_of_lies": {"name": "Lantern of Lies", "desc": "20% more of each party follows your lure."},
 	"hollow_echo": {"name": "Hollow Echo", "desc": "+0.2 Warden damage for every page in the Book of the Fallen."},
 }
 

@@ -84,7 +84,7 @@ func _add_system(sys: Node, sys_name: String) -> void:
 
 
 func _process(delta: float) -> void:
-	if state.is_blocked():
+	if state.time_stopped():
 		hud.refresh()
 		return
 	delta *= state.time_scale
@@ -132,7 +132,7 @@ func _new_day() -> void:
 	if state.day % D.SEAL_EVERY == 0:
 		beat("tut_week")
 		state.add_log(Loc.t("The week ends: the dungeon may sleep now and keep everything."))
-		hud.show_banner("WEEK'S END: SLEEP TO KEEP 100%")
+		hud.show_banner(Loc.t("WEEK'S END: SLEEP TO KEEP 100%"))
 	state.hand_changed.emit()
 
 
@@ -140,8 +140,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key != null and key.pressed and not key.echo:
 		match key.keycode:
-			KEY_SPACE, KEY_ESCAPE:
+			KEY_SPACE:
 				toggle_pause()
+			KEY_ESCAPE:
+				open_settings()
 			KEY_1:
 				set_speed(1.0)
 			KEY_2:
@@ -207,6 +209,19 @@ func _debug_key(code: Key) -> void:
 			warden._complete_loop()
 
 
+## Esc: settings over a paused run (language stays fixed mid-run).
+func open_settings() -> void:
+	if hud.has_node("Settings"):
+		return
+	var was_paused: bool = state.paused
+	state.paused = true
+	var panel: Control = load("res://scripts/ui/settings_panel.gd").new()
+	panel.name = "Settings"
+	panel.allow_language = false
+	panel.closed.connect(func(): state.paused = was_paused)
+	hud.add_child(panel)
+
+
 func toggle_pause() -> void:
 	if state.game_over:
 		return
@@ -225,7 +240,17 @@ func set_lure(id: String) -> void:
 	if Meta.available_lures(state.act).has(id):
 		state.lure = id
 		Meta.set_lure(id)
-		state.add_log(Loc.t("New lure: %s. Tomorrow's travelers will follow it.") % Loc.t(D.LURES[id]["name"]))
+		heroes_sys.roll_forecast()
+
+
+## How loudly the dungeon calls tomorrow (paid when the day starts).
+func set_lure_level(lv: int) -> void:
+	if lv < 0 or lv > Meta.max_lure_level():
+		return
+	state.lure_level = lv
+	Meta.lure_level = lv
+	Meta.save_game()
+	heroes_sys.roll_forecast()
 
 
 ## Warden slain (win = false) or champion slain (win = true).

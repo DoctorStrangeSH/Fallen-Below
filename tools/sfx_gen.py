@@ -8,7 +8,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(__file__))
-import music_gen as M  # noqa: E402
+import synth_basics as M  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "audio", "sfx")
 SR = M.SR

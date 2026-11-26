@@ -134,6 +134,13 @@ static func paint(ci: CanvasItem, kind: String, c: Vector2, sz: float, col: Colo
 		"pick", "shaft":
 			ci.draw_line(c + Vector2(-5, 7) * k, c + Vector2(3, -3) * k, Color(0.6, 0.45, 0.3), 2.2 * k)
 			ci.draw_arc(c + Vector2(4, 0) * k, 7 * k, PI * 1.05, PI * 1.75, 10, col, 2.6 * k)
+		"person":
+			ci.draw_circle(c + Vector2(0, -4.5) * k, 3.2 * k, col)
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-4.5, 7) * k, c + Vector2(-3, -0.5) * k,
+				c + Vector2(3, -0.5) * k, c + Vector2(4.5, 7) * k]), col)
+		"trail":
+			for i in 4:
+				ci.draw_circle(c + Vector2(-6 + i * 4, 5 - i * 3.5) * k, (1.6 + (i % 2) * 0.8) * k, col)
 		"lock":
 			ci.draw_arc(c + Vector2(0, -2) * k, 4 * k, PI, TAU, 10, col, 2.0 * k)
 			ci.draw_rect(Rect2(c + Vector2(-5.5, -2) * k, Vector2(11, 9) * k), col)

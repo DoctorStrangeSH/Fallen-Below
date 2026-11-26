@@ -49,6 +49,9 @@ var loot_boxes: Array = []
 # dungeon levers
 var lure_buttons := {}
 var lure_name: Label
+var loud_buttons: Array = []
+var forecast_row: HBoxContainer
+var forecast_key := ""
 var devour_btn: Button
 var raise_btn: Button
 var pouch_labels := {}
@@ -72,6 +75,14 @@ var narration_queue: Array = []
 var narration_time := 0.0
 
 # hover hints: whichever control the mouse is over supplies the tooltip text
+# drag & drop: loot -> gear slot, gear -> bag, card -> map
+var drag_kind := ""       # "", "loot", "gear", "card"
+var drag_index := -1
+var drag_from := Vector2.ZERO
+var drag_active := false
+var drag_ghost: Control
+var loot_row: HBoxContainer
+
 var hint_owner: Control = null
 var hint_text: Callable
 
@@ -241,7 +252,7 @@ func _build_top_bar() -> void:
 	pause_icon.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pause_btn.add_child(pause_icon)
 	pause_btn.pressed.connect(func(): run.toggle_pause())
-	_hint(pause_btn, func(): return Loc.t("Pause (Space)"))
+	_hint(pause_btn, func(): return Loc.t("Planning pause (Space): time stops, everything else still works.\nEsc: settings."))
 	row.add_child(pause_btn)
 	speed_btn = _small_button("x1", 40)
 	speed_btn.pressed.connect(func(): run.cycle_speed())
@@ -340,6 +351,7 @@ func _build_warden(v: VBoxContainer) -> void:
 		gear_row.add_child(box)
 		gear_boxes.append(box)
 		var idx: int = i
+		box.gui_input.connect(func(ev: InputEvent): _press(ev, "gear", idx))
 		_hint(box, func(): return _gear_hint(idx))
 
 	# active ability
@@ -372,13 +384,13 @@ func _build_warden(v: VBoxContainer) -> void:
 	# loot bag
 	loot_title = _header("")
 	v.add_child(loot_title)
-	var loot_row := HBoxContainer.new()
+	loot_row = HBoxContainer.new()
 	loot_row.add_theme_constant_override("separation", 4)
 	v.add_child(loot_row)
 	for i in D.INVENTORY_MAX:
 		var b := _icon_button("", Vector2(47, 44), 22)
 		var idx: int = i
-		b.pressed.connect(func(): run.loot.equip(idx))
+		b.button_down.connect(func(): _begin("loot", idx))
 		b.gui_input.connect(func(ev: InputEvent):
 			var mb := ev as InputEventMouseButton
 			if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
@@ -415,6 +427,26 @@ func _build_dungeon(v: VBoxContainer) -> void:
 		_hint(b, func(): return _lure_hint(lure_id))
 		lure_row.add_child(b)
 		lure_buttons[lure_id] = b
+
+	# how loudly to call: Whisper (free), Call, Feast (paid from the harvest each day)
+	var loud_row := HBoxContainer.new()
+	loud_row.add_theme_constant_override("separation", 4)
+	v.add_child(loud_row)
+	for i in D.LURE_LEVELS.size():
+		var lv_i: int = i
+		var b := _small_button("", INNER_W / 3.0 - 3)
+		b.add_theme_font_size_override("font_size", 12)
+		b.pressed.connect(func(): run.set_lure_level(lv_i))
+		_hint(b, func(): return _loud_hint(lv_i))
+		loud_row.add_child(b)
+		loud_buttons.append(b)
+	# tomorrow's party
+	forecast_row = HBoxContainer.new()
+	forecast_row.add_theme_constant_override("separation", 2)
+	forecast_row.mouse_filter = Control.MOUSE_FILTER_STOP
+	forecast_row.custom_minimum_size.y = 22
+	v.add_child(forecast_row)
+	_hint(forecast_row, _forecast_hint)
 
 	# souls: two halves of one switch
 	v.add_child(_header(Loc.t("Souls of the fallen  [R]")))
@@ -590,6 +622,104 @@ func _next_narration() -> void:
 
 
 ## Narration runs on real time, so it also reads fine while the game is paused.
+## Mouse down on a gear slot (not a Button, so it needs gui_input).
+func _press(ev: InputEvent, kind: String, idx: int) -> void:
+	var mb := ev as InputEventMouseButton
+	if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+		_begin(kind, idx)
+
+
+func _begin(kind: String, idx: int) -> void:
+	if run.state.is_blocked():
+		return
+	drag_kind = kind
+	drag_index = idx
+	drag_from = get_viewport().get_mouse_position()
+	drag_active = false
+
+
+## Follows the mouse once it has moved far enough; a short press stays a plain click.
+func _input(event: InputEvent) -> void:
+	if drag_kind == "":
+		return
+	var s = run.state
+	var mm := event as InputEventMouseMotion
+	if mm != null and not drag_active and mm.position.distance_to(drag_from) > 8.0:
+		_start_drag()
+	if mm != null and drag_active and drag_ghost != null:
+		drag_ghost.position = mm.position - drag_ghost.size / 2.0
+	var mb := event as InputEventMouseButton
+	if mb == null or mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+		return
+	var kind := drag_kind
+	var idx := drag_index
+	var was_drag := drag_active
+	_end_drag()
+	if not was_drag:
+		match kind:  # plain clicks keep their old meaning
+			"loot":
+				run.loot.equip(idx)
+			"card":
+				run.cards.use_card(idx)
+		return
+	get_viewport().set_input_as_handled()
+	var at := mb.position
+	match kind:
+		"loot":
+			for g in gear_boxes.size():
+				if (gear_boxes[g] as Control).get_global_rect().has_point(at):
+					run.loot.equip(idx, g)
+					return
+		"gear":
+			if loot_row.get_global_rect().grow(6).has_point(at):
+				run.loot.unequip(idx)
+		"card":
+			var cell: Vector2i = run.view.mouse_cell()
+			if s.in_grid(cell) and Rect2(D.MAP_OFFSET, Vector2(D.GRID_W, D.GRID_H) * D.CELL).has_point(at):
+				s.selected = idx
+				run.cards.place_selected(cell)
+			s.selected = -1
+			s.hand_changed.emit()
+
+
+func _start_drag() -> void:
+	var s = run.state
+	var kind := "card:" + str(s.hand[drag_index]) if drag_kind == "card" else ""
+	var col := Color(1, 1, 1)
+	if drag_kind == "loot":
+		if drag_index >= s.inventory.size():
+			drag_kind = ""
+			return
+		var item: Dictionary = s.inventory[drag_index]
+		kind = str(item["slot"])
+		col = D.RARITIES[item["rarity"]]["color"]
+	elif drag_kind == "gear":
+		var gear: Dictionary = s.warden["gear"]
+		if not gear.has(drag_index):
+			drag_kind = ""
+			return
+		kind = str(gear[drag_index]["slot"])
+		col = D.RARITIES[gear[drag_index]["rarity"]]["color"]
+	drag_active = true
+	s.holding = true
+	if drag_kind == "card":
+		s.selected = drag_index  # the map shows where it would go
+	drag_ghost = Icon.make(kind, 40 if drag_kind == "card" else 28, col)
+	drag_ghost.size = Vector2(80, 60) if drag_kind == "card" else Vector2(44, 44)
+	drag_ghost.modulate.a = 0.85
+	drag_ghost.animated = true
+	add_child(drag_ghost)
+
+
+func _end_drag() -> void:
+	drag_kind = ""
+	drag_active = false
+	run.state.holding = false
+	if drag_ghost != null:
+		drag_ghost.queue_free()
+		drag_ghost = null
+
+
 func _process(delta: float) -> void:
 	if narration_time > 0.0:
 		narration_time -= delta
@@ -633,7 +763,7 @@ func rebuild_hand() -> void:
 		c.queue_free()
 	for i in s.hand.size():
 		var btn := _card_button(s.hand[i], i == s.selected)
-		btn.pressed.connect(func(): run.cards.use_card(i))
+		btn.button_down.connect(func(): _begin("card", i))
 		hand_box.add_child(btn)
 
 
@@ -654,6 +784,89 @@ func rebuild_lures() -> void:
 			ic.set_icon(id, Icons.color_of(id) if picked else Color(0.85, 0.8, 0.95, 0.65))
 		_style_slot(b, Color(0.3, 0.2, 0.08) if picked else SLOT_BG, Color(1, 0.8, 0.4) if picked else Color(0.3, 0.25, 0.38))
 	lure_name.text = Loc.t(D.LURES[s.lure]["name"]) if D.LURES.has(s.lure) else ""
+	_refresh_loudness()
+
+
+func _refresh_loudness() -> void:
+	var s = run.state
+	var price: String = D.LURES[s.lure]["price"]
+	for i in loud_buttons.size():
+		var b: Button = loud_buttons[i]
+		var locked: bool = i > Meta.max_lure_level()
+		var cost: int = Meta.lure_cost(i)
+		var name: String = Loc.t(D.LURE_LEVELS[i]["name"])
+		b.text = name if cost == 0 else "%s %d" % [name, cost]
+		if locked:
+			b.text = name
+		b.disabled = locked
+		var on: bool = i == s.lure_level
+		_style_slot(b, Color(0.3, 0.2, 0.08) if on else SLOT_BG, Color(1, 0.8, 0.4) if on else Color(0.3, 0.25, 0.38))
+		var ic: Control = b.get_node_or_null("Price")
+		if ic == null:
+			ic = Icon.make(price, 12)
+			ic.name = "Price"
+			ic.position = Vector2(4, 7)
+			ic.size = Vector2(16, 16)
+			b.add_child(ic)
+		ic.visible = cost > 0 and not locked
+		ic.set_icon(price, Icons.color_of(price))
+		if locked:
+			var lk: Control = b.get_node_or_null("Lock")
+			if lk == null:
+				lk = Icon.make("lock", 11, Color(1, 1, 1, 0.35))
+				lk.name = "Lock"
+				lk.position = Vector2(4, 7)
+				lk.size = Vector2(16, 16)
+				b.add_child(lk)
+
+
+func _loud_hint(i: int) -> String:
+	var s = run.state
+	var def: Dictionary = D.LURE_LEVELS[i]
+	if i > Meta.max_lure_level():
+		return Loc.t("%s\nLocked: Bait Workshop level 2 in the Lair.") % Loc.t(def["name"])
+	var price: String = D.LURES[s.lure]["price"]
+	var t := "%s\n%s" % [Loc.t(def["name"]), Loc.t(def["desc"])]
+	var cost: int = Meta.lure_cost(i)
+	if cost > 0:
+		t += Loc.t("\n\nCosts %d %s from this run's harvest at the start of each day.") % [cost, Loc.t(D.RESOURCES[price]["name"])]
+	return t
+
+
+func _forecast_hint() -> String:
+	var s = run.state
+	var lines: Array = [Loc.t("Tomorrow's party:")]
+	var show_traits: bool = Meta.level("bait_workshop") >= 3
+	for f in s.forecast:
+		var cls: Dictionary = D.HERO_CLASSES[f["cls"]]
+		var drop: Dictionary = cls["drop"]
+		var carry: Array = []
+		for k in drop:
+			carry.append("%d %s" % [int(drop[k]), Loc.t(D.RESOURCES[k]["name"])])
+		var tr := ""
+		if show_traits and f["trait"] != "":
+			tr = " [%s]" % Loc.t(D.TRAITS[f["trait"]]["name"])
+		lines.append("• %s%s: %s" % [Loc.t(cls["name"]), tr, ", ".join(carry)])
+	if D.LURES[s.lure].get("wounded", false):
+		lines.append(Loc.t("They come wounded and carry half as much."))
+	return "\n".join(lines)
+
+
+func _refresh_forecast() -> void:
+	var s = run.state
+	var key := str(s.forecast) + str(s.lure_level)
+	if key == forecast_key:
+		return
+	forecast_key = key
+	for c in forecast_row.get_children():
+		c.queue_free()
+	forecast_row.add_child(_header(Loc.t("Tomorrow")))
+	var sp := Control.new()
+	sp.custom_minimum_size.x = 6
+	forecast_row.add_child(sp)
+	for f in s.forecast:
+		var col: Color = D.HERO_CLASSES[f["cls"]]["color"]
+		forecast_row.add_child(Icon.make("person", 15, col))
 
 
 func _lure_hint(id: String) -> String:
@@ -687,7 +900,7 @@ func _loot_hint(i: int) -> String:
 	if i >= s.inventory.size():
 		return Loc.t("Empty. Gear drops from the travelers you kill.")
 	var item: Dictionary = s.inventory[i]
-	return Loc.t("%s  (%s, level %d)\n%s\n\nWearing now: %s\n\nClick: wear  ·  RMB: throw away") % [item["name"], Loc.t(str(item["slot"]).capitalize()),
+	return Loc.t("%s  (%s, level %d)\n%s\n\nWearing now: %s\n\nClick or drag onto a slot: wear  ·  RMB: throw away") % [item["name"], Loc.t(str(item["slot"]).capitalize()),
 		int(item["level"]), LootSystem.describe(item).replace(", ", "\n"), _worn_text(item["slot"])]
 
 
@@ -767,6 +980,8 @@ func refresh() -> void:
 	active_btn.text = (Loc.t("[Q] %s") % Loc.t(wdef["active"])) if cd <= 0.0 else (Loc.t("[Q] %s  %ds") % [Loc.t(wdef["active"]), int(ceil(cd))])
 	active_btn.disabled = cd > 0.0 or s.game_over
 
+	_refresh_forecast()
+	_refresh_loudness()
 	if night_btn != null:
 		night_bar.value = s.night
 		var full: bool = s.night >= D.NIGHT_MAX
@@ -826,7 +1041,8 @@ func _gear_hint(i: int) -> String:
 	if not gear.has(i):
 		return Loc.t("%s: empty") % Loc.t(slot.capitalize())
 	var it: Dictionary = gear[i]
-	return "%s  (%s)\n%s" % [it["name"], Loc.t(slot.capitalize()), LootSystem.describe(it).replace(", ", "\n")]
+	return "%s  (%s)\n%s\n\n%s" % [it["name"], Loc.t(slot.capitalize()), LootSystem.describe(it).replace(", ", "\n"),
+		Loc.t("Drag into the bag to take it off.")]
 
 
 func show_end(outcome: String, payout: Dictionary, pct: float, kept: Array, lost: Array) -> void:

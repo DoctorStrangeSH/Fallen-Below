@@ -49,6 +49,9 @@ var day_timer := 0.0
 var combat_timer := 0.0
 var jar_cap := 2           # undead servant slots
 var lure := "gold"
+var lure_level := 0            # 0 Whisper, 1 Call, 2 Feast
+var forecast: Array = []       # tomorrow's party: [{"cls": String, "trait": String}]
+var forecast_seed := 0
 var raise_souls := false   # soul stance: false = Warden devours, true = raise as servant
 var loop := 1              # patrol loops completed by the Warden + 1; scales travelers and loot
 var level_choices := []    # ability ids offered on level up (the game waits while non-empty)
@@ -73,6 +76,8 @@ func setup(jars: int, weights: Dictionary, equipped: Array, start_lure: String) 
 	jar_cap = jars
 	card_weights = weights
 	lure = start_lure
+	lure_level = clampi(Meta.lure_level, 0, Meta.max_lure_level())
+	forecast_seed = rng.randi()
 	_build_map()
 
 
@@ -396,8 +401,20 @@ func seal_pct() -> float:
 	return D.SEAL_WEEK_PCT if day % D.SEAL_EVERY == 0 else D.SEAL_EARLY_PCT
 
 
+## The player cannot act (run over, or an ability choice is open).
 func is_blocked() -> bool:
-	return game_over or paused or not level_choices.is_empty()
+	return game_over or not level_choices.is_empty()
+
+
+var holding := false  # the player is dragging a card or an item (set by the HUD)
+
+
+## Time stands still: paused (planning), blocked, or auto-paused while the player holds
+## a card or an item (planning mode, like Loop Hero; can be turned off in Settings).
+func time_stopped() -> bool:
+	if is_blocked() or paused:
+		return true
+	return Meta.auto_pause and (selected >= 0 or holding)
 
 
 func in_grid(c: Vector2i) -> bool:

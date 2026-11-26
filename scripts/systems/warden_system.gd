@@ -217,9 +217,13 @@ func slot_for(slot_type: String) -> int:
 	return first
 
 
-## Puts an item on the Warden. Returns the item it replaced (or {}).
-func equip(item: Dictionary) -> Dictionary:
+## Puts an item on the Warden (into gear slot `at`, or the best matching one).
+## Returns the item it replaced (or {}).
+func equip(item: Dictionary, at: int = -1) -> Dictionary:
+	var slots: Array = s.warden["slots"]
 	var idx := slot_for(item["slot"])
+	if at >= 0 and at < slots.size() and slots[at] == item["slot"]:
+		idx = at
 	if idx < 0:
 		return item  # cannot wear it: hand it straight back
 	var gear: Dictionary = s.warden["gear"]
@@ -227,6 +231,17 @@ func equip(item: Dictionary) -> Dictionary:
 	gear[idx] = item
 	recompute()
 	return old
+
+
+## Takes off the item in gear slot `idx` (returns it, or {} if the slot was empty).
+func unequip(idx: int) -> Dictionary:
+	var gear: Dictionary = s.warden["gear"]
+	if not gear.has(idx):
+		return {}
+	var item: Dictionary = gear[idx]
+	gear.erase(idx)
+	recompute()
+	return item
 
 
 ## stats = base + diet + gear, with caps on chance stats.

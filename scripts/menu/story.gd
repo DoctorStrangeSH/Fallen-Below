@@ -29,11 +29,23 @@ func _ready() -> void:
 	hint.position = Vector2(0, 640)
 	hint.size = Vector2(1280, 30)
 	add_child(hint)
+	_add_skip()
 
 	if pages.is_empty():
 		_finish.call_deferred()
 	else:
 		_show_page()
+
+
+var skip_btn: Button
+
+
+func _add_skip() -> void:
+	skip_btn = UI.button(Loc.t("Skip"), Vector2(140, 38))
+	skip_btn.position = Vector2(1110, 660)
+	skip_btn.add_theme_font_size_override("font_size", 14)
+	skip_btn.pressed.connect(_finish)
+	add_child(skip_btn)
 
 
 func _show_page() -> void:
@@ -42,7 +54,10 @@ func _show_page() -> void:
 	create_tween().tween_property(text_label, "modulate:a", 1.0, 0.8)
 
 
-func _unhandled_input(event: InputEvent) -> void:
+## _input, not _unhandled_input: the full-screen background would swallow mouse clicks.
+func _input(event: InputEvent) -> void:
+	if finished:
+		return
 	var key := event as InputEventKey
 	if key != null and key.pressed and not key.echo:
 		if key.keycode == KEY_ESCAPE:
@@ -52,6 +67,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var mb := event as InputEventMouseButton
 	if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+		if skip_btn != null and skip_btn.get_global_rect().has_point(mb.position):
+			return  # the skip button handles this click
+		get_viewport().set_input_as_handled()
 		_next()
 
 

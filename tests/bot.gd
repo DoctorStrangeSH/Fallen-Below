@@ -21,6 +21,7 @@ var lure := "gold"
 var sleep_mode := ""
 var shot_path := ""
 var shot_day := 6
+var loud := 1        # lure loudness: 0 Whisper, 1 Call, 2 Feast
 var lair_mode := ""   # none | mid | full: simulate a fresh, half-built or finished Lair
 var results: Array = []
 var current: Node = null
@@ -48,6 +49,8 @@ func _ready() -> void:
 				shot_day = int(kv[1])
 			"shot_night":
 				shot_night = true
+			"loud":
+				loud = int(kv[1])
 			"noquench":
 				quench = false
 			"hover":
@@ -66,6 +69,7 @@ func _ready() -> void:
 				Meta.selected_act = int(kv[1])
 	rng.seed = 12345
 	Meta.no_save = true
+	Meta.auto_pause = false
 	# make every Warden and lure available to the bot (does not touch buildings permanently)
 	Meta.warden_id = warden_id
 	Meta.lure = lure
@@ -84,7 +88,10 @@ func _ready() -> void:
 		if lair_mode == "none":
 			Meta.buildings = {}
 		Meta.deck = D.START_CARDS.duplicate()
-	print("BOT: %d runs, warden=%s, lure=%s, lair=%s" % [runs_total, warden_id, lure, lair_mode])
+	Meta.lure_level = loud
+	if loud >= 2 and Meta.level("bait_workshop") < 2:
+		Meta.buildings["bait_workshop"] = 2
+	print("BOT: %d runs, warden=%s, lure=%s, lair=%s, loud=%d" % [runs_total, warden_id, lure, lair_mode, loud])
 	_start_run()
 
 

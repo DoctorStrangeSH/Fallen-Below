@@ -13,7 +13,6 @@ var veins: Array = []
 func _ready() -> void:
 	Music.play("menu")
 	UI.background(self)
-	var tip := UI.hover_tip(self)
 
 	# the heart, with veins crawling out across the right half of the screen
 	heart_view = Control.new()
@@ -43,42 +42,19 @@ func _ready() -> void:
 		var path: String = pair[1]
 		b.pressed.connect(func(): get_tree().change_scene_to_file(path))
 		buttons.add_child(b)
+	var settings := UI.button(Loc.t("Settings"), Vector2(300, 46))
+	settings.pressed.connect(func():
+		var panel: Control = load("res://scripts/ui/settings_panel.gd").new()
+		panel.closed.connect(func():
+			if panel.language_changed:
+				get_tree().reload_current_scene()
+		)
+		add_child(panel)
+	)
+	buttons.add_child(settings)
 	var quit := UI.button(Loc.t("Quit"), Vector2(300, 46))
 	quit.pressed.connect(func(): get_tree().quit())
 	buttons.add_child(quit)
-
-	# settings: one compact row
-	var settings := HBoxContainer.new()
-	settings.position = Vector2(80, 560)
-	settings.add_theme_constant_override("separation", 8)
-	add_child(settings)
-	var music := _setting(Loc.t("Music %d%%") % int(Meta.music_volume * 100.0))
-	music.pressed.connect(func():
-		var steps: Array = [0.0, 0.35, 0.7, 1.0]
-		var i := steps.find(snappedf(Meta.music_volume, 0.05))
-		Meta.music_volume = steps[(i + 1) % steps.size()] if i >= 0 else 0.7
-		Meta.save_game()
-		music.text = Loc.t("Music %d%%") % int(Meta.music_volume * 100.0)
-	)
-	settings.add_child(music)
-	var sound := _setting(Loc.t("Sound %d%%") % int(Meta.sfx_volume * 100.0))
-	sound.pressed.connect(func():
-		var steps: Array = [0.0, 0.4, 0.8, 1.0]
-		var i := steps.find(snappedf(Meta.sfx_volume, 0.05))
-		Meta.sfx_volume = steps[(i + 1) % steps.size()] if i >= 0 else 0.8
-		Meta.save_game()
-		sound.text = Loc.t("Sound %d%%") % int(Meta.sfx_volume * 100.0)
-	)
-	settings.add_child(sound)
-	var lang := _setting(str(Loc.LANGUAGES[Loc.lang]))
-	lang.pressed.connect(func():
-		Loc.next_language()
-		get_tree().reload_current_scene()
-	)
-	settings.add_child(lang)
-	tip.bind(music, func(): return Loc.t("Music volume"))
-	tip.bind(sound, func(): return Loc.t("Sound effects volume"))
-	tip.bind(lang, func(): return Loc.t("Language"))
 
 	# what the dungeon has gathered so far
 	var stats := HBoxContainer.new()
@@ -97,13 +73,6 @@ func _ready() -> void:
 	relics.add_child(UI.label("%d/%d" % [Meta.relics.size(), D.RELICS.size()], 15, Color(0.85, 0.7, 1.0)))
 	stats.add_child(relics)
 	stats.add_child(UI.label(Loc.t("Runs %d  ·  Travelers taken %d") % [Meta.runs, Meta.total_kills], 14, Color(1, 1, 1, 0.45)))
-
-
-func _setting(text: String) -> Button:
-	var b := UI.button(text, Vector2(0, 34))
-	b.add_theme_font_size_override("font_size", 13)
-	b.custom_minimum_size.x = 96
-	return b
 
 
 func _make_veins() -> void:

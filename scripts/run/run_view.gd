@@ -109,6 +109,8 @@ func add_fx(kind: String, target, amount: float) -> void:
 			_float(pos + Vector2(0, -14), "-%d" % D.QUENCH_BLOOD, Color(0.95, 0.25, 0.3), 13)
 		"ash":
 			_burst(pos, Color(0.5, 0.48, 0.45), 30.0)
+		"lure_paid":
+			_float(pos + Vector2(0, -44), "-%d" % int(amount), Color(1, 0.8, 0.45), 13)
 		"nightfall":
 			_burst(pos, Color(0.4, 0.35, 0.95), 160.0)
 		"sunburst":
@@ -164,6 +166,7 @@ func _draw() -> void:
 	_draw_units(s, t)
 	_draw_heroes(s, font, t)
 	_draw_warden(s, font, t)
+	_draw_lure(s, t)
 	_draw_charges(s, font, t)
 	_draw_fires(s, font, t)
 	_draw_night(s, t)
@@ -171,9 +174,22 @@ func _draw() -> void:
 		_draw_ashfall(t)
 	_draw_effects(font)
 	_draw_vignette()
-	if s.paused and not s.game_over:
-		var vr := get_viewport_rect()
-		draw_string(font, Vector2(D.MAP_OFFSET.x, vr.size.y * 0.42), Loc.t("PAUSED"), HORIZONTAL_ALIGNMENT_CENTER, D.GRID_W * D.CELL, 40, Color(1, 1, 1, 0.8))
+	if s.time_stopped() and not s.is_blocked():
+		_draw_planning(s, font)
+
+
+## Planning: a cool frame around the map and a quiet label; everything still works.
+func _draw_planning(s, font: Font) -> void:
+	var area := Rect2(D.MAP_OFFSET, Vector2(D.GRID_W, D.GRID_H) * D.CELL)
+	draw_rect(area, Color(0.05, 0.1, 0.2, 0.12))
+	draw_rect(area.grow(-2), Color(0.55, 0.75, 1.0, 0.6), false, 3.0)
+	var text := Loc.t("PLANNING") if s.paused else Loc.t("PLANNING (auto)")
+	var hint := Loc.t("Time stands still: place cards, swap gear, change the lure. Space to continue.")
+	draw_string_outline(font, D.MAP_OFFSET + Vector2(0, 30), text, HORIZONTAL_ALIGNMENT_CENTER, area.size.x, 22, 5, Color(0, 0, 0, 0.8))
+	draw_string(font, D.MAP_OFFSET + Vector2(0, 30), text, HORIZONTAL_ALIGNMENT_CENTER, area.size.x, 22, Color(0.75, 0.88, 1.0))
+	if s.paused:
+		draw_string_outline(font, D.MAP_OFFSET + Vector2(0, 52), hint, HORIZONTAL_ALIGNMENT_CENTER, area.size.x, 13, 4, Color(0, 0, 0, 0.8))
+		draw_string(font, D.MAP_OFFSET + Vector2(0, 52), hint, HORIZONTAL_ALIGNMENT_CENTER, area.size.x, 13, Color(1, 1, 1, 0.7))
 
 
 func _draw_floor(s) -> void:
@@ -280,6 +296,31 @@ func _draw_door(center: Vector2, t: float) -> void:
 	draw_circle(center + Vector2(0, -14), 12.0, Color(0.28, 0.16, 0.08))
 	draw_rect(door, Color(0.28, 0.16, 0.08))
 	draw_rect(Rect2(center + Vector2(-3, -6), Vector2(6, 14)), Color(1.0, 0.75, 0.35, 0.7 * flick))
+
+
+## The lure itself, set out by the door: it glows louder with the lure's loudness,
+## and tomorrow's party waits beside it as small silhouettes.
+func _draw_lure(s, t: float) -> void:
+	var door := cell_center(s.cell_of(0))
+	var p := door + Vector2(0, -30)
+	var lv: int = s.lure_level
+	var col: Color = Icons.color_of(s.lure) if Icons.COLORS.has(s.lure) else Color(1, 0.8, 0.45)
+	var pulse := 0.5 + 0.5 * sin(t * (2.0 + lv * 1.5))
+	for i in 3 + lv * 2:
+		draw_circle(p, 10.0 + i * 4.0 + pulse * 3.0, Color(col, (0.05 + 0.03 * lv) * (1.0 - i * 0.12)))
+	if lv == 2:  # the feast throws sparks
+		for k in 6:
+			var a := t * 1.5 + k * TAU / 6.0
+			draw_circle(p + Vector2(cos(a), sin(a)) * (16.0 + 4.0 * sin(t * 3.0 + k)), 1.6, Color(col, 0.8))
+	Icons.paint(self, s.lure, p + Vector2(0, -2.0 * pulse), 16.0 + 2.0 * lv, Color(col.lightened(0.2), 0.95))
+	# tomorrow's travelers, waiting
+	var n: int = s.forecast.size()
+	for i in n:
+		var f: Dictionary = s.forecast[i]
+		var c: Color = D.HERO_CLASSES[f["cls"]]["color"]
+		var q := door + Vector2(-((n - 1) * 9.0) / 2.0 + i * 9.0, 30)
+		draw_circle(q + Vector2(0, -5), 3.0, Color(c, 0.75))
+		draw_rect(Rect2(q + Vector2(-3, -2), Vector2(6, 7)), Color(c, 0.6))
 
 
 ## Simple drawn icons for cards (used until sprites exist).

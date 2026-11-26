@@ -13,7 +13,7 @@ const LOOKS := {
 	"forge": "dmg", "walls": "def", "larder": "hp", "pit": "devour", "pens": "card:crypt",
 	"traps": "card:spikes", "archive": "eye", "reliquary": "relic", "library": "arcane",
 	"treasury": "gold", "golden_hoard": "card:chest", "shrine": "holy", "stones": "rumors",
-	"jars": "card:jar", "brood_chamber": "card:spider",
+	"jars": "card:jar", "brood_chamber": "card:spider", "bait_workshop": "trail",
 }
 
 var current := ""
