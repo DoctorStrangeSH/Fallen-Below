@@ -186,3 +186,105 @@ static func card_glyph(ci: CanvasItem, card: String, c: Vector2, t: float) -> vo
 			ci.draw_rect(Rect2(c - Vector2(10, 10), Vector2(20, 20)), col)
 	# a thin colour bar so the card type is readable at a glance
 	ci.draw_rect(Rect2(c + Vector2(-20, 17), Vector2(40, 3)), col)
+
+
+## Heartbeat with a "lub-dub" double pulse. Returns 0..1.
+static func heartbeat(t: float, bpm: float) -> float:
+	var ph := fmod(t * bpm / 60.0, 1.0)
+	return exp(-pow((ph - 0.06) / 0.045, 2.0)) + 0.55 * exp(-pow((ph - 0.24) / 0.045, 2.0))
+
+
+## The dungeon's heart: a dark muscle caged in ribs, with glowing seams that
+## flare on every beat. `sc` 1.0 is about one map tile; `hunger` 0..1 makes it glow hotter.
+static func heart(ci: CanvasItem, c: Vector2, sc: float, t: float, bpm: float = 60.0, hunger: float = 0.3) -> void:
+	var beat := heartbeat(t, bpm)
+	var s := sc * (1.0 + 0.08 * beat)
+	var hot := clampf(0.3 + 0.5 * hunger + 0.45 * beat, 0.0, 1.0)
+	var line_w := minf(sc, 3.0)  # strokes stay fine when the heart is drawn large
+
+	# glow
+	for i in 8:
+		var f := 1.0 - i / 8.0
+		ci.draw_circle(c, (12.0 + 30.0 * f) * sc * (1.0 + 0.12 * beat), Color(0.8, 0.06, 0.14, 0.03 + 0.025 * beat))
+
+	# great vessels behind, rising from the top
+	var vessel := Color(0.38, 0.04, 0.09)
+	ci.draw_arc(c + Vector2(4, -13) * s, 8.0 * s, PI * 1.05, PI * 1.85, 14, vessel, 5.0 * sc)
+	ci.draw_line(c + Vector2(-5, -9) * s, c + Vector2(-8, -20) * s, vessel.darkened(0.15), 4.0 * sc)
+	ci.draw_line(c + Vector2(9, -8) * s, c + Vector2(14, -16) * s, vessel.darkened(0.25), 3.0 * sc)
+	for e in [Vector2(-8, -20), Vector2(14, -16), Vector2(11.5, -19.5)]:
+		ci.draw_circle(c + (e as Vector2) * s, 1.6 * sc, Color(0.16, 0.01, 0.04))
+
+	# ribs cradling it on both sides: ( ( heart ) )
+	var bone := Color(0.8, 0.74, 0.64)
+	for k in 3:
+		var y := -8.0 + k * 8.0
+		var r := 21.0 - absf(k - 1) * 2.5 + k * 1.5
+		for side in [-1.0, 1.0]:
+			var a0: float = PI * 0.72 if side < 0.0 else -PI * 0.28
+			var a1: float = PI * 1.22 if side < 0.0 else PI * 0.22
+			var cc := c + Vector2(0, y) * sc
+			ci.draw_arc(cc, r * sc, a0, a1, 14, Color(bone.darkened(0.25 + 0.1 * k), 0.95), 3.2 * line_w)
+			ci.draw_arc(cc, r * sc, a0 + 0.05, a1 - 0.05, 14, Color(bone, 0.9), 1.6 * line_w)
+			ci.draw_circle(cc + Vector2.from_angle(a0) * r * sc, 1.9 * line_w, bone.darkened(0.2))
+			ci.draw_circle(cc + Vector2.from_angle(a1) * r * sc, 1.9 * line_w, bone.darkened(0.2))
+
+	# the muscle: a lopsided heart curve with a slow organic wobble, shaded in soft layers
+	var layers := [[1.0, Color(0.3, 0.02, 0.07)], [0.86, Color(0.42, 0.04, 0.09)], [0.68, Color(0.55, 0.06, 0.12)], [0.45, Color(0.68, 0.1, 0.15)]]
+	var outline := PackedVector2Array()
+	for li in layers.size():
+		var k: float = layers[li][0]
+		var col: Color = layers[li][1]
+		col = col.lerp(Color(0.9, 0.15, 0.18), beat * 0.25 * li / 3.0)
+		var poly := PackedVector2Array()
+		for i in 44:
+			var th := TAU * i / 44.0
+			var x := 16.0 * pow(sin(th), 3.0)
+			var y := -(13.0 * cos(th) - 5.0 * cos(2.0 * th) - 2.0 * cos(3.0 * th) - cos(4.0 * th))
+			var wob := 1.0 + 0.035 * sin(th * 5.0 + t * 1.3)
+			var p := Vector2(x, y + 1.5) * 0.92 * wob
+			p = (p * k + Vector2(-3.0, -3.5) * (1.0 - k)).rotated(-0.22)
+			poly.append(c + p * s)
+		ci.draw_colored_polygon(poly, col)
+		if li == 0:
+			outline = poly
+	var closed := outline.duplicate()
+	closed.append(outline[0])
+	ci.draw_polyline(closed, Color(0.1, 0.0, 0.03, 0.9), 1.2 * line_w)
+
+	# glowing seams, branching like cracks in cooling lava
+	var seam := Color(1.0, 0.45 + 0.3 * hot, 0.2, 0.3 + 0.7 * hot)
+	var seams := [
+		[Vector2(-1, -8), Vector2(-3, -3), Vector2(-2, 1), Vector2(-5, 6), Vector2(-4, 10)],
+		[Vector2(-2, 1), Vector2(-8, 2), Vector2(-11, -1)],
+		[Vector2(5, -6), Vector2(6, -1), Vector2(4, 3), Vector2(6, 7)],
+		[Vector2(4, 3), Vector2(1, 7), Vector2(0, 12)],
+		[Vector2(6, -1), Vector2(10, -3)],
+	]
+	for line in seams:
+		var pl := PackedVector2Array()
+		for p in line:
+			pl.append(c + (p as Vector2).rotated(-0.22) * s)
+		ci.draw_polyline(pl, Color(seam, seam.a * 0.25), 2.6 * line_w)
+		ci.draw_polyline(pl, seam, 0.9 * line_w)
+	# a wet sheen along the upper left curve
+	for i in 5:
+		var a := PI * (1.05 + i * 0.08)
+		ci.draw_circle(c + (Vector2(-6.5, -5.5) + Vector2.from_angle(a) * 4.5).rotated(-0.22) * s, (1.4 - i * 0.18) * line_w, Color(1, 0.75, 0.75, 0.28))
+
+
+## A Warden figure: a bone mask over a dark body, in the Warden's colour.
+static func warden_figure(ci: CanvasItem, p: Vector2, col: Color, sc: float, t: float) -> void:
+	var glow := 0.5 + 0.5 * sin(t * 2.0)
+	ci.draw_circle(p, 30.0 * sc, Color(col, 0.08 + 0.06 * glow))
+	ci.draw_circle(p + Vector2(0, 22) * sc, 16.0 * sc, Color(0, 0, 0, 0.35))
+	var body := PackedVector2Array([p + Vector2(0, -18) * sc, p + Vector2(16, -3) * sc, p + Vector2(11, 18) * sc,
+		p + Vector2(-11, 18) * sc, p + Vector2(-16, -3) * sc])
+	ci.draw_colored_polygon(body, Color(0.08, 0.1, 0.15))
+	var closed := body.duplicate()
+	closed.append(body[0])
+	ci.draw_polyline(closed, col, 2.0 * sc)
+	for k in 3:
+		ci.draw_line(p + Vector2(-8, 1 + k * 5) * sc, p + Vector2(8, 1 + k * 5) * sc, col.darkened(0.35), 1.4 * sc)
+	ci.draw_circle(p + Vector2(-5, -7) * sc, 2.6 * sc, col.lightened(0.5))
+	ci.draw_circle(p + Vector2(5, -7) * sc, 2.6 * sc, col.lightened(0.5))

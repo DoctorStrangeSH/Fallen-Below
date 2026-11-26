@@ -290,15 +290,11 @@ func _draw_scenery(s, t: float) -> void:
 ## The dungeon's hungry heart. Beats faster the more travelers are inside.
 func _draw_heart(s, t: float) -> void:
 	var center := cell_center(s.heart_cell)
-	var speed: float = 3.0 + 0.8 * s.heroes.size()
-	var pulse := 1.0 + 0.09 * pow(maxf(0.0, sin(t * speed)), 4.0)
-	draw_circle(center, 30.0 * pulse, Color(0.6, 0.05, 0.12, 0.12))
-	if Art.draw(self, "heart", center, 44.0 * pulse):
+	if Art.draw(self, "heart", center, 44.0 * (1.0 + 0.09 * Icons.heartbeat(t, 60.0))):
 		return
-	draw_circle(center + Vector2(-5, -4) * pulse, 9.0 * pulse, Color(0.75, 0.12, 0.22))
-	draw_circle(center + Vector2(5, -4) * pulse, 9.0 * pulse, Color(0.75, 0.12, 0.22))
-	draw_colored_polygon(PackedVector2Array([center + Vector2(-13.5, -1) * pulse, center + Vector2(13.5, -1) * pulse, center + Vector2(0, 14) * pulse]), Color(0.75, 0.12, 0.22))
-	draw_circle(center + Vector2(-6, -6) * pulse, 2.5, Color(1, 0.5, 0.55, 0.6))
+	# it beats faster the more travelers are inside, and glows hotter as the Order closes in
+	var bpm: float = 52.0 + 10.0 * s.heroes.size()
+	Icons.heart(self, center, 1.2, t, bpm, clampf(s.threat / D.BOSS_THREAT, 0.0, 1.0))
 
 
 func _draw_preview(s) -> void:

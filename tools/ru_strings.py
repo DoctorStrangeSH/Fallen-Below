@@ -593,4 +593,21 @@ RU = {
 "%s: empty": "%s: пусто",
 "\n\nEaten: ": "\n\nСъедено: ",
 "\"%s\"": "«%s»",
+
+# ---- menus redesign
+"The dungeon hungers. You are its will.": "Подземелье голодно. Ты — его воля.",
+"Music %d%%": "Музыка %d%%",
+"Sound %d%%": "Звуки %d%%",
+"Music volume": "Громкость музыки",
+"Sound effects volume": "Громкость звуков",
+"Language": "Язык",
+"Runs %d  ·  Travelers taken %d": "Забегов %d  ·  Поглощено путников %d",
+"Warden": "Страж",
+"%s\nChampion: %s, %s": "%s\nЧемпион: %s, %s",
+"%s, %s\n\nPassive, %s: %s\n\n[Q] %s: %s\n\nSlots: %s": "%s, %s\n\nПассивно, %s: %s\n\n[Q] %s: %s\n\nСлоты: %s",
+"In the deck: click to remove.": "В колоде: нажми, чтобы убрать.",
+"Click to add to the deck.": "Нажми, чтобы добавить в колоду.",
+"Equipped: click to take it off.": "Надета: нажми, чтобы снять.",
+"Click to take it into the dungeon.": "Нажми, чтобы взять с собой.",
+"Next level:": "Следующий уровень:",
 }

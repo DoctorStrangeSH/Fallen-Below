@@ -4,8 +4,17 @@ extends Control
 
 const D = preload("res://scripts/data/game_data.gd")
 const Art = preload("res://scripts/ui/art.gd")
+const Icons = preload("res://scripts/ui/icons.gd")
 
 signal selected(id: String)
+
+## What each building looks like on the map: an icon kind, or "card:<id>" for a card glyph.
+const LOOKS := {
+	"forge": "dmg", "walls": "def", "larder": "hp", "pit": "devour", "pens": "card:crypt",
+	"traps": "card:spikes", "archive": "eye", "reliquary": "relic", "library": "arcane",
+	"treasury": "gold", "golden_hoard": "card:chest", "shrine": "holy", "stones": "rumors",
+	"jars": "card:jar", "brood_chamber": "card:spider",
+}
 
 var current := ""
 var hover := ""
@@ -62,7 +71,7 @@ func _hit(p: Vector2) -> String:
 func _draw() -> void:
 	if cave.is_empty():
 		_make_cave()
-	draw_colored_polygon(cave, Color(0.07, 0.05, 0.1))
+	draw_colored_polygon(cave, Color(0.07, 0.05, 0.1, 0.85))
 	var closed := cave.duplicate()
 	closed.append(cave[0])
 	draw_polyline(closed, Color(0.25, 0.18, 0.32), 3.0)
@@ -82,7 +91,12 @@ func _draw() -> void:
 		var max_lvl: int = Meta.max_level(id)
 		var can: bool = Meta.requirements_met(id)
 		var r := 24.0
-		if lvl > 0:
+		if id == "den":
+			# the Warden's den is where the dungeon's heart beats
+			Icons.heart(self, p + Vector2(0, -2), 1.5, t, 50.0 + 6.0 * lvl, 0.2 + 0.1 * lvl)
+			if id == current or id == hover:
+				draw_arc(p, r + 14, 0, TAU, 40, Color(1, 1, 1, 0.6), 2.0)
+		elif lvl > 0:
 			var glow := 0.5 + 0.5 * sin(t * 2.0 + p.x)
 			draw_circle(p, r + 8, Color(0.8, 0.45, 1.0, 0.12 + 0.08 * glow))
 			if not Art.draw(self, "lair_" + id, p, r * 2.2):
@@ -97,8 +111,17 @@ func _draw() -> void:
 		else:
 			draw_circle(p, r, Color(0.05, 0.04, 0.06))
 			draw_arc(p, r, 0, TAU, 32, Color(0.25, 0.22, 0.28), 1.5)
-		if id == current or id == hover:
+		if id != "den" and (id == current or id == hover):
 			draw_arc(p, r + 7, 0, TAU, 40, Color(1, 1, 1, 0.8), 2.0)
+		if id != "den" and LOOKS.has(id) and not Art.tex("lair_" + id):
+			var look: String = LOOKS[id]
+			var a := 1.0 if lvl > 0 else (0.55 if can else 0.2)
+			if look.begins_with("card:"):
+				draw_set_transform(p + Vector2(0, -3), 0.0, Vector2(0.8, 0.8))
+				Icons.card_glyph(self, look.substr(5), Vector2.ZERO, t)
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			else:
+				Icons.paint(self, look, p, 22.0, Color(Icons.color_of(look), a))
 		# level pips
 		for k in max_lvl:
 			var pp := p + Vector2((k - (max_lvl - 1) * 0.5) * 8.0, r + 7)

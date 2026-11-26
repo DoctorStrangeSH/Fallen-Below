@@ -5,8 +5,11 @@ extends Control
 const D = preload("res://scripts/data/game_data.gd")
 const UI = preload("res://scripts/ui/ui_style.gd")
 const LairMap = preload("res://scripts/menu/lair_map.gd")
+const Icon = preload("res://scripts/ui/icon.gd")
+const Icons = preload("res://scripts/ui/icons.gd")
 
-var res_label: Label
+var res_labels := {}
+var cost_row: HBoxContainer
 var map: LairMap
 var title_label: Label
 var level_label: Label
@@ -24,15 +27,23 @@ func _ready() -> void:
 	if memory != "" and Meta.first_time(memory):
 		Meta.play_story.call_deferred(memory, "res://scenes/lair.tscn")
 		return
-	set_anchors_preset(Control.PRESET_FULL_RECT)
 	UI.background(self)
 
-	var title := UI.label(Loc.t("THE LAIR"), 34, Color(0.75, 0.55, 1.0))
-	title.position = Vector2(30, 14)
+	var title := UI.title(Loc.t("THE LAIR"), 32)
+	title.position = Vector2(30, 12)
 	add_child(title)
-	res_label = UI.label("", 18, Color(0.95, 0.9, 0.75))
-	res_label.position = Vector2(260, 24)
-	add_child(res_label)
+	var res_row := HBoxContainer.new()
+	res_row.position = Vector2(300, 22)
+	res_row.add_theme_constant_override("separation", 22)
+	add_child(res_row)
+	for r in D.RESOURCES:
+		var cell := HBoxContainer.new()
+		cell.add_theme_constant_override("separation", 6)
+		cell.add_child(Icon.make(r, 20))
+		var l := UI.label("", 20, Icons.color_of(r))
+		cell.add_child(l)
+		res_labels[r] = l
+		res_row.add_child(cell)
 
 	map = LairMap.new()
 	map.position = Vector2(20, 70)
@@ -41,10 +52,9 @@ func _ready() -> void:
 	add_child(map)
 
 	# details
-	var panel := PanelContainer.new()
+	var panel := UI.panel()
 	panel.position = Vector2(840, 70)
 	panel.custom_minimum_size = Vector2(420, 560)
-	panel.add_theme_stylebox_override("panel", UI.box(Color(0.08, 0.06, 0.11), Color(0.3, 0.22, 0.4)))
 	add_child(panel)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
@@ -53,6 +63,7 @@ func _ready() -> void:
 	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title_label.custom_minimum_size = Vector2(390, 0)
 	v.add_child(title_label)
+	v.add_child(UI.ornament(390))
 	level_label = UI.label("", 15, Color(1, 0.85, 0.5))
 	v.add_child(level_label)
 	desc_label = UI.label("", 15, Color(1, 1, 1, 0.8))
@@ -65,7 +76,10 @@ func _ready() -> void:
 	v.add_child(req_label)
 	cost_label = UI.label("", 15)
 	v.add_child(cost_label)
-	build_btn = UI.button(Loc.t("Build"), Vector2(390, 52))
+	cost_row = HBoxContainer.new()
+	cost_row.add_theme_constant_override("separation", 16)
+	v.add_child(cost_row)
+	build_btn = UI.primary(Loc.t("Build"), Vector2(390, 52))
 	build_btn.pressed.connect(func():
 		if Meta.buy(selected_id):
 			_refresh()
@@ -76,7 +90,7 @@ func _ready() -> void:
 	row.position = Vector2(20, 650)
 	row.add_theme_constant_override("separation", 12)
 	add_child(row)
-	var run_btn := UI.button(Loc.t("Prepare descent"))
+	var run_btn := UI.primary(Loc.t("Prepare descent"), Vector2(240, 46))
 	run_btn.pressed.connect(func(): Meta.start_run())
 	row.add_child(run_btn)
 	var book := UI.button(Loc.t("Book of the Fallen"))
@@ -108,10 +122,8 @@ func _select(id: String) -> void:
 
 
 func _refresh() -> void:
-	var parts: Array = []
-	for k in D.RESOURCES:
-		parts.append("%s %d" % [Loc.t(D.RESOURCES[k]["name"]), int(Meta.res[k])])
-	res_label.text = Loc.t("     ").join(parts)
+	for k in res_labels:
+		res_labels[k].text = str(int(Meta.res[k]))
 
 	var def: Dictionary = D.BUILDINGS[selected_id]
 	var lvl: int = Meta.level(selected_id)
@@ -124,9 +136,24 @@ func _refresh() -> void:
 	var cost: Dictionary = Meta.next_cost(selected_id)
 	if cost.is_empty():
 		cost_label.text = Loc.t("Fully built.")
+		_cost_icons({})
 		build_btn.text = Loc.t("Built")
 		build_btn.disabled = true
 	else:
-		cost_label.text = Loc.t("Next level: %s") % Meta.cost_text(cost)
+		cost_label.text = Loc.t("Next level:")
+		_cost_icons(cost)
 		build_btn.text = Loc.t("Build") if lvl == 0 else Loc.t("Upgrade to level %d") % (lvl + 1)
 		build_btn.disabled = not met or not Meta.can_afford(cost)
+
+
+## The price as resource icons; a number turns red when the Lair cannot pay it.
+func _cost_icons(cost: Dictionary) -> void:
+	for c in cost_row.get_children():
+		c.queue_free()
+	for k in cost:
+		var cell := HBoxContainer.new()
+		cell.add_theme_constant_override("separation", 5)
+		cell.add_child(Icon.make(k, 18))
+		var enough: bool = int(Meta.res[k]) >= int(cost[k])
+		cell.add_child(UI.label(str(int(cost[k])), 18, Icons.color_of(k) if enough else Color(1, 0.35, 0.3)))
+		cost_row.add_child(cell)
