@@ -258,6 +258,10 @@ func damage(h: Dictionary, amount: float) -> void:
 		h["half_said"] = true
 		for line in boss_lines()["half"]:
 			s.narrate.emit(Loc.t(line))
+	if h["boss"] and not h.get("low_said", false) and h["hp"] > 0.0 and h["hp"] < h["max_hp"] * 0.25:
+		h["low_said"] = true
+		for line in boss_lines()["low"]:
+			s.narrate.emit(Loc.t(line))
 	if h["hp"] <= 0.0:
 		_kill(h)
 	elif h["trait"] == "coward" and not h["boss"] and h["hp"] < h["max_hp"] * 0.3:

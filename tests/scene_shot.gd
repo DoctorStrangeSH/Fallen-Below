@@ -7,6 +7,9 @@ var out := "/tmp/shot.png"
 var frames := 0
 
 
+var page := 0
+
+
 func _ready() -> void:
 	var scene := "res://scenes/lair.tscn"
 	Meta.no_save = true
@@ -22,6 +25,10 @@ func _ready() -> void:
 				out = kv[1]
 			"lang":
 				Loc.set_language(kv[1], false)
+			"story":
+				Meta.pending_story = kv[1]
+			"page":
+				page = int(kv[1])
 			"lair":
 				Meta.buildings = {}
 				for id in D.BUILDINGS:
@@ -31,12 +38,16 @@ func _ready() -> void:
 					elif kv[1] == "full":
 						Meta.buildings[id] = m
 				Meta.res = {"bones": 140, "blood": 45, "gold": 60}
-	add_child(load(scene).instantiate())
+	var node: Node = load(scene).instantiate()
+	add_child(node)
+	if page > 0:
+		node.index = page
+		node._show_page()
 
 
 func _process(_d: float) -> void:
 	frames += 1
-	if frames == 30:
+	if frames == 150:
 		get_viewport().get_texture().get_image().save_png(out)
 		print("saved ", out)
 		get_tree().quit()

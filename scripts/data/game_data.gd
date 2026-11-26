@@ -338,7 +338,7 @@ const TRAITS := {
 	"veteran": {"name": "Veteran", "desc": "+30% HP, always carries gear"},
 }
 
-const FIRST_NAMES := ["Alric", "Brann", "Cedric", "Dara", "Elowen", "Finn", "Greta", "Hector",
+const FIRST_NAMES := ["Alric", "Corwin", "Cedric", "Dara", "Elowen", "Finn", "Greta", "Hector",
 	"Isolde", "Jorah", "Kael", "Lyra", "Mira", "Nolan", "Orin", "Petra", "Quinn", "Rowan",
 	"Sable", "Tamsin", "Ulric", "Vera", "Wren", "Yorick"]
 
@@ -436,42 +436,42 @@ const WARDEN_TRUE_NAME := "Ren"
 
 const STORY := {
 	"intro": [
-		"There is a door in the mountain that was not there yesterday.\n\nThere never is.",
-		"Behind it, stairs. At the bottom, a glimmer of gold, a whisper of treasure, a rumour of a beast worth killing.\n\nTravelers always go down. None of them come back up.",
-		"The dungeon is alive. It does not hate them. It is simply, endlessly hungry.\n\nYou are its will. You shape its halls, its traps, the crawling things in its walls.",
-		"And you are its Warden: old bones knitted around a hollow where a heart should be.\n\nYou do not remember who you were. You only know that you must not let them leave.",
-		"Far above, in white towers, the Order of Dawn counts the missing. They call you a monster.\n\nThey keep sending people anyway.",
+		"There is a door in the mountainside. Yesterday it was not there.\n\nIt never is, until the morning someone finds it.",
+		"Beyond it, steps worn hollow by a thousand feet. Below, the glint of gold and the rustle of a rumour: treasure, or a beast whose head is worth a fortune.\n\nTravelers always go down. No one ever climbs back up.",
+		"The dungeon is alive. It bears them no hatred, any more than winter hates the ones who freeze. It is simply hungry, as it has always been.\n\nYou are its will. You carve its halls, set its traps, wake the things that stir inside its walls.",
+		"And you are its Warden: old bones grown together around the hollow where a heart once beat.\n\nYou do not remember who you were. You remember only this: no one may leave.",
+		"Far above, in the white towers, the Order of Dawn keeps count of the missing. From the pulpits they call you a monster, and the faithful trace the sign of the sun.\n\nAnd still the Order sends people down to you. Again, and again.",
 	],
 	"memory_sword": [
-		"Among the bones of the Lair, the Warden finds a small thing. A child's wooden sword, worn smooth by a small hand.",
-		"It does not know why it keeps it. It does not know why holding it hurts.",
-		"Somewhere very far away, a girl's voice:\n\n\"Ren, wait for me! Don't go in without me!\"",
+		"Among the bones of the Lair the Warden finds a small thing: a wooden sword. The grip is worn glossy by a child's palm, and a clumsy letter R is carved into the blade.",
+		"It does not know why it keeps it. It does not know why the touch aches in the place where nothing is left.",
+		"And somewhere very far away, through the depth of years and stone, a girl's voice rings out:\n\n\"Ren, wait! Don't go in without me!\"",
 	],
 	"memory_feast": [
-		"At night the raised dead murmur to each other in the dark. Each of them knew a little. Together they know a lot.",
-		"The Order draws the treasure maps. The Order lights the holy fire at the door. The Order pays the hunters half up front, and never the rest.",
+		"At night the raised dead talk among themselves in the dark: a rustle, a click, a dry whisper. Each of them knew a little. Together they know too much.",
+		"The Order draws the treasure maps. The Order lights the holy fire at the door. The Order pays the hunters half in advance, and has never once paid the rest.",
 		"They are not trying to kill the dungeon.\n\nThey are feeding it.",
-		"And an old scholar among the dead says what none of them wants to hear:\n\nevery time the dungeon eats, the sun above burns a little brighter.",
-	],
-	"act2_intro": [
-		"The Order did not send another saint. It sent miners.\n\nDwarves with picks and powder, and a contract sealed with a little sun.",
-		"They are not here to kill you. They are here to dig. Somewhere beneath your halls lies dawnstone: pale crystal that glows like morning.",
-		"Ren remembers Lia's last breath rising through the rock as light. He begins to understand what the dawnstone is made of.",
-		"Lead them in. Let the water have them.",
-	],
-	"act2_end": [
-		"Brann the Delver King falls into the black water with his last charge still in his hand.",
-		"His pockets are full of dawnstone. In the dark it glows, and in the glow there are faces.\n\nPilgrims. Hunters. Children who followed a map with a little sun in the corner.",
-		"The sun of the world is not a star. It is a furnace. And every soul the dungeon swallows is fuel the Order mines and burns.",
-		"Far above, the Inquisitor Vael has read the ledgers. She does not want to stop the furnace.\n\nShe wants to feed it everything.\n\n(Act III: The Ash Cathedral is coming soon.)",
+		"And an old scholar, his fingers still stained with ink, says what none of them wants to hear:\n\n\"Every time the dungeon eats, the sun above us burns a little brighter.\"",
 	],
 	"act1_end": [
-		"Aurelia falls. Her light gutters on the stones.\n\nThe Warden kneels over her, and for the first time, it does not want to eat.",
+		"Aurelia falls. Her light gutters across the stones like a candle in a draught.\n\nThe Warden bends over her, and for the first time in all its long dark, it does not want to eat.",
 		"\"Ren,\" she whispers. \"It's me. It's Lia.\"\n\nAnd the bones remember.",
-		"Two children, lost in the dark, thirty years ago. A door that should not have opened. A dungeon that wanted one of them.",
-		"The boy said: take me. Let her go.\n\nAnd the dungeon, which had never let anyone go, did.",
-		"She grew up in the white towers. They made her a saint. They told her the monster ate her brother.\n\nThey never told her what he became.",
-		"Her last breath rises through the rock like a small, warm light. Far above, for one morning, the sun shines a little brighter.\n\nRen does not understand why. Not yet.\n\n(Act II: The Drowned Mines is coming soon.)",
+		"Thirty years ago two children, lost in the woods below the mountain, found a door that had not been there the day before. The dungeon wanted one of them. Only one.",
+		"The boy said: \"Take me. Let her go.\"\n\nAnd the dungeon, which had never let anyone go, let her go.",
+		"She grew up in the white towers. They made a saint of her. They told her the monster had eaten her brother.\n\nThey never told her what he became.",
+		"Her last breath rises through the rock, a small warm light. Next morning the sun over the world shines a little brighter than the day before.\n\nRen does not understand why. Not yet.",
+	],
+	"act2_intro": [
+		"The Order did not send another saint. It sent miners.\n\nDwarves with picks and kegs of powder, and a contract sealed in wax stamped with a little sun.",
+		"They have not come for your head. They have come to dig. Somewhere beneath your halls lies dawnstone: pale crystal that glows like the sky a minute before morning.",
+		"Ren remembers Lia's last breath sinking into the stone and rising through it as light. He begins to guess what dawnstone is made of, and the guess chills even him, who long ago forgot what warmth was.",
+		"The shafts are flooded; the water is black and still.\n\nLead them deeper. Let the water close over them.",
+	],
+	"act2_end": [
+		"Brann the Delver King sinks beneath the black water, his last charge clenched in his fist, the fuse never lit.",
+		"His pockets are full of dawnstone. In the dark it glows, and in the glow there are faces.\n\nPilgrims. Hunters. Children who followed a map with a little sun in the corner.",
+		"The sun of this world is not a star. It is a furnace. And every soul the dungeon has swallowed is coal the Order mines, weighs, and throws on the fire.",
+		"Far above, Inquisitor Vael turns the last page of the mine ledgers. She does not want to put out the furnace.\n\nShe wants to feed it everything beneath the mountain.\n\n(Act III: The Ash Cathedral is coming soon.)",
 	],
 }
 
@@ -483,14 +483,14 @@ const MEMORIES := [
 
 ## One-time story moments during runs, shown as narration over the map.
 const BEATS := {
-	"first_kill": "The first one falls. Something in the dark goes quiet, almost content. Almost.",
-	"first_raise": "The dead traveler stands, and looks at the Warden for a long moment, as if trying to remember where it has seen that face before.",
-	"first_escape": "One got away. Tonight a tavern will hear the story. By morning, so will the Order.",
-	"first_loop": "The Warden completes its round. The dungeon grows deeper, and whatever comes down next will be stronger. So will what they carry.",
-	"first_devour": "The Warden eats. Its bones crack and grow. For a moment a name almost rises to the surface. Then it is gone.",
-	"first_level": "Something old wakes in the Warden. It remembers a way to kill it had forgotten.",
-	"attention_half": "Bells ring in the white towers. The Order has noticed you. Something bright is being prepared.",
-	"first_sleep": "The door in the mountain closes. The dungeon curls around its full belly and dreams of the next door.",
+	"first_kill": "The first one falls. Somewhere deep below, the dark grows still, almost content. Almost.",
+	"first_raise": "The dead traveler rises and looks at the Warden for a long time, as if straining to remember where it has seen that face before.",
+	"first_escape": "One got away. Tonight a tavern will hear his tale. By morning, so will the Order.",
+	"first_loop": "The Warden closes its round. The dungeon sinks deeper; whatever comes down next will be stronger, and so will what they carry.",
+	"first_devour": "The Warden eats. Its bones crack and lengthen. For a moment a name rises from the depths, short and warm, and sinks again.",
+	"first_level": "Something ancient stirs in the Warden. It remembers a way to kill that it had long forgotten.",
+	"attention_half": "Bells toll in the white towers. The Order has noticed you. Up there, something blinding is being prepared.",
+	"first_sleep": "The door in the mountain swings shut. The dungeon curls around its full belly and dreams of the next door.",
 	# tutorial hints (first run)
 	"tut_start": "Pick a card at the bottom, then a tile. Rooms and traps go on the path; altars and graveyards go beside it.",
 	"tut_warden": "The glowing shape is your Warden. It walks against the travelers and fights whoever it meets. Press Q for its ability. If it falls, the run is over.",
@@ -501,72 +501,104 @@ const BEATS := {
 	"tut_week": "The week ends. Sleep now to keep the whole harvest, or risk another week for more.",
 }
 
-## What the act champion says, and when.
+## What the act champion says, and when (arrive / below half / below a quarter / death).
 const BOSS_LINES := {
 	"arrive": [
-		"A light comes down the stairs, and the whole dungeon flinches.",
-		"Aurelia: \"I know these halls. I swore I would never come back.\"",
-		"Aurelia: \"Warden! I have come for what you took from me.\"",
+		"A light comes down the stairs, and the whole dungeon flinches like a beast under the lash.",
+		"Aurelia: \"I remember these vaults. I swore I would never see them again.\"",
+		"Aurelia: \"Warden! For thirty years I have prayed for the day I take back what you stole from me.\"",
 	],
-	"half": ["Aurelia: \"Your eyes... No. It can't be. ...Ren?\""],
-	"death": ["Aurelia: \"I'm sorry I left you down here...\""],
+	"half": [
+		"Aurelia: \"Your eyes... No. It cannot be. ...Ren?\"",
+	],
+	"low": [
+		"Aurelia: \"They told me you screamed when it took you. You didn't. You held the door so I could run.\"",
+	],
+	"death": [
+		"Aurelia: \"Forgive me for leaving you down here... alone in the dark...\"",
+	],
 }
 const BRANN_LINES := {
 	"arrive": [
-		"The walls shake. Somewhere above, powder kegs roll down the stairs.",
-		"Brann: \"Contract says dig till we hit the light. Nothing in it about a monster.\"",
-		"Brann: \"Lads! Charges on every hall. If it moves, blow it.\"",
+		"The walls shudder. Somewhere above, powder kegs thunder down the stairs.",
+		"Brann: \"The contract says dig till we strike light. Not a line about monsters. So monsters cost extra.\"",
+		"Brann: \"Lads, a charge in every hall! Anything that moves goes to gravel. Leave the heart be, it's in the estimate.\"",
 	],
-	"half": ["Brann: \"That stone... it's warm. Like it's breathing. What have we been selling?\""],
-	"death": ["Brann: \"Should've stayed... in the sunlight...\""],
+	"half": [
+		"Brann: \"Hold on... the stone's warm. Like it's breathing. Forty years I've been splitting it, and never once asked what was inside.\"",
+	],
+	"low": [
+		"Brann: \"My grandfather used to say the mountain gives back only what was put into it. I thought he meant gold.\"",
+	],
+	"death": [
+		"Brann: \"Should've stayed up top... in the sunshine... Only the sunshine's made of us...\"",
+	],
 }
 
 ## The Book of the Fallen: raised travelers give these pages in order, 4 per kind.
 const FRAGMENTS := {
 	"seeker": [
-		"The map said treasure. I bought it from a priest. Why would a priest sell a treasure map?",
-		"Every map has a mark in the corner. A little sun. I thought it was the mapmaker's sign.",
-		"The priest asked my name and wrote it in a book. Like a ledger. Like a bill of sale.",
-		"We weren't seeking treasure. We were the treasure. Somebody up there is paid in us.",
+		"I bought the map from a priest for three silver. It never crossed my mind to ask why a servant of the sun would sell the way to treasure.",
+		"Every map has a little sun drawn in the corner. I took it for the mapmaker's mark. Now I think it is the seal on a bill of sale.",
+		"The priest asked my name and wrote it in a thick book. Neatly, without a blot. The way a clerk enters sold goods into a ledger.",
+		"We weren't after treasure. We were the treasure. Up there someone is paid in us, and judging by the towers, paid well.",
 	],
 	"hunter": [
-		"They paid us to kill a beast. Half up front. They never expected to pay the other half.",
-		"My captain has sent eleven companies down here. He has never once come down himself.",
-		"Every Order blade bears the same rune. It glows when it's near you. Like it's homesick.",
-		"If they wanted you dead they would send an army. They send us. A few at a time. Like rationing.",
+		"We were paid for a beast. Half up front. No one ever meant to pay the rest; I knew it the moment I saw how easily they parted with the first.",
+		"My captain has sent eleven companies down here. He himself has never gone lower than the tavern at the foot of the mountain.",
+		"Every Order blade bears the same rune. Near you it glows, wistfully, like something that has come home.",
+		"If they wanted you dead, they'd send an army. Instead they send us, three or four at a time. That isn't war. That's rationing.",
 	],
 	"pilgrim": [
-		"The priests lit the holy fire at the door themselves. They said it would guide us. It guided us here.",
-		"The hymns say Saint Aurelia came out of the dark as a child. They never say what she left behind.",
-		"At dawn mass the priests face the mountain, not the sun. I always wondered why.",
-		"We were not sent to cleanse the dark. We were sent to feed it. A pilgrimage is just a longer word for a meal.",
+		"The priests lit the holy fire at the door with their own hands. They said it would show us the way. It did. It showed us here.",
+		"The hymns sing of how Saint Aurelia walked out of the dark as a little girl. Not one hymn tells whom she left behind.",
+		"At dawn mass the priests turn their faces not to the sun but to the mountain. I always wondered why. Now I know to whom they pray.",
+		"We were not sent to cleanse the dark. We were sent to feed it. A pilgrimage is only a very long road to someone else's table.",
 	],
 	"miner": [
-		"Dawnstone sells by the ounce in the white towers. They told us it was crystal. Crystal does not scream when you cut it.",
-		"Brann's contract pays double for any stone that glows gold. Those are the fresh ones.",
-		"The deeper shafts are flooded on purpose. Water keeps the stone from going out.",
-		"Every cart we haul up, the Order weighs it and writes a number. Next to the number, a list of names.",
+		"In the white towers dawnstone sells by the ounce, dearer than gold. They told us it was crystal. But crystal doesn't moan under the pick.",
+		"Brann's contract pays double for stone with a golden sheen. The golden ones are the fresh ones. We worked that out later.",
+		"The lower drifts were flooded on purpose. In dry rock the stone goes dark within a week; under water it keeps for years.",
+		"Every cart we haul up, the Order weighs and writes down a number. And beside the number, a column of names, in small handwriting.",
 	],
 	"sapper": [
-		"Blow the halls, leave the heart. Those were the orders. Never hurt the heart.",
-		"The Order needs you alive. Hungry, but alive. A dead furnace burns nothing.",
-		"I set a charge once near the heart by mistake. The captain beat me half to death.",
-		"They are not afraid of you. They are afraid of you being full.",
+		"The orders were simple: blow the halls, leave the heart. Bring the whole mountain down if you must, but leave the heart alone.",
+		"They need you alive. Hungry, but alive. A dead furnace warms no one.",
+		"Once, by mistake, I set a charge right by the heart. The captain beat me till his arm gave out, then dug the fuse out himself, on his knees.",
+		"They aren't afraid of you. They're afraid of the day you finally have enough.",
 	],
 	"mage": [
-		"The Dawn's light is not theirs. My instruments say it rises through the rock. From below.",
-		"Each time a traveler dies down here, the sun above flickers brighter. Forty years of measurements.",
-		"The archives were sealed after the Founding. I broke the seal. One word was written there: FED.",
-		"Long ago there was no morning. They buried something beneath this mountain and made it hungry, so the sun would rise. You are what they buried.",
+		"The light of Dawn does not belong to the Order. My instruments do not lie: it rises through the rock. From below.",
+		"Each time someone dies down here, the sun above flares brighter. Forty years of observations. Not one exception.",
+		"The archives were sealed right after the Founding. I broke the seal. Inside lay a single sheet, and on it a single word: FED.",
+		"Once this world knew no morning. The Founders buried something living beneath this mountain and left it to starve, so that the sun would rise. What they buried is you.",
 	],
 }
 
 ## Once a kind's pages are all collected, raised travelers mutter one of these.
 const WHISPERS := {
-	"seeker": ["Someone up there sells these maps. Ask who.", "I picked the wrong door."],
-	"pilgrim": ["We were an offering, not a cure.", "The fire was lit for us, not for you."],
-	"hunter": ["The Order counts the missing. It never comes to look.", "The other half was never coming."],
-	"mage": ["Their light flickers when you starve.", "The archives were sealed for a reason."],
-	"miner": ["The stone was warm.", "We were digging up the dead."],
-	"sapper": ["Never hurt the heart.", "Blow everything but the heart."],
+	"seeker": [
+		"Ask who sells the maps up there.",
+		"I chose the wrong door. Then again, there was no other.",
+	],
+	"pilgrim": [
+		"We were an offering, not a cure.",
+		"The fire was lit for us, not against you.",
+	],
+	"hunter": [
+		"The Order counts the missing. It never searches for them.",
+		"The second half was never coming.",
+	],
+	"mage": [
+		"When you starve, their light trembles.",
+		"The archives were sealed for a reason.",
+	],
+	"miner": [
+		"The stone was warm...",
+		"We were digging up the dead.",
+	],
+	"sapper": [
+		"Not the heart...",
+		"Blow it all. All but the heart.",
+	],
 }
