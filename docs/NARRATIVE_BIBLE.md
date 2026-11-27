@@ -1,6 +1,6 @@
 # ABYSSAL GENESIS — Narrative Bible
 
-**Версия 1.1** · 27 ноября 2026 · *Beneath the world, something remembers.*
+**Версия 1.1** · утверждена владельцем 27 ноября 2026 · *Beneath the world, something remembers.*
 
 Сюжетный источник истины кампании. Связанные документы, которые должны ему соответствовать:
 - `docs/GDD.md` — геймдизайн;
