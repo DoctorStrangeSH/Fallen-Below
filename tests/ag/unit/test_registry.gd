@@ -11,7 +11,7 @@ func test_data_is_consistent() -> void:
 func test_slice_counts_match_gdd() -> void:
 	# GDD 14: Heart + 5 organs, 5 species, 10 mutations, 3 Order enemies, 1 boss, 3 resources
 	eq(Reg.ids("organ").size(), 6, "organs")
-	eq(Reg.ids("species").size(), 5, "species")
+	eq(Reg.ids("species").size(), 6, "species (5 bred + Zero)")
 	eq(Reg.ids("mutation").size(), 10, "mutations")
 	eq(Reg.ids("enemy").size(), 3, "enemies")
 	eq(Reg.ids("boss").size(), 1, "bosses")

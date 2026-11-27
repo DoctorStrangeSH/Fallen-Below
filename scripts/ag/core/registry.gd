@@ -20,7 +20,9 @@ static func table(kind: String) -> Dictionary:
 	if TABLES.has(kind):
 		var v = Defs.new().get(TABLES[kind])
 		if v is Dictionary:
-			t = v
+			t = (v as Dictionary).duplicate()
+		if kind == "species":
+			t.merge(Defs.ZERO)   # Zero is a species too, but never bred
 	_cache[kind] = t
 	return t
 
@@ -84,6 +86,12 @@ static func _check_refs(id: String, d: Dictionary, errors: Array) -> void:
 			for r in c:
 				if str(r) != "impulse" and not has(str(r)):
 					errors.append("%s: %s refers to unknown resource %s" % [id, key, r])
+	for key in ["embody_cost"]:
+		var ec = d.get(key, {})
+		if ec is Dictionary:
+			for r in ec:
+				if not has(str(r)):
+					errors.append("%s: %s refers to unknown resource %s" % [id, key, r])
 	var br = d.get("breed", {})
 	if br is Dictionary and br.get("cost", {}) is Dictionary:
 		for r in br.get("cost", {}):
@@ -95,7 +103,7 @@ static func _check_refs(id: String, d: Dictionary, errors: Array) -> void:
 			for x in l:
 				if not has(str(x)):
 					errors.append("%s: %s refers to unknown id %s" % [id, key, x])
-	for key in ["faction", "biome", "boss_id", "decision"]:
+	for key in ["faction", "biome", "boss_id", "decision", "body"]:
 		if d.has(key) and not has(str(d[key])):
 			errors.append("%s: %s refers to unknown id %s" % [id, key, d[key]])
 	if d.has("footprint"):

@@ -61,7 +61,7 @@ func write_json_atomic(path: String, data: Dictionary) -> bool:
 	if disabled:
 		return false
 	_ensure_dir()
-	var text := JSON.stringify(data, "\t")
+	var text := JSON.stringify(data, "\t", true, true)   # full precision: a loaded sprout continues identically
 	var tmp := path + ".tmp"
 	var f := FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:
@@ -165,7 +165,8 @@ func migrate_legacy():
 # ------------------------------------------------------------------ sprout (run in progress)
 
 func save_sprout(s) -> bool:
-	var ok := write_json_atomic(sprout_path(), s.to_dict())
+	var ok := write_json_atomic(sprout_path(), {"schema": Sprout.SCHEMA, "gen_version": Sprout.GEN_VERSION,
+		"tick": s.tick, "format": "variant64", "data": s.pack()})
 	_emit_saved("sprout", ok)
 	return ok
 
@@ -179,7 +180,8 @@ func load_sprout():
 	var r := read_json_with_backup(sprout_path())
 	if str(r["source"]) == "none":
 		return null
-	var s = Sprout.from_dict(r["data"])
+	var d: Dictionary = r["data"]
+	var s = Sprout.unpack(str(d.get("data", ""))) if str(d.get("format", "")) == "variant64" else Sprout.from_dict(d)
 	if not disabled:
 		discard_sprout()
 	return s

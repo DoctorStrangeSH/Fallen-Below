@@ -208,7 +208,7 @@ func test_save_round_trip_with_anatomy() -> void:
 	sp.organs.lay_channel(_free_cell_near_heart(sp))
 	for i in 7:
 		sp.step()
-	var d: Dictionary = JSON.parse_string(JSON.stringify(sp.state.to_dict()))
+	var d: Dictionary = JSON.parse_string(JSON.stringify(sp.state.to_dict(), "", true, true))
 	var back = Sprout.from_dict(d)
 	check(back != null, "loaded")
 	eq(back.state_hash(), sp.state.state_hash(), "same state after JSON round-trip")

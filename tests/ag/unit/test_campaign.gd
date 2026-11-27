@@ -26,7 +26,7 @@ func test_round_trip_and_sanitising() -> void:
 	c.decide("E2", "archive")
 	c.notes_found = 3
 	c.add_deed("ren", "deed.let_speak")
-	var d: Dictionary = JSON.parse_string(JSON.stringify(c.to_dict()))
+	var d: Dictionary = JSON.parse_string(JSON.stringify(c.to_dict(), "", true, true))
 	(d["unlocked"] as Array).append("species.removed_long_ago")
 	d["notes_found"] = 99
 	var back = Campaign.from_dict(d)

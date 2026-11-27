@@ -79,29 +79,68 @@ const ORGANS := {
 const SPECIES := {
 	"species.bone_crawler": {
 		"name": "Bone Crawler", "desc": "Armoured with bone. Holds a corridor while others strike.",
-		"role": "defender", "stats": {"hp": 90, "atk": 6, "armor": 4, "speed": 0.6},
+		"role": "defender", "stats": {"hp": 90, "atk": 6, "armor": 4, "speed": 0.6, "sight": 4.0, "upkeep": 0.3},
 		"traits": ["trait.bone_armor"], "breed": {"kind": "egg", "time": 20.0, "cost": {"resource.biomass": 18}},
 	},
 	"species.blood_tick": {
 		"name": "Blood Tick", "desc": "Drains life and infects whatever it bites.",
-		"role": "parasite", "stats": {"hp": 30, "atk": 4, "armor": 0, "speed": 1.2},
+		"role": "parasite", "stats": {"hp": 30, "atk": 4, "armor": 0, "speed": 1.2, "sight": 8.0, "upkeep": 0.1},
 		"traits": ["trait.drain", "trait.infect"], "breed": {"kind": "division", "time": 10.0, "cost": {"resource.biomass": 8}},
 	},
 	"species.devourer": {
 		"name": "Devourer", "desc": "Hunts the wounded and grows with every kill.",
-		"role": "hunter", "stats": {"hp": 60, "atk": 12, "armor": 1, "speed": 1.0},
+		"role": "hunter", "stats": {"hp": 60, "atk": 12, "armor": 1, "speed": 1.0, "sight": 10.0, "upkeep": 0.4},
 		"traits": ["trait.execute", "trait.grow_on_kill"], "breed": {"kind": "egg", "time": 25.0, "cost": {"resource.biomass": 25, "resource.genome": 5}},
 	},
 	"species.nerve_stalker": {
 		"name": "Nerve Stalker", "desc": "Unseen until it strikes. The first blow lands hardest.",
-		"role": "ambusher", "stats": {"hp": 45, "atk": 10, "armor": 0, "speed": 1.1},
+		"role": "ambusher", "stats": {"hp": 45, "atk": 10, "armor": 0, "speed": 1.1, "sight": 3.5, "upkeep": 0.3},
 		"traits": ["trait.stealth", "trait.first_strike"], "breed": {"kind": "egg", "time": 22.0, "cost": {"resource.biomass": 20, "resource.genome": 8}},
 	},
 	"species.lymphatic": {
 		"name": "Lymphatic", "desc": "Mends creatures and channels nearby.",
-		"role": "support", "stats": {"hp": 50, "atk": 2, "armor": 1, "speed": 0.8},
+		"role": "support", "stats": {"hp": 50, "atk": 2, "armor": 1, "speed": 0.8, "sight": 6.0, "upkeep": 0.2},
 		"traits": ["trait.heal_aura"], "breed": {"kind": "spore", "time": 18.0, "cost": {"resource.biomass": 15, "resource.genome": 3}},
 	},
+}
+
+## Zero (Ren): the unique avatar, not bred (Narrative Bible 6.2, GDD 6). Adapted from Fallen Below's Bone Warden:
+## stats of Marrowgrave, growth from kills, Bone Storm as the active ability.
+const ZERO := {
+	"species.zero": {
+		"name": "Zero", "desc": "A child's silhouette in a bone mask. He fights for you because he believes you are his younger brother.",
+		"role": "avatar", "stats": {"hp": 70, "atk": 6, "armor": 0, "speed": 1.3, "sight": 9.0, "upkeep": 0.3},
+		"traits": [], "embody_cost": {"resource.biomass": 40, "resource.genome": 10},
+		"xp_per_kill": 4, "xp_levels": [10, 25, 45, 70, 100],
+		"level_up": {"hp": 0.12, "atk": 1.0, "heal": 0.3},
+		"storm": {"name": "Bone Storm", "desc": "Double damage to every invader next to Zero.", "cooldown": 20.0, "radius": 1.5, "mult": 2.0},
+		"leash": 14.0,
+	},
+}
+
+## Creature behaviour constants (GDD 6). Distances in cells, times in seconds.
+const AI := {
+	"move_speed": 2.0,         # cells per second at speed 1.0
+	"attack_range": 1.5,
+	"attack_period": 1.0,
+	"repath": 1.0,
+	"stuck_time": 4.0,         # no progress this long -> re-path, then drop the target
+	"retreat_hp": 0.3,
+	"recover_hp": 0.8,
+	"recover_rate": 0.03,      # share of max hp per second while resting at home
+	"defender_leash": 5.0,
+	"alert_time": 3.0,         # an attacked organ calls defenders for this long
+	"alert_radius": 10.0,
+	"heal_rate": 4.0,          # Lymphatic: hp per second to one ally in range
+	"heal_range": 2.0,
+	"drain": 0.5,
+	"infect_dps": 1.5,
+	"infect_time": 4.0,
+	"execute_below": 0.4,
+	"execute_bonus": 0.5,
+	"gorge_hp": 5.0,
+	"rehide_time": 5.0,
+	"starve_dps": 1.0,
 }
 
 const TRAITS := {
@@ -145,13 +184,13 @@ const FACTIONS := {
 
 const ENEMIES := {
 	"enemy.pilgrim": {"name": "Pilgrim", "desc": "Scouts the halls. Brings a mind worth keeping.",
-		"faction": "faction.order", "goal": "scout", "stats": {"hp": 40, "atk": 3, "armor": 0, "speed": 0.9},
+		"faction": "faction.order", "goal": "heart", "stats": {"hp": 40, "atk": 3, "armor": 0, "speed": 0.9, "sight": 5.0}, "damage": "physical", "body": "body.pilgrim",
 		"counters": [], "sees_hidden": false, "sentient": true},
 	"enemy.knight": {"name": "Knight", "desc": "Hallowed blade. Cuts organs open.",
-		"faction": "faction.order", "goal": "organ", "stats": {"hp": 110, "atk": 12, "armor": 4, "speed": 0.7},
+		"faction": "faction.order", "goal": "organ", "stats": {"hp": 110, "atk": 12, "armor": 4, "speed": 0.7, "sight": 5.0}, "damage": "holy", "body": "body.knight",
 		"counters": ["holy"], "sees_hidden": false, "sentient": true},
 	"enemy.burner": {"name": "Burner Priest", "desc": "Sets organs alight. Sees what hides in the dark.",
-		"faction": "faction.order", "goal": "organ", "stats": {"hp": 60, "atk": 8, "armor": 1, "speed": 0.8},
+		"faction": "faction.order", "goal": "organ", "stats": {"hp": 60, "atk": 8, "armor": 1, "speed": 0.8, "sight": 6.0}, "damage": "fire", "body": "body.burner",
 		"counters": ["fire"], "sees_hidden": true, "sentient": true},
 }
 

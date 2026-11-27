@@ -82,6 +82,7 @@ func test_sprout_ironman_and_version() -> void:
 	check(back != null, "loaded")
 	eq(back.state_hash(), s.state_hash(), "identical state")
 	check(not m.has_sprout(), "file consumed on load (no save-scum)")
+	eq(back.rng.to_dict(), s.rng.to_dict(), "RNG state exact")
 	var d: Dictionary = s.to_dict()
 	d["gen_version"] = 0
 	check(Sprout.from_dict(d) == null, "old generator version refused")

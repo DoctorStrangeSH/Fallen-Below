@@ -218,7 +218,7 @@ func test_save_keeps_economy() -> void:
 	_grow(sp, "organ.stomach")
 	sp.economy.add_body("body.knight")
 	_settle(sp, 25)
-	var back = Sprout.from_dict(JSON.parse_string(JSON.stringify(sp.state.to_dict())))
+	var back = Sprout.from_dict(JSON.parse_string(JSON.stringify(sp.state.to_dict(), "", true, true)))
 	eq(back.state_hash(), sp.state.state_hash(), "same state")
 	eq(back.bodies.size(), 1, "body queue kept")
 	sp.free()

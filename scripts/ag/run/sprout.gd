@@ -6,6 +6,7 @@ const Sprout = preload("res://scripts/ag/run/sprout_state.gd")
 const MapGen = preload("res://scripts/ag/systems/map_gen.gd")
 const OrganSystem = preload("res://scripts/ag/systems/organ_system.gd")
 const EconomySystem = preload("res://scripts/ag/systems/economy_system.gd")
+const CreatureSystem = preload("res://scripts/ag/systems/creature_system.gd")
 const Defs = preload("res://scripts/ag/data/defs.gd")
 
 const TICK := 0.1
@@ -15,6 +16,7 @@ signal started
 var state = null
 var organs: OrganSystem
 var economy: EconomySystem
+var creatures: CreatureSystem
 var speed := 1.0
 var _acc := 0.0
 
@@ -26,6 +28,9 @@ func _init() -> void:
 	economy = EconomySystem.new()
 	economy.name = "Economy"
 	add_child(economy)
+	creatures = CreatureSystem.new()
+	creatures.name = "Creatures"
+	add_child(creatures)
 
 
 ## New sprout: generate the map and grow the Heart Bud in the middle of its hall.
@@ -54,6 +59,8 @@ func _wire() -> void:
 	organs.setup(state)
 	organs.economy = economy
 	economy.setup(state, organs)
+	economy.creatures = creatures
+	creatures.setup(state, organs, economy)
 
 
 func _process(delta: float) -> void:
@@ -70,3 +77,4 @@ func step() -> void:
 	state.tick += 1
 	organs.tick(TICK)
 	economy.tick(TICK)
+	creatures.tick(TICK)

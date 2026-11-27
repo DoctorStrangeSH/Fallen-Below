@@ -15,6 +15,7 @@ const ENERGY := "resource.energy"
 
 var s       # SproutState
 var organs  # OrganSystem
+var creatures = null  # CreatureSystem: creature upkeep
 
 
 func setup(state, organ_system) -> void:
@@ -123,6 +124,10 @@ func rates(dt: float = 0.0) -> Array:
 		var up: Dictionary = d.get("upkeep", {})
 		for r in up:
 			out.append({"res": str(r), "amount": -float(up[r]), "source": name})
+	if creatures != null:
+		var cu: float = creatures.upkeep_rate() * (1.0 - s.starve_frac)
+		if cu > 0.0:
+			out.append({"res": ENERGY, "amount": -cu, "source": "Creatures"})
 	# digestion: each working Stomach works on its own body from the queue
 	var k := 0
 	for uid in _uids():
@@ -196,6 +201,8 @@ func forecast(seconds: float = 10.0) -> Dictionary:
 ## Puts organs to sleep (lowest priority, then highest upkeep, then newest) while energy would run out,
 ## and wakes sleepers (highest priority first) when the balance stays non-negative with them.
 func balance_energy(dt: float) -> void:
+	s.starving = false
+	s.starve_frac = 0.0
 	var guard := 0
 	while amount(ENERGY) + net(ENERGY) * dt < 0.0 and guard < 64:
 		guard += 1
@@ -205,6 +212,16 @@ func balance_energy(dt: float) -> void:
 		s.organs[victim]["asleep"] = true
 		organs.refresh(victim)
 		s.fx.emit("organ_sleep", victim, 0.0)
+	if amount(ENERGY) + net(ENERGY) * dt < 0.0 and creatures != null:
+		# every organ that can sleep is asleep and it is still not enough: creatures get only
+		# the share of energy that exists, and weaken in proportion to what they miss
+		var cu: float = creatures.upkeep_rate()
+		if cu > 0.0:
+			var without := net(ENERGY) + cu
+			var paid := clampf((amount(ENERGY) / dt + without) / cu, 0.0, 1.0)
+			s.starve_frac = 1.0 - paid
+			s.starving = s.starve_frac > 0.0
+		return
 	var sleepers: Array = []
 	for uid in _uids():
 		if bool(s.organs[uid].get("asleep", false)):

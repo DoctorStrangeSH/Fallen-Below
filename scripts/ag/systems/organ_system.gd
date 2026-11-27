@@ -119,6 +119,7 @@ func place(def_id: String, at: Vector2i) -> int:
 		var i: int = s.grid.idx(c)
 		s.grid.organ[i] = uid
 		s.grid.channel[i] = 0   # the organ itself carries the signal now
+	s.grid_version += 1
 	recompute(true)
 	s.fx.emit("organ_grow", uid, 0.0)
 	return uid
@@ -155,6 +156,7 @@ func damage(uid: int, amount: float, kind: String = "physical") -> float:
 	var o: Dictionary = s.organs[uid]
 	o["hp"] = maxf(0.0, float(o["hp"]) - dealt)
 	_bus("organ_damaged", [uid, dealt, kind])
+	s.alerts[uid] = float(Defs.AI["alert_time"])
 	s.fx.emit("organ_hit", uid, dealt)
 	if float(o["hp"]) <= 0.0:
 		destroy(uid)
@@ -179,6 +181,7 @@ func destroy(uid: int) -> void:
 		var i: int = s.grid.idx(c)
 		s.grid.organ[i] = -1
 		s.grid.scar[i] = 1.0
+	s.grid_version += 1
 	s.organs.erase(uid)
 	_bus("organ_state_changed", [uid, "destroyed"])
 	s.fx.emit("organ_destroyed", uid, 0.0)
@@ -196,6 +199,7 @@ func reabsorb(uid: int) -> bool:
 	var cost: Dictionary = def_of(uid).get("cost", {})
 	for c in cells_of(uid):
 		s.grid.organ[s.grid.idx(c)] = -1
+	s.grid_version += 1
 	s.organs.erase(uid)
 	if economy != null:
 		var keys: Array = cost.keys()

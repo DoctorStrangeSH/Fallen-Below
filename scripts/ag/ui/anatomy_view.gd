@@ -29,6 +29,7 @@ var ghost_cell := Vector2i(-1, -1)
 var ghost_ok := false
 var ghost_route: Array = []  # preview of an auto-routed channel
 var hover_uid := -1
+var selected_uid := -1
 
 
 func cell_center(c: Vector2i) -> Vector2:
@@ -70,6 +71,7 @@ func _draw() -> void:
 	_draw_channels(g)
 	for uid in sp.state.organs:
 		_draw_organ(int(uid))
+	_draw_units()
 	_draw_ghost(g)
 
 
@@ -176,8 +178,15 @@ func _draw_organ(uid: int) -> void:
 		Icons.heart(self, c, r.size.x / 44.0, t, 60.0, 0.3)
 	else:
 		_organ_body(str(o["def"]), r, c, col)
-	if uid == hover_uid:
+	if uid == hover_uid or uid == selected_uid:
 		draw_rect(r.grow(2), Color(1, 0.8, 0.45, 0.9), false, 1.5)
+	if str(o["def"]) == "organ.incubator":
+		var bp: float = sp.creatures.breed_progress(uid)
+		var queued: int = (sp.state.breeding.get(uid, {}).get("queue", []) as Array).size()
+		if queued > 0:
+			draw_arc(c, r.size.y * 0.62, 0.0, TAU, 24, Color(0.9, 0.5, 0.75, 0.25), 2.0)
+			draw_arc(c, r.size.y * 0.62, -PI / 2.0, -PI / 2.0 + TAU * bp, 20, Color(0.9, 0.5, 0.75), 2.0)
+			draw_string(ThemeDB.fallback_font, r.position + Vector2(r.size.x - 6, r.size.y + 2), str(queued), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(1, 0.85, 0.95))
 	var ratio := float(o["hp"]) / maxf(1.0, float(o["max_hp"]))
 	if ratio < 1.0:
 		var bar := Rect2(r.position + Vector2(2, -5), Vector2(r.size.x - 4, 3))
@@ -239,6 +248,139 @@ func _blob(c: Vector2, rad: Vector2, fill: Color, rim: Color) -> void:
 	draw_colored_polygon(pts, fill)
 	pts.append(pts[0])
 	draw_polyline(pts, rim, 1.5)
+
+
+func unit_screen_pos(u: Dictionary) -> Vector2:
+	return ORIGIN + (Vector2(float(u["pos"][0]), float(u["pos"][1])) + Vector2(0.5, 0.5)) * CS
+
+
+func _draw_units() -> void:
+	var keys: Array = sp.state.units.keys()
+	keys.sort()
+	# heal beams under the bodies
+	for uid in keys:
+		var u: Dictionary = sp.state.units[uid]
+		if str(u["state"]) == "heal" and sp.state.units.has(int(u["target"])):
+			var a := unit_screen_pos(u)
+			var b := unit_screen_pos(sp.state.units[int(u["target"])])
+			if a.distance_to(b) <= 2.2 * CS:
+				draw_line(a, b, Color(0.5, 1.0, 0.6, 0.35 + 0.25 * sin(t * 8.0)), 3.0)
+	for uid in keys:
+		_draw_unit(sp.state.units[uid])
+
+
+func _draw_unit(u: Dictionary) -> void:
+	var p := unit_screen_pos(u)
+	var def_id := str(u["def"])
+	var period := 1.0
+	var lunge := Vector2.ZERO
+	var cd := float(u["cd"])
+	if cd > period - 0.2 and str(u["state"]) == "engage":
+		var tp := p
+		if str(u["target_kind"]) == "unit" and sp.state.units.has(int(u["target"])):
+			tp = unit_screen_pos(sp.state.units[int(u["target"])])
+		elif str(u["target_kind"]) == "organ" and sp.state.organs.has(int(u["target"])):
+			tp = organ_rect(int(u["target"])).get_center()
+		if tp != p:
+			lunge = (tp - p).normalized() * 4.0
+	p += lunge
+	var bob := sin(t * 6.0 + float(u["uid"])) * 0.8
+	var hidden := bool(u.get("hidden", false))
+	var a := 0.35 if hidden else 1.0
+	match def_id:
+		"species.bone_crawler":
+			_blob(p + Vector2(0, bob * 0.3), Vector2(7.5, 6.0), Color(0.78, 0.72, 0.6, a), Color(0.35, 0.3, 0.25, a))
+			for k in 3:
+				draw_arc(p + Vector2(-3 + k * 3, 0), 4.0, PI * 1.1, PI * 1.9, 6, Color(0.45, 0.4, 0.33, a), 1.5)
+			for side in [-1.0, 1.0]:
+				draw_line(p + Vector2(side * 6, 2), p + Vector2(side * 9, 5 + bob), Color(0.6, 0.55, 0.45, a), 1.5)
+		"species.blood_tick":
+			for k in 4:
+				var ang := PI * (0.15 + 0.23 * k)
+				draw_line(p, p + Vector2.from_angle(ang) * 7.0 + Vector2(0, bob), Color(0.4, 0.05, 0.08, a), 1.2)
+				draw_line(p, p + Vector2.from_angle(PI - ang) * 7.0 + Vector2(0, bob), Color(0.4, 0.05, 0.08, a), 1.2)
+			draw_circle(p, 4.5, Color(0.75, 0.08, 0.14, a))
+			draw_circle(p + Vector2(-1.5, -1.5), 1.4, Color(1, 0.5, 0.5, a))
+		"species.devourer":
+			_blob(p, Vector2(8.0, 5.5), Color(0.45, 0.06, 0.1, a), Color(0.2, 0.02, 0.04, a))
+			var jaw := 0.25 + 0.2 * absf(sin(t * 5.0))
+			draw_arc(p + Vector2(5, 0), 3.5, -jaw * PI, jaw * PI, 8, Color(0.95, 0.85, 0.75, a), 2.0)
+			draw_circle(p + Vector2(2, -2.5), 1.2, Color(1, 0.8, 0.3, a))
+		"species.nerve_stalker":
+			if hidden:
+				draw_arc(p, 6.0, 0.0, TAU, 14, Color(0.7, 0.55, 1.0, 0.25 + 0.15 * sin(t * 3.0)), 1.0)
+			else:
+				var pts := PackedVector2Array([p + Vector2(0, -8), p + Vector2(5, 3), p + Vector2(0, 6), p + Vector2(-5, 3)])
+				draw_colored_polygon(pts, Color(0.45, 0.25, 0.8))
+				for side in [-1.0, 1.0]:
+					draw_line(p + Vector2(side * 3, -2), p + Vector2(side * 9, -6 + bob), Color(0.7, 0.55, 1.0), 1.2)
+				draw_circle(p + Vector2(0, -3), 1.3, Color(1, 1, 1))
+		"species.lymphatic":
+			_blob(p + Vector2(0, bob * 0.5), Vector2(6.5, 6.5), Color(0.5, 0.95, 0.65, 0.55 * a), Color(0.75, 1.0, 0.85, 0.8 * a))
+			draw_circle(p + Vector2(1, 1), 2.0, Color(0.9, 1.0, 0.9, 0.8 * a))
+		"species.zero":
+			_draw_zero(p, bob, u)
+		"enemy.pilgrim", "enemy.knight", "enemy.burner":
+			_draw_invader(p, def_id, bob)
+	var ratio := float(u["hp"]) / maxf(1.0, float(u["max_hp"]))
+	if ratio < 1.0 and not hidden:
+		var bar := Rect2(p + Vector2(-7, -13), Vector2(14, 2.5))
+		draw_rect(bar, Color(0, 0, 0, 0.7))
+		var col := Color(0.85, 0.2, 0.25) if str(u["team"]) == "abyss" else Color(1.0, 0.8, 0.45)
+		draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(ratio, 0.0, 1.0), 2.5)), col)
+	if str(u["state"]) == "retreat" or str(u["state"]) == "recover":
+		draw_arc(p, 9.0, 0.0, TAU * fmod(t, 1.0), 10, Color(0.6, 0.8, 1.0, 0.6), 1.0)
+	if float(u.get("infect_t", 0.0)) > 0.0:
+		draw_circle(p + Vector2(6, -6), 2.0, Color(0.4, 0.9, 0.2, 0.9))
+
+
+## Zero: a child's silhouette in a bone mask (Narrative Bible 6.2). Form: Vessel.
+func _draw_zero(p: Vector2, bob: float, u: Dictionary) -> void:
+	var body := Color(0.08, 0.05, 0.1)
+	var glow := 0.5 + 0.5 * sin(t * 2.0)
+	draw_circle(p + Vector2(0, -2), 11.0, Color(0.6, 0.8, 1.0, 0.06 + 0.05 * glow))
+	# small body and thin legs
+	var torso := PackedVector2Array([p + Vector2(-4, -2), p + Vector2(4, -2), p + Vector2(5, 7), p + Vector2(-5, 7)])
+	draw_colored_polygon(torso, body)
+	draw_line(p + Vector2(-2, 7), p + Vector2(-2.5, 11 + bob * 0.3), body, 2.0)
+	draw_line(p + Vector2(2, 7), p + Vector2(2.5, 11 - bob * 0.3), body, 2.0)
+	# bone fingers
+	draw_line(p + Vector2(-5, 0), p + Vector2(-8, 6), Color(0.85, 0.8, 0.7), 1.2)
+	draw_line(p + Vector2(5, 0), p + Vector2(8, 6), Color(0.85, 0.8, 0.7), 1.2)
+	# the mask grown from his skull
+	var m := p + Vector2(0, -7 + bob * 0.4)
+	draw_circle(m, 5.5, Color(0.9, 0.86, 0.76))
+	draw_circle(m + Vector2(-2, -0.5), 1.4, Color(0.05, 0.03, 0.05))
+	draw_circle(m + Vector2(2, -0.5), 1.4, Color(0.05, 0.03, 0.05))
+	draw_line(m + Vector2(-1.5, 3), m + Vector2(1.5, 3), Color(0.4, 0.35, 0.3), 1.0)
+	draw_line(m + Vector2(1, -5), m + Vector2(2.5, -1), Color(0.5, 0.45, 0.4), 0.8)   # crack
+	if int(u.get("level", 1)) > 1:
+		draw_string(ThemeDB.fallback_font, p + Vector2(7, -9), str(int(u["level"])), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.7, 0.85, 1.0))
+
+
+func _draw_invader(p: Vector2, def_id: String, bob: float) -> void:
+	var robe := Color(0.45, 0.33, 0.2)
+	var trim := Color(1.0, 0.8, 0.45)
+	if def_id == "enemy.knight":
+		robe = Color(0.62, 0.64, 0.7)
+	elif def_id == "enemy.burner":
+		robe = Color(0.6, 0.15, 0.1)
+	var pts := PackedVector2Array([p + Vector2(0, -6), p + Vector2(6, 8), p + Vector2(-6, 8)])
+	draw_colored_polygon(pts, robe)
+	draw_circle(p + Vector2(0, -7), 3.2, Color(0.85, 0.72, 0.6))
+	match def_id:
+		"enemy.pilgrim":
+			draw_line(p + Vector2(5, -2), p + Vector2(8, 4), Color(0.4, 0.3, 0.2), 1.2)
+			draw_circle(p + Vector2(8, 5 + bob * 0.4), 2.2, Color(1.0, 0.85, 0.4, 0.9))
+		"enemy.knight":
+			draw_line(p + Vector2(6, -8), p + Vector2(6, 6), Color(0.95, 0.95, 1.0), 2.0)
+			draw_line(p + Vector2(3.5, -3), p + Vector2(8.5, -3), trim, 1.5)
+			draw_circle(p + Vector2(0, -7), 3.4, Color(0.7, 0.72, 0.8))
+		"enemy.burner":
+			var f := 2.0 + sin(t * 12.0) * 0.8
+			draw_circle(p + Vector2(7, -3), f + 1.0, Color(1.0, 0.4, 0.1, 0.7))
+			draw_circle(p + Vector2(7, -3.5), f * 0.6, Color(1.0, 0.85, 0.3))
+	draw_line(p + Vector2(-4, 1), p + Vector2(4, 1), trim, 1.0)
 
 
 func _draw_ghost(g) -> void:

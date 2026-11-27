@@ -4,6 +4,7 @@ extends Node
 ## Keys: 1-5 organs, C channel (Shift+click: auto-route to the network), X cut, D debug damage,
 ##       R new map, Space pause, Esc / right click: drop the tool.
 ##       Over an organ: S sleep/wake, P priority, A reabsorb. B drops a pilgrim's body into the Stomach queue.
+##       Click an Incubator (no tool) to breed. Z embody Zero, Q Bone Storm, E send one invader, W send a wave.
 
 const SproutRoot = preload("res://scripts/ag/run/sprout.gd")
 const View = preload("res://scripts/ag/ui/anatomy_view.gd")
@@ -19,6 +20,12 @@ const STATE_NAMES := {
 	"dormant": "Put to sleep",
 }
 const PRIORITY_NAMES := ["Low priority", "Normal priority", "High priority"]
+const BREEDABLE := ["species.bone_crawler", "species.blood_tick", "species.devourer", "species.nerve_stalker", "species.lymphatic"]
+const INVADERS := ["enemy.pilgrim", "enemy.knight", "enemy.burner"]
+const UNIT_STATES := {
+	"idle": "Waiting", "engage": "Fighting", "protect": "Guarding an organ", "return": "Returning to its post",
+	"retreat": "Retreating to heal", "recover": "Healing", "heal": "Mending an ally",
+}
 
 var sp: SproutRoot
 var view: View
@@ -31,6 +38,12 @@ var painting := false
 var shot_path := ""
 var hover_at := Vector2(-1, -1)
 var bar: ResourceBar
+var breed_panel: PanelContainer
+var breed_box: VBoxContainer
+var invader_i := 0
+var cam: Camera2D
+var shot_zoom := 1.0
+var panning := false
 
 
 func _ready() -> void:
@@ -39,6 +52,8 @@ func _ready() -> void:
 			seed_value = int(a.substr(7))
 		elif a.begins_with("--shot="):
 			shot_path = a.substr(7)
+		elif a.begins_with("--zoom="):
+			shot_zoom = float(a.substr(7))
 		elif a.begins_with("--hover="):
 			var xy := a.substr(8).split(",")
 			hover_at = Vector2(float(xy[0]), float(xy[1]))
@@ -48,10 +63,17 @@ func _ready() -> void:
 	view = View.new()
 	view.sp = sp
 	add_child(view)
+	cam = Camera2D.new()
+	cam.position = Vector2(640, 360)
+	add_child(cam)
+	cam.make_current()
 	_build_hud()
 	_new_map(seed_value)
 	if shot_path != "":
 		_demo_layout()
+		if shot_zoom != 1.0:
+			cam.zoom = Vector2(shot_zoom, shot_zoom)
+			cam.position = view.cell_center(sp.organs.cells_of(sp.organs.heart_uid())[0]) + Vector2(60, 0)
 		if hover_at.x >= 0.0:
 			var m := InputEventMouseMotion.new()
 			m.position = hover_at
@@ -98,6 +120,12 @@ func _build_hud() -> void:
 		b.pressed.connect(_select.bind(id))
 		tools.add_child(b)
 		buttons[id] = b
+	breed_panel = UI.panel()
+	breed_panel.position = Vector2(1010, 50)
+	breed_panel.visible = false
+	layer.add_child(breed_panel)
+	breed_box = VBoxContainer.new()
+	breed_panel.add_child(breed_box)
 	info = UI.label("", 14, UI.MUTED)
 	info.position = Vector2(80, 698)
 	info.size = Vector2(1120, 18)
@@ -106,6 +134,37 @@ func _build_hud() -> void:
 	tip.add_theme_stylebox_override("normal", UI.box(Color(0.04, 0.03, 0.06, 0.94), Color(0.5, 0.38, 0.65), 4))
 	tip.visible = false
 	layer.add_child(tip)
+
+
+func _open_breeding(uid: int) -> void:
+	view.selected_uid = uid
+	breed_panel.visible = uid >= 0
+	for ch in breed_box.get_children():
+		ch.queue_free()
+	if uid < 0:
+		return
+	breed_box.add_child(UI.label(Loc.t("Incubator: grow a creature"), 15, UI.GOLD))
+	for id in BREEDABLE:
+		var d := Reg.get_def(id)
+		var b := UI.button("%s  %s" % [Loc.t(str(d["name"])), _cost_text(d["breed"]["cost"])], Vector2(240, 34))
+		b.add_theme_font_size_override("font_size", 13)
+		b.pressed.connect(func():
+			sp.creatures.queue_breed(uid, id))
+		tip_bind(b, id)
+		breed_box.add_child(b)
+
+
+func tip_bind(b: Control, species_id: String) -> void:
+	b.mouse_entered.connect(func():
+		var d := Reg.get_def(species_id)
+		var st: Dictionary = d["stats"]
+		hover_text = "%s\n%s\n%s" % [Loc.t(str(d["desc"])),
+			Loc.t("Health %d · attack %d · armour %d · speed %.1f") % [int(st["hp"]), int(st["atk"]), int(st["armor"]), float(st["speed"])],
+			Loc.t("Grows in %d s · upkeep %s") % [int(d["breed"]["time"]), _cost_text({"resource.energy": st["upkeep"]}, true)]])
+	b.mouse_exited.connect(func(): hover_text = "")
+
+
+var hover_text := ""
 
 
 func _select(id: String) -> void:
@@ -140,8 +199,28 @@ func _unhandled_input(e: InputEvent) -> void:
 					sp.organs.reabsorb(view.hover_uid)
 			KEY_B:
 				sp.economy.add_body("body.pilgrim")
+			KEY_Z:
+				sp.creatures.embody_zero()
+			KEY_Q:
+				sp.creatures.zero_storm()
+			KEY_E:
+				_send_invader()
+			KEY_W:
+				for i in 3:
+					_send_invader()
+	elif e is InputEventMouseButton and e.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN] and e.pressed:
+		var before := view.get_global_mouse_position()
+		var z := clampf(cam.zoom.x * (1.15 if e.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.15), 1.0, 3.5)
+		cam.zoom = Vector2(z, z)
+		cam.position += before - view.get_global_mouse_position()
+		_clamp_cam()
+	elif e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_MIDDLE:
+		panning = e.pressed
+	elif e is InputEventMouseMotion and panning:
+		cam.position -= e.relative / cam.zoom.x
+		_clamp_cam()
 	elif e is InputEventMouseButton:
-		var c := view.cell_at(e.position)
+		var c := view.cell_at(view.get_global_mouse_position())
 		if e.button_index == MOUSE_BUTTON_RIGHT and e.pressed:
 			if tool != "":
 				_select("")
@@ -150,9 +229,12 @@ func _unhandled_input(e: InputEvent) -> void:
 		elif e.button_index == MOUSE_BUTTON_LEFT:
 			painting = e.pressed
 			if e.pressed:
+				if tool == "":
+					var ou: int = sp.state.grid.organ_at(c) if sp.state.grid.in_bounds(c) else -1
+					_open_breeding(ou if ou >= 0 and str(sp.state.organs[ou]["def"]) == "organ.incubator" else -1)
 				_apply(c, e.shift_pressed)
 	elif e is InputEventMouseMotion:
-		var c := view.cell_at(e.position)
+		var c := view.cell_at(view.get_global_mouse_position())
 		if painting and (tool == "channel" or tool == "cut"):
 			_apply(c, false)
 
@@ -173,11 +255,22 @@ func _apply(c: Vector2i, shift: bool) -> void:
 			sp.organs.place(tool, c)
 
 
-func _process(_d: float) -> void:
+func _clamp_cam() -> void:
+	var half := Vector2(640, 360) / cam.zoom.x
+	cam.position = cam.position.clamp(half, Vector2(1280, 720) - half)
+
+
+func _process(delta: float) -> void:
 	if sp.state == null:
 		return
+	var pan := Vector2(float(Input.is_key_pressed(KEY_RIGHT)) - float(Input.is_key_pressed(KEY_LEFT)),
+		float(Input.is_key_pressed(KEY_DOWN)) - float(Input.is_key_pressed(KEY_UP)))
+	if pan != Vector2.ZERO:
+		cam.position += pan * 600.0 * delta / cam.zoom.x
+		_clamp_cam()
 	var mouse := get_viewport().get_mouse_position()
-	var c := view.cell_at(mouse)
+	var world := view.get_global_mouse_position()
+	var c := view.cell_at(world)
 	var g = sp.state.grid
 	view.ghost_cell = c
 	view.ghost_route = []
@@ -203,6 +296,16 @@ func _process(_d: float) -> void:
 			Loc.t("[S] sleep / wake  [P] priority  [A] reabsorb (half the cost back)") if str(o["def"]) != "organ.heart" else ""]
 	elif g.is_entrance(c):
 		text = Loc.t("Entrance. Invaders come down here.")
+	if text == "" and tool == "":
+		var near := _unit_under(world)
+		if near >= 0:
+			var u: Dictionary = sp.state.units[near]
+			var d := Reg.get_def(str(u["def"]))
+			text = "%s — %s  (%d/%d)" % [Loc.t(str(d["name"])), Loc.t(str(UNIT_STATES.get(str(u["state"]), u["state"]))), int(ceil(float(u["hp"]))), int(float(u["max_hp"]))]
+			if str(u["def"]) == "species.zero":
+				text += "\n" + Loc.t("Level %d · [Q] Bone Storm %s") % [int(u["level"]), Loc.t("ready") if float(u["storm_cd"]) <= 0.0 else "%d s" % ceili(float(u["storm_cd"]))]
+	if hover_text != "":
+		text = hover_text
 	tip.text = text
 	tip.visible = text != ""
 	tip.reset_size()
@@ -211,10 +314,31 @@ func _process(_d: float) -> void:
 	for uid in sp.state.organs:
 		if sp.economy.is_working(int(uid)):
 			working += 1
-	info.text = Loc.t("Seed %d · organs working: %d of %d · bodies to digest: %d · %s · [R] new map  [Space] pause  [B] drop a body  [D] debug damage") % [
-		seed_value, working, sp.state.organs.size(), sp.state.bodies.size(), Loc.t("Paused") if sp.state.paused else Loc.t("Running")]
+	info.text = Loc.t("Seed %d · creatures %d · invaders %d · bodies %d · %s · [Z] Zero [Q] storm [E] invader [W] wave [B] body [R] new map [Space] pause") % [
+		seed_value, sp.creatures.team_units("abyss").size(), sp.creatures.team_units("order").size(), sp.state.bodies.size(),
+		Loc.t("Paused") if sp.state.paused else Loc.t("Running")]
+	if view.selected_uid >= 0 and not sp.state.organs.has(view.selected_uid):
+		_open_breeding(-1)
 	if sp.state.lost:
 		info.text = Loc.t("The Heart Bud is dead. The sprout burns out. [R] new map")
+
+
+func _unit_under(p: Vector2) -> int:
+	var best := -1
+	var bd := 12.0
+	for uid in sp.state.units:
+		var d: float = view.unit_screen_pos(sp.state.units[uid]).distance_to(p)
+		if d < bd:
+			bd = d
+			best = int(uid)
+	return best
+
+
+func _send_invader() -> void:
+	var g = sp.state.grid
+	var e: Vector2i = g.entrances[invader_i % g.entrances.size()]
+	sp.creatures.spawn_enemy(INVADERS[invader_i % INVADERS.size()], e)
+	invader_i += 1
 
 
 func _reason(ok: Dictionary) -> String:
@@ -278,3 +402,20 @@ func _demo_layout() -> void:
 	sp.economy.add_body("body.pilgrim")
 	for i in 40:
 		sp.step()
+	# a small garrison and Zero, then an invasion in progress
+	sp.economy.apply("resource.biomass", 150.0, "Test")
+	sp.economy.apply("resource.genome", 40.0, "Test")
+	var stand: Array = sp.creatures.paths.stand_cells(sp.organs.cells_of(sp.organs.heart_uid()))
+	var k := 0
+	for id in ["species.bone_crawler", "species.devourer", "species.lymphatic", "species.blood_tick", "species.nerve_stalker"]:
+		sp.creatures.spawn_creature(id, stand[(k * 3) % stand.size()])
+		k += 1
+	sp.creatures.embody_zero()
+	for i in 4:
+		_send_invader()
+	for i in 90:
+		sp.step()
+	for uid in sp.state.organs:
+		if str(sp.state.organs[uid]["def"]) == "organ.incubator":
+			sp.creatures.queue_breed(int(uid), "species.devourer")
+			_open_breeding(int(uid))

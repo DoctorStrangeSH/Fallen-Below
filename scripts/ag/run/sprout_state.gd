@@ -25,6 +25,14 @@ var network := {}           # Vector2i -> true: cells linked to the Heart (recom
 var lost := false           # the Heart Bud died
 var bodies: Array = []      # digestion queue: [{"id": body id, "left": mass}]
 var impulses: float = 0.0   # nerve impulses for commands (stage 07)
+var grid_version: int = 0  # bumped whenever walkability changes (organs grow / die); not saved
+var units := {}             # uid -> creature or invader (creature_system.gd)
+var breeding := {}          # incubator uid -> {"queue": [species ids], "progress": seconds}
+var alerts := {}            # organ uid -> seconds left: organ under attack, defenders respond
+var zero_dead := false      # Zero fell in this sprout
+var starving := false       # energy cannot pay the creatures: they weaken
+var starve_frac := 0.0      # share of creature upkeep that is not paid this tick
+var stats := {}             # counters for tests and the run summary
 var ledger := {}            # res -> {source: total change}; explains every change of the stock
 
 
@@ -44,6 +52,8 @@ func to_dict() -> Dictionary:
 		"tick": tick, "rng": rng.to_dict(), "resources": resources.duplicate(),
 		"grid": grid.to_dict() if grid else {}, "organs": organs.values(), "next_uid": next_uid, "lost": lost,
 		"bodies": bodies.duplicate(true), "impulses": impulses, "ledger": ledger.duplicate(true),
+		"units": units.values(), "breeding": _int_keys_to_str(breeding), "zero_dead": zero_dead, "stats": stats.duplicate(true),
+		"alerts": _int_keys_to_str(alerts),
 	}
 
 
@@ -84,6 +94,31 @@ static func from_dict(d: Dictionary):
 			if b is Dictionary:
 				s.bodies.append({"id": str(b.get("id", "")), "left": float(b.get("left", 0.0))})
 	s.impulses = float(d.get("impulses", 0.0))
+	var us = d.get("units", [])
+	if us is Array:
+		for u in us:
+			if u is Dictionary:
+				var inst: Dictionary = (u as Dictionary).duplicate(true)
+				inst["uid"] = int(inst["uid"])
+				for k in ["target", "level", "xp", "kills"]:
+					if inst.has(k):
+						inst[k] = int(inst[k])
+				s.units[int(inst["uid"])] = inst
+	var br = d.get("breeding", {})
+	if br is Dictionary:
+		for k in br:
+			s.breeding[int(k)] = {"queue": (br[k].get("queue", []) as Array).duplicate(), "progress": float(br[k].get("progress", 0.0))}
+	s.zero_dead = bool(d.get("zero_dead", false))
+	var al = d.get("alerts", {})
+	if al is Dictionary:
+		var ak: Array = al.keys()
+		ak.sort_custom(func(a, b): return int(a) < int(b))
+		for k in ak:
+			s.alerts[int(k)] = float(al[k])
+	var st = d.get("stats", {})
+	if st is Dictionary:
+		for k in st:
+			s.stats[str(k)] = int(st[k])
 	var lg = d.get("ledger", {})
 	if lg is Dictionary:
 		for res_id in lg:
@@ -93,6 +128,30 @@ static func from_dict(d: Dictionary):
 	return s
 
 
+## Exact encoding for saves: JSON keeps ~16 digits and would make a loaded fight drift.
+func pack() -> String:
+	return Marshalls.variant_to_base64(to_dict())
+
+
+static func unpack(text: String):
+	var v = Marshalls.base64_to_variant(text)
+	if not v is Dictionary:
+		return null
+	return load("res://scripts/ag/run/sprout_state.gd").from_dict(v)
+
+
+static func _int_keys_to_str(d: Dictionary) -> Dictionary:
+	var out := {}
+	for k in d:
+		out[str(k)] = d[k]
+	return out
+
+
+func count(stat: String, n: int = 1) -> void:
+	stats[stat] = int(stats.get(stat, 0)) + n
+
+
 ## Stable fingerprint of the serialised state (save/load round-trip and determinism tests).
 func state_hash() -> int:
-	return hash(JSON.stringify(to_dict(), "", true))
+	# normalised through JSON so 3 and 3.0 hash the same before and after a save
+	return hash(JSON.stringify(JSON.parse_string(JSON.stringify(to_dict(), "", true, true)), "", true, true))
