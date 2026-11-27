@@ -12,7 +12,11 @@ const RECOVER_TIME := 3.0   # seconds an organ needs to wake up after being reco
 signal organ_changed(uid: int)
 signal heart_destroyed
 
+const Defs = preload("res://scripts/ag/data/defs.gd")
+const PRIORITY_NAMES := ["Low priority", "Normal priority", "High priority"]
+
 var s   # SproutState
+var economy = null   # EconomySystem; when set, organs and channels cost resources
 
 
 func setup(state) -> void:
@@ -66,6 +70,14 @@ func can_place(def_id: String, at: Vector2i) -> Dictionary:
 			return {"ok": false, "reason": "Organs cannot take root in water."}
 		if g.is_entrance(c):
 			return {"ok": false, "reason": "Entrances cannot be sealed by organs."}
+	return _afford(d.get("cost", {}))
+
+
+func _afford(cost: Dictionary) -> Dictionary:
+	if economy != null:
+		var m: String = economy.missing(cost)
+		if m != "":
+			return {"ok": false, "reason": "Not enough %s.", "arg": str(Reg.get_def(m).get("name", m))}
 	return {"ok": true, "reason": ""}
 
 
@@ -79,7 +91,7 @@ func can_lay_channel(c: Vector2i) -> Dictionary:
 		return {"ok": false, "reason": "There is already a channel here."}
 	if g.is_entrance(c):
 		return {"ok": false, "reason": "Entrances cannot be sealed by organs."}
-	return {"ok": true, "reason": ""}
+	return _afford(Defs.ECONOMY["channel_cost"])
 
 
 func state_of(uid: int) -> String:
@@ -93,12 +105,15 @@ func place(def_id: String, at: Vector2i) -> int:
 	if not can_place(def_id, at)["ok"]:
 		return -1
 	var d := Reg.get_def(def_id)
+	if economy != null and not economy.pay(d.get("cost", {}), "Construction"):
+		return -1
 	var uid: int = s.next_uid
 	s.next_uid += 1
 	var hp := float(d.get("hp", 100))
 	s.organs[uid] = {
 		"uid": uid, "def": def_id, "cell": [at.x, at.y], "hp": hp, "max_hp": hp,
 		"state": "normal", "connected": false, "recover": 0.0, "mutations": [],
+		"priority": 1, "dormant": false, "asleep": false,
 	}
 	for c in footprint_cells(def_id, at):
 		var i: int = s.grid.idx(c)
@@ -111,6 +126,8 @@ func place(def_id: String, at: Vector2i) -> int:
 
 func lay_channel(c: Vector2i) -> bool:
 	if not can_lay_channel(c)["ok"]:
+		return false
+	if economy != null and not economy.pay(Defs.ECONOMY["channel_cost"], "Channels"):
 		return false
 	s.grid.channel[s.grid.idx(c)] = 1
 	recompute()
@@ -142,7 +159,7 @@ func damage(uid: int, amount: float, kind: String = "physical") -> float:
 	if float(o["hp"]) <= 0.0:
 		destroy(uid)
 	else:
-		_refresh_state(uid)
+		refresh(uid)
 	return dealt
 
 
@@ -151,7 +168,7 @@ func heal(uid: int, amount: float) -> void:
 		return
 	var o: Dictionary = s.organs[uid]
 	o["hp"] = minf(float(o["max_hp"]), float(o["hp"]) + amount)
-	_refresh_state(uid)
+	refresh(uid)
 
 
 func destroy(uid: int) -> void:
@@ -172,13 +189,49 @@ func destroy(uid: int) -> void:
 	recompute()
 
 
+## Player takes an organ back into the body: part of its cost returns, no scar is left.
+func reabsorb(uid: int) -> bool:
+	if not s.organs.has(uid) or str(s.organs[uid]["def"]) == "organ.heart":
+		return false
+	var cost: Dictionary = def_of(uid).get("cost", {})
+	for c in cells_of(uid):
+		s.grid.organ[s.grid.idx(c)] = -1
+	s.organs.erase(uid)
+	if economy != null:
+		var keys: Array = cost.keys()
+		keys.sort()
+		for r in keys:
+			economy.apply(str(r), float(cost[r]) * float(Defs.ECONOMY["reabsorb_refund"]), "Reabsorbed organs")
+	_bus("organ_state_changed", [uid, "destroyed"])
+	s.fx.emit("organ_reabsorb", uid, 0.0)
+	organ_changed.emit(uid)
+	recompute()
+	return true
+
+
+## Manual sleep: the organ stops working and stops costing upkeep.
+func set_dormant(uid: int, on: bool) -> void:
+	if not s.organs.has(uid) or str(s.organs[uid]["def"]) == "organ.heart":
+		return
+	s.organs[uid]["dormant"] = on
+	refresh(uid)
+
+
+func cycle_priority(uid: int) -> int:
+	if not s.organs.has(uid):
+		return 1
+	var p := (int(s.organs[uid].get("priority", 1)) + 1) % 3
+	s.organs[uid]["priority"] = p
+	return p
+
+
 func tick(delta: float) -> void:
 	for uid in s.organs:
 		var o: Dictionary = s.organs[uid]
 		if float(o["recover"]) > 0.0:
 			o["recover"] = maxf(0.0, float(o["recover"]) - delta)
 			if float(o["recover"]) == 0.0:
-				_refresh_state(int(uid))
+				refresh(int(uid))
 
 
 ## Shortest route of free floor cells from `from` to the nearest cell next to the network.
@@ -256,17 +309,21 @@ func recompute(fresh: bool = false) -> void:
 			o["connected"] = now
 			if now and not fresh:
 				o["recover"] = RECOVER_TIME
-			_refresh_state(int(uid))
+			refresh(int(uid))
 		elif fresh and str(o["state"]) == "normal" and not now:
-			_refresh_state(int(uid))
+			refresh(int(uid))
 
 
-func _refresh_state(uid: int) -> void:
+func refresh(uid: int) -> void:
 	var o: Dictionary = s.organs[uid]
 	var st := "normal"
 	var ratio := float(o["hp"]) / maxf(1.0, float(o["max_hp"]))
 	if not bool(o["connected"]):
 		st = "disabled"
+	elif bool(o.get("dormant", false)):
+		st = "dormant"
+	elif bool(o.get("asleep", false)):
+		st = "asleep"
 	elif float(o["recover"]) > 0.0:
 		st = "recovering"
 	elif ratio < 0.25:

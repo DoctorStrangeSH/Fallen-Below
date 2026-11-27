@@ -6,7 +6,7 @@ extends RefCounted
 const Grid = preload("res://scripts/ag/run/grid_state.gd")
 
 const W := 56
-const H := 32
+const H := 30
 const MAX_ROOMS := 11
 const ENTRANCES := 3
 

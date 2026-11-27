@@ -7,7 +7,7 @@ const Grid = preload("res://scripts/ag/run/grid_state.gd")
 const Icons = preload("res://scripts/ui/icons.gd")
 
 const CS := 20.0
-const ORIGIN := Vector2(80, 8)
+const ORIGIN := Vector2(80, 40)
 
 const ROCK_COL := Color(0.045, 0.035, 0.05)
 const FLESH_COL := Color(0.22, 0.08, 0.09)
@@ -151,6 +151,7 @@ func _draw_channels(g) -> void:
 func _state_tint(st: String) -> Color:
 	match st:
 		"disabled": return Color(0.45, 0.42, 0.45, 0.75)
+		"asleep", "dormant": return Color(0.55, 0.55, 0.75, 0.8)
 		"recovering": return Color(1, 1, 1, 0.55 + 0.35 * sin(t * 8.0))
 		"critical": return Color(1, 0.55 + 0.45 * sin(t * 10.0), 0.55 + 0.45 * sin(t * 10.0))
 		"damaged": return Color(1, 0.85, 0.85)
@@ -166,6 +167,8 @@ func _draw_organ(uid: int) -> void:
 	var col: Color = CATEGORY_COL.get(str(d.get("category", "")), Color.WHITE)
 	if st == "disabled":
 		col = col.lerp(Color(0.4, 0.4, 0.42), 0.7)
+	elif st == "asleep" or st == "dormant":
+		col = col.lerp(Color(0.25, 0.28, 0.45), 0.55)
 	col *= tint
 	var c := r.get_center()
 	if str(o["def"]) == "organ.heart":
@@ -180,6 +183,13 @@ func _draw_organ(uid: int) -> void:
 		var bar := Rect2(r.position + Vector2(2, -5), Vector2(r.size.x - 4, 3))
 		draw_rect(bar, Color(0, 0, 0, 0.7))
 		draw_rect(Rect2(bar.position, Vector2(bar.size.x * ratio, 3)), BLOOD if ratio > 0.25 else Color(1, 0.3, 0.2))
+	if st == "asleep" or st == "dormant":
+		# sleeping: a drifting "z"
+		var zp := r.position + Vector2(r.size.x - 4, 2 - fmod(t * 6.0, 6.0))
+		draw_string(ThemeDB.fallback_font, zp, "z", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.8, 0.85, 1.0, 0.9))
+	var pr := int(o.get("priority", 1))
+	if pr != 1:
+		draw_circle(r.position + Vector2(3, 3), 2.5, Color(1.0, 0.8, 0.45) if pr == 2 else Color(0.5, 0.5, 0.6))
 	if st == "disabled":
 		# broken link marker
 		draw_line(c + Vector2(-4, -4), c + Vector2(4, 4), Color(0.9, 0.9, 0.9, 0.8), 2.0)
@@ -192,7 +202,8 @@ func _organ_body(def_id: String, r: Rect2, c: Vector2, col: Color) -> void:
 	match def_id:
 		"organ.stomach":
 			_blob(c, Vector2(r.size.x * 0.46, r.size.y * 0.42) * beat, col, dark)
-			draw_arc(c, r.size.y * 0.2, t, t + PI * 1.4, 12, dark, 2.0)
+			var churn := 3.0 if not sp.state.bodies.is_empty() else 1.0
+			draw_arc(c, r.size.y * 0.2, t * churn, t * churn + PI * 1.4, 12, dark, 2.0)
 		"organ.incubator":
 			_blob(c, Vector2(r.size.x * 0.47, r.size.y * 0.4), dark.lightened(0.1), col.darkened(0.3))
 			for k in 3:

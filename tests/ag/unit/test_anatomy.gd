@@ -10,6 +10,7 @@ const Grid = preload("res://scripts/ag/run/grid_state.gd")
 func _sprout(seed_value: int = 1):
 	var sp = SproutRoot.new()
 	sp.start(seed_value)
+	sp.economy.apply("resource.biomass", 1000.0, "Test")   # anatomy tests are not about cost
 	return sp
 
 

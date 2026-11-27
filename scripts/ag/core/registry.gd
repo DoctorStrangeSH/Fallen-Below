@@ -7,7 +7,7 @@ const Defs = preload("res://scripts/ag/data/defs.gd")
 const TABLES := {
 	"resource": "RESOURCES", "organ": "ORGANS", "species": "SPECIES", "trait": "TRAITS",
 	"mutation": "MUTATIONS", "faction": "FACTIONS", "enemy": "ENEMIES", "boss": "BOSSES",
-	"biome": "BIOMES", "decision": "DECISIONS",
+	"biome": "BIOMES", "decision": "DECISIONS", "body": "BODIES",
 }
 
 static var _cache := {}
@@ -78,7 +78,7 @@ static func validate() -> Array:
 
 
 static func _check_refs(id: String, d: Dictionary, errors: Array) -> void:
-	for key in ["cost", "upkeep", "produces"]:
+	for key in ["cost", "upkeep", "produces", "storage", "yield"]:
 		var c = d.get(key, {})
 		if c is Dictionary:
 			for r in c:

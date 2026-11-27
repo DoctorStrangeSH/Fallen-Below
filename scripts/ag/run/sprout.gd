@@ -5,6 +5,8 @@ extends Node
 const Sprout = preload("res://scripts/ag/run/sprout_state.gd")
 const MapGen = preload("res://scripts/ag/systems/map_gen.gd")
 const OrganSystem = preload("res://scripts/ag/systems/organ_system.gd")
+const EconomySystem = preload("res://scripts/ag/systems/economy_system.gd")
+const Defs = preload("res://scripts/ag/data/defs.gd")
 
 const TICK := 0.1
 
@@ -12,6 +14,7 @@ signal started
 
 var state = null
 var organs: OrganSystem
+var economy: EconomySystem
 var speed := 1.0
 var _acc := 0.0
 
@@ -20,25 +23,37 @@ func _init() -> void:
 	organs = OrganSystem.new()
 	organs.name = "Organs"
 	add_child(organs)
+	economy = EconomySystem.new()
+	economy.name = "Economy"
+	add_child(economy)
 
 
 ## New sprout: generate the map and grow the Heart Bud in the middle of its hall.
 func start(seed_value: int, biome_id: String = "biome.catacombs") -> void:
 	state = Sprout.new(seed_value, biome_id)
 	state.grid = MapGen.generate(state.rng, biome_id)
-	organs.setup(state)
+	_wire()
 	var c: Vector2i = state.grid.room_center(state.grid.heart_room) - Vector2i(1, 1)
 	var uid := organs.place("organ.heart", c)
 	assert(uid >= 0, "Heart room must fit the Heart")
+	for r in Defs.ECONOMY["start"]:
+		state.resources[r] = 0.0
+		economy.apply(str(r), float(Defs.ECONOMY["start"][r]), "Sprout start")
 	started.emit()
 
 
 ## Continue a loaded sprout.
 func resume(loaded) -> void:
 	state = loaded
-	organs.setup(state)
+	_wire()
 	organs.recompute(true)
 	started.emit()
+
+
+func _wire() -> void:
+	organs.setup(state)
+	organs.economy = economy
+	economy.setup(state, organs)
 
 
 func _process(delta: float) -> void:
@@ -54,3 +69,4 @@ func _process(delta: float) -> void:
 func step() -> void:
 	state.tick += 1
 	organs.tick(TICK)
+	economy.tick(TICK)

@@ -9,6 +9,26 @@ const SCHEMA := 3
 ## old id -> new id, applied when loading saves (TECH_SPEC 2.4)
 const RENAMED := {}
 
+## Economy constants (GDD 5). Rates are per second.
+const ECONOMY := {
+	"start": {"resource.biomass": 120.0, "resource.energy": 40.0, "resource.genome": 20.0},
+	"channel_cost": {"resource.biomass": 2},
+	"reabsorb_refund": 0.5,        # share of the organ's cost returned when the player reabsorbs it
+	"digest_speed": 3.0,           # body mass digested per second by one Stomach
+	"regen_heal": 2.0,             # hp per second healed by Regenerative Tissue on each organ in range
+	"regen_range": 3,              # cells (Chebyshev) from any cell of the tissue
+	"regen_cost": 0.25,            # biomass per hp healed
+	"impulse_base_cap": 3.0,
+	"impulse_cap_per_node": 2.0,
+}
+
+## Bodies the Stomach can digest (combat adds these from stage 07; the sandbox drops them for testing).
+const BODIES := {
+	"body.pilgrim": {"name": "Pilgrim's body", "mass": 30.0, "yield": {"resource.biomass": 30.0, "resource.genome": 6.0}},
+	"body.knight": {"name": "Knight's body", "mass": 45.0, "yield": {"resource.biomass": 40.0, "resource.genome": 8.0}},
+	"body.burner": {"name": "Burner Priest's body", "mass": 35.0, "yield": {"resource.biomass": 28.0, "resource.genome": 10.0}},
+}
+
 const RESOURCES := {
 	"resource.biomass": {"name": "Biomass", "desc": "Living matter digested from bodies. Builds organs, grows creatures, repairs tissue."},
 	"resource.energy": {"name": "Energy", "desc": "The Heart's pulse. Pays upkeep for organs, creatures, nerve impulses and kept minds."},
@@ -19,7 +39,8 @@ const ORGANS := {
 	"organ.heart": {
 		"name": "Heart Bud", "desc": "The heart of this sprout. If it dies, the sprout burns out.",
 		"category": "central", "footprint": [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)],
-		"cost": {}, "hp": 400, "upkeep": {}, "produces": {"resource.energy": 3.0},
+		"cost": {}, "hp": 400, "upkeep": {}, "produces": {"resource.energy": 4.0, "resource.biomass": 0.6},
+		"storage": {"resource.biomass": 300, "resource.energy": 100, "resource.genome": 120},
 		"needs_channel": false, "ability": "nightfall", "slots": 2, "resist": {}, "weak": {"holy": 0.25},
 	},
 	"organ.stomach": {

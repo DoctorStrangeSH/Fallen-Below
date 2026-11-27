@@ -9,7 +9,7 @@ const Grid = preload("res://scripts/ag/run/grid_state.gd")
 signal fx(kind: String, target, amount: float)
 
 const SCHEMA := 3
-const GEN_VERSION := 1      # bump when the map generator changes; old mid-run saves are then refused
+const GEN_VERSION := 2      # bump when the map generator changes; old mid-run saves are then refused
 
 var seed_value: int = 0
 var gen_version: int = GEN_VERSION
@@ -23,6 +23,9 @@ var organs := {}            # uid -> organ instance (TECH_SPEC 3 OrganInstance)
 var next_uid: int = 1
 var network := {}           # Vector2i -> true: cells linked to the Heart (recomputed, not saved)
 var lost := false           # the Heart Bud died
+var bodies: Array = []      # digestion queue: [{"id": body id, "left": mass}]
+var impulses: float = 0.0   # nerve impulses for commands (stage 07)
+var ledger := {}            # res -> {source: total change}; explains every change of the stock
 
 
 func _init(seed_in: int = 0, biome: String = "biome.catacombs") -> void:
@@ -40,6 +43,7 @@ func to_dict() -> Dictionary:
 		"schema": SCHEMA, "gen_version": gen_version, "seed": str(seed_value), "biome": biome_id,
 		"tick": tick, "rng": rng.to_dict(), "resources": resources.duplicate(),
 		"grid": grid.to_dict() if grid else {}, "organs": organs.values(), "next_uid": next_uid, "lost": lost,
+		"bodies": bodies.duplicate(true), "impulses": impulses, "ledger": ledger.duplicate(true),
 	}
 
 
@@ -70,9 +74,22 @@ static func from_dict(d: Dictionary):
 				inst["cell"] = [int(inst["cell"][0]), int(inst["cell"][1])]
 				for k in ["hp", "max_hp", "recover"]:
 					inst[k] = float(inst.get(k, 0.0))
+				inst["priority"] = int(inst.get("priority", 1))
 				s.organs[int(inst["uid"])] = inst
 	s.next_uid = int(d.get("next_uid", 1))
 	s.lost = bool(d.get("lost", false))
+	var bs = d.get("bodies", [])
+	if bs is Array:
+		for b in bs:
+			if b is Dictionary:
+				s.bodies.append({"id": str(b.get("id", "")), "left": float(b.get("left", 0.0))})
+	s.impulses = float(d.get("impulses", 0.0))
+	var lg = d.get("ledger", {})
+	if lg is Dictionary:
+		for res_id in lg:
+			s.ledger[str(res_id)] = {}
+			for src in lg[res_id]:
+				s.ledger[str(res_id)][str(src)] = float(lg[res_id][src])
 	return s
 
 
