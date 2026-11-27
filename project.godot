@@ -18,6 +18,8 @@ Meta="*res://scripts/autoload/meta.gd"
 Music="*res://scripts/autoload/music.gd"
 Loc="*res://scripts/autoload/loc.gd"
 Sfx="*res://scripts/autoload/sfx.gd"
+Bus="*res://scripts/autoload/bus.gd"
+Saves="*res://scripts/autoload/save_manager.gd"
 
 [display]
 

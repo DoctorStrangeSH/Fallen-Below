@@ -1,0 +1,54 @@
+extends RefCounted
+## State of one sprout (= one run). Stage 02 skeleton: identity, clock, RNG and serialisation.
+## Grid, organs, creatures, enemies and scene queue are added in stages 03-10 (TECH_SPEC 3, 5).
+
+const Rng = preload("res://scripts/ag/core/rng_streams.gd")
+
+const SCHEMA := 3
+const GEN_VERSION := 1      # bump when the map generator changes; old mid-run saves are then refused
+
+var seed_value: int = 0
+var gen_version: int = GEN_VERSION
+var biome_id: String = "biome.catacombs"
+var tick: int = 0           # fixed 10 Hz simulation ticks
+var rng: Rng
+var resources := {"resource.biomass": 0.0, "resource.energy": 0.0, "resource.genome": 0.0}
+var paused := false
+
+
+func _init(seed_in: int = 0, biome: String = "biome.catacombs") -> void:
+	seed_value = seed_in
+	biome_id = biome
+	rng = Rng.new(seed_in)
+
+
+func time_stopped() -> bool:
+	return paused
+
+
+func to_dict() -> Dictionary:
+	return {
+		"schema": SCHEMA, "gen_version": gen_version, "seed": str(seed_value), "biome": biome_id,
+		"tick": tick, "rng": rng.to_dict(), "resources": resources.duplicate(),
+	}
+
+
+## Returns null when the save belongs to another generator version or is malformed.
+static func from_dict(d: Dictionary):
+	if int(d.get("schema", 0)) != SCHEMA or int(d.get("gen_version", 0)) != GEN_VERSION:
+		return null
+	var s = load("res://scripts/ag/run/sprout_state.gd").new(int(str(d.get("seed", "0"))), str(d.get("biome", "biome.catacombs")))
+	s.tick = int(d.get("tick", 0))
+	var r = d.get("rng", {})
+	if r is Dictionary:
+		s.rng = Rng.from_dict(r)
+	var res = d.get("resources", {})
+	if res is Dictionary:
+		for k in s.resources:
+			s.resources[k] = float(res.get(k, 0.0))
+	return s
+
+
+## Stable fingerprint of the serialised state (save/load round-trip and determinism tests).
+func state_hash() -> int:
+	return hash(JSON.stringify(to_dict(), "", true))

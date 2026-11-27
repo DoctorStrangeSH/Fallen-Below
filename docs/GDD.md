@@ -372,7 +372,7 @@
 
 | Пункт | Статус |
 |---|---|
-| AG-01 Run Manager (росток, фазы, seed) | NOT DONE |
+| AG-01 Run Manager (росток, фазы, seed) | PARTIAL (SproutState: seed, потоки RNG, сохранение; фаз нет) |
 | AG-02 Dungeon (сетка, комнаты, маршруты) | NOT DONE |
 | AG-03 Organs (органы, каналы) | NOT DONE |
 | AG-04 Resources (ресурсы, прогноз) | NOT DONE |
@@ -384,7 +384,7 @@
 | AG-10 Boss (Железный палач) | NOT DONE |
 | AG-11 Narrative (решения, состояния, планировщик сцен, концовки) | NOT DONE (правила готовы в `tools/narrative_check.py`) |
 | AG-12 Meta (Архив Памяти) | NOT DONE |
-| AG-13 Save (кампания, забег, резервные копии) | NOT DONE |
+| AG-13 Save (кампания, забег, резервные копии) | PARTIAL (SaveManager, атомарная запись, `.bak`, миграция v2→v3, unit-тесты; полное состояние ростка — по мере этапов 03–10) |
 | AG-14 UI/UX (панели, масштаб, клавиши) | NOT DONE |
 | AG-15 Audio/Visual (состояния музыки, окружение) | PARTIAL (наследие Fallen Below) |
 | Вертикальный срез | NOT DONE |

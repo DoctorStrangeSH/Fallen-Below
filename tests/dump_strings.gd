@@ -1,7 +1,8 @@
 extends SceneTree
 ## Dumps every player-facing string from game_data.gd to stdout as JSON (for translation).
 const D = preload("res://scripts/data/game_data.gd")
-const KEYS := ["name", "desc", "title", "style", "passive", "passive_desc", "active", "active_desc",
+const AG = preload("res://scripts/ag/data/defs.gd")
+const KEYS := ["name", "desc", "drawback", "title", "style", "passive", "passive_desc", "active", "active_desc",
 	"hint", "xp_source", "boss", "boss_title", "dark"]
 var out := {}
 
@@ -35,5 +36,7 @@ func _init() -> void:
 	_add(D.WARDEN_TRUE_NAME)
 	for s in D.GEAR_SLOTS:
 		_add(str(s).capitalize())
+	for c in ["RESOURCES", "ORGANS", "SPECIES", "TRAITS", "MUTATIONS", "FACTIONS", "ENEMIES", "BOSSES", "BIOMES", "DECISIONS"]:
+		_walk(AG.new().get(c))
 	print("JSONSTART" + JSON.stringify(out.keys()) + "JSONEND")
 	quit()
