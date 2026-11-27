@@ -2,7 +2,7 @@
 
 *Loop Hero in reverse: build the dungeon, kill the heroes, raise them as your army. Only the dead remember who they were.*
 
-Roguelite с непрямым управлением на **Godot 4.7**. Полный дизайн: [docs/GDD.md](docs/GDD.md).
+Roguelite с непрямым управлением на **Godot 4.7**. Полный дизайн: [docs/archive/GDD_FALLEN_BELOW.md](docs/archive/GDD_FALLEN_BELOW.md).
 
 ## Как запустить
 
@@ -31,7 +31,7 @@ Roguelite с непрямым управлением на **Godot 4.7**. Пол�
 - **Акт III «Пепельный собор»** открывается после Акта II: огонь перекидывается между залами, кровь из добычи его гасит (клик по пожару), фанатики, кадильщики и инквизитор Ваэль.
 - **Акт II «Затопленные шахты»** открывается после победы в Акте I (выбор акта на экране подготовки): гномы в броне, подрывники, обвалы и Король-рудокоп Бранн, который взрывает твои залы.
 - **Sleep** завершает забег: 100% добычи в конце недели (каждый 5-й день), 60% в другие дни. Если Страж пал, только 30%.
-- **Сюжет:** поднятые мертвецы шепчут страницы **Книги Павших**. Чем больше страниц, тем больше воспоминаний открывается в Логове. Вся история в [docs/STORY.md](docs/STORY.md).
+- **Сюжет:** поднятые мертвецы шепчут страницы **Книги Павших**. Чем больше страниц, тем больше воспоминаний открывается в Логове. Вся история в [docs/archive/STORY_FALLEN_BELOW.md](docs/archive/STORY_FALLEN_BELOW.md).
 - Пробел — пауза, 1/2/3 — скорость, ПКМ — отмена.
 
 ## Тестирование (только при запуске из редактора)
@@ -84,7 +84,7 @@ godot --headless res://tests/bot.tscn -- --runs=10 --warden=bone --lure=gold
 ## Структура
 
 ```
-docs/GDD.md                  дизайн-документ
+docs/GDD.md                  дизайн ABYSSAL GENESIS (+ NARRATIVE_BIBLE, TECH_SPEC, ROADMAP)
 scenes/                      main_menu, lair, run
 scripts/autoload/meta.gd     мета-прогресс и сохранения (autoload "Meta")
 scripts/data/game_data.gd    все данные и баланс: карты, герои, черты, постройки
