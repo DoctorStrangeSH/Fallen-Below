@@ -130,6 +130,9 @@ func rates(dt: float = 0.0) -> Array:
 		var cu: float = creatures.upkeep_rate() * (1.0 - s.starve_frac)
 		if cu > 0.0:
 			out.append({"res": ENERGY, "amount": -cu, "source": "Creatures"})
+	var mu: float = minds_upkeep() * (1.0 - s.starve_frac)
+	if mu > 0.0:
+		out.append({"res": ENERGY, "amount": -mu, "source": "Kept minds"})
 	# digestion: each working Stomach works on its own body from the queue
 	var k := 0
 	for uid in _uids():
@@ -214,10 +217,10 @@ func balance_energy(dt: float) -> void:
 		s.organs[victim]["asleep"] = true
 		organs.refresh(victim)
 		s.fx.emit("organ_sleep", victim, 0.0)
-	if amount(ENERGY) + net(ENERGY) * dt < 0.0 and creatures != null:
+	if amount(ENERGY) + net(ENERGY) * dt < 0.0 and (creatures != null or minds_upkeep() > 0.0):
 		# every organ that can sleep is asleep and it is still not enough: creatures get only
 		# the share of energy that exists, and weaken in proportion to what they miss
-		var cu: float = creatures.upkeep_rate()
+		var cu: float = (creatures.upkeep_rate() if creatures != null else 0.0) + minds_upkeep()
 		if cu > 0.0:
 			var without := net(ENERGY) + cu
 			var paid := clampf((amount(ENERGY) / dt + without) / cu, 0.0, 1.0)
@@ -235,6 +238,10 @@ func balance_energy(dt: float) -> void:
 			s.organs[uid]["asleep"] = false
 			organs.refresh(uid)
 			s.fx.emit("organ_wake", uid, 0.0)
+
+
+func minds_upkeep() -> float:
+	return float(s.kept_minds) * float(Defs.MINDS["archive_upkeep"])
 
 
 func _sleep_candidate() -> int:

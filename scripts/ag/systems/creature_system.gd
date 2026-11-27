@@ -21,6 +21,7 @@ var economy
 var paths := Pathing.new()
 var genetics = null   # GeneticsSystem
 var evolution = null  # EvolutionSystem
+var minds = null      # MindSystem
 
 
 func setup(state, organ_system, economy_system) -> void:
@@ -100,6 +101,7 @@ func _new_unit(def_id: String, team: String, cell: Vector2i, d: Dictionary) -> i
 		"mutations": [], "defects": [], "bonus_hp": 0.0, "bonus_atk": 0.0, "resist": {}, "weak": {},
 		"heal_mult": 1.0, "thorns": 0.0, "regen": 0.0, "upkeep_extra": 0.0, "spores": false, "predator": 0.0,
 		"ignores_alarm": false, "impulse_cost": 0, "insulated": false, "slow_t": 0.0,
+		"order": "", "order_target": -1, "order_t": 0.0, "last_hit": {}, "infect_by": "",
 	}
 	return uid
 
@@ -224,12 +226,18 @@ func zero_storm() -> bool:
 	var st: Dictionary = Defs.ZERO["species.zero"]["storm"]
 	var hit := false
 	for e in team_units(ORDER):
-		if pos_of(s.units[e]).distance_to(pos_of(u)) <= float(st["radius"]):
-			_hurt_unit(z, e, float(u["atk"]) * float(st["mult"]), "Bone Storm")
+		if s.units.has(e) and pos_of(s.units[e]).distance_to(pos_of(u)) <= float(st["radius"]):
+			_hurt_unit(z, e, float(u["atk"]) * float(st["mult"]), "Bone Storm", "physical")
 			hit = true
 	u["storm_cd"] = float(st["cooldown"])
 	s.fx.emit("bone_storm", z, 0.0)
 	return hit
+
+
+## A mind given to Zero: experience and a little healing (GDD 7).
+func feed_zero(z: Dictionary, xp: int, heal: float) -> void:
+	_gain_xp(z, xp)
+	z["hp"] = minf(float(z["max_hp"]), float(z["hp"]) + float(z["max_hp"]) * heal)
 
 
 func _gain_xp(u: Dictionary, amount: int) -> void:
@@ -301,8 +309,14 @@ func _timers(u: Dictionary, dt: float) -> void:
 	if float(u["infect_t"]) > 0.0:
 		u["infect_t"] = maxf(0.0, float(u["infect_t"]) - dt)
 		u["hp"] = float(u["hp"]) - ai("infect_dps") * dt
+		u["last_hit"] = {"by": str(u.get("infect_by", "")), "reason": "infection", "kind": "poison"}
 	if str(u["team"]) == ABYSS and s.starving:
 		u["hp"] = float(u["hp"]) - ai("starve_dps") * s.starve_frac * dt
+		u["last_hit"] = {"by": "", "reason": "starvation", "kind": ""}
+	if float(u.get("order_t", 0.0)) > 0.0:
+		u["order_t"] = maxf(0.0, float(u["order_t"]) - dt)
+		if float(u["order_t"]) == 0.0:
+			u["order"] = ""
 	if float(u.get("regen", 0.0)) > 0.0 and float(u["hp"]) > 0.0:
 		_heal_unit(u, float(u["regen"]) * float(u["max_hp"]) * dt)
 	u["slow_t"] = maxf(0.0, float(u.get("slow_t", 0.0)) - dt)
@@ -352,6 +366,17 @@ func _think_creature(u: Dictionary, dt: float) -> void:
 		if cell_of(u) == home_of(u):
 			u["state"] = "recover"
 		return
+	# a nerve command overrides the creature's own judgement while it lasts
+	if float(u.get("order_t", 0.0)) > 0.0:
+		var ot := int(u["order_target"])
+		if str(u["order"]) == "focus" and s.units.has(ot):
+			_set_target(u, ot, "unit", "engage")
+			return
+		if str(u["order"]) == "protect" and s.organs.has(ot):
+			_set_target(u, ot, "guard", "protect")
+			return
+		u["order_t"] = 0.0
+		u["order"] = ""
 	if st == "recover":
 		_heal_unit(u, float(u["max_hp"]) * ai("recover_rate") * dt)
 		var attacker := int(u["aggro"])
@@ -702,15 +727,17 @@ func _strike_unit(att_uid: int, def_uid: int) -> void:
 	if str(victim["team"]) == ABYSS and evolution != null:
 		evolution.record(str(r["kind"]), float(r["amount"]), str(a["def"]), str(victim["def"]))
 	var thorns := float(victim.get("thorns", 0.0))
-	_hurt_unit(att_uid, def_uid, float(r["amount"]), str(r["reason"]))
+	var victim_def := str(victim["def"])
+	_hurt_unit(att_uid, def_uid, float(r["amount"]), str(r["reason"]), str(r["kind"]))
 	if thorns > 0.0 and s.units.has(att_uid):
-		_hurt_unit(def_uid if s.units.has(def_uid) else -1, att_uid, thorns, "acid")
+		_hurt_unit(def_uid if s.units.has(def_uid) else -1, att_uid, thorns, "acid blood", "acid", victim_def)
 	if not s.units.has(att_uid):
 		return
 	if Rules.has_trait(a, "trait.drain"):
 		_heal_unit(a, float(r["amount"]) * ai("drain"))
 	if Rules.has_trait(a, "trait.infect") and s.units.has(def_uid):
 		s.units[def_uid]["infect_t"] = ai("infect_time")
+		s.units[def_uid]["infect_by"] = str(a["def"])
 
 
 func _strike_organ(u: Dictionary, organ_uid: int) -> void:
@@ -726,11 +753,14 @@ func _reveal(u: Dictionary) -> void:
 	u["hide_t"] = 0.0
 
 
-func _hurt_unit(att_uid: int, def_uid: int, amount: float, reason: String) -> void:
+func _hurt_unit(att_uid: int, def_uid: int, amount: float, reason: String, kind: String = "physical", by: String = "") -> void:
 	if not s.units.has(def_uid):
 		return
 	var d: Dictionary = s.units[def_uid]
 	d["hp"] = float(d["hp"]) - amount
+	if by == "" and s.units.has(att_uid):
+		by = str(s.units[att_uid]["def"])
+	d["last_hit"] = {"by": by, "reason": reason, "kind": kind}
 	if att_uid >= 0:
 		d["aggro"] = att_uid
 		d["aggro_t"] = 3.0
@@ -746,6 +776,9 @@ func _die(uid: int, killer: int) -> void:
 	var u: Dictionary = s.units[uid]
 	var def_id := str(u["def"])
 	var team := str(u["team"])
+	var lh: Dictionary = u.get("last_hit", {})
+	s.log_death({"victim": def_id, "team": team, "by": str(lh.get("by", "")), "reason": str(lh.get("reason", "")),
+		"kind": str(lh.get("kind", ""))})
 	s.units.erase(uid)
 	if team == ORDER:
 		s.count("invaders_killed")
@@ -754,6 +787,8 @@ func _die(uid: int, killer: int) -> void:
 			economy.add_body(str(d["body"]))
 		if bool(d.get("sentient", false)):
 			_bus("mind_released", [uid, def_id])
+			if minds != null:
+				minds.release(def_id, cell_of(u))
 		if s.units.has(killer):
 			var k: Dictionary = s.units[killer]
 			k["kills"] = int(k["kills"]) + 1

@@ -21,6 +21,7 @@ var room := PackedInt32Array()       # room index or -1 (corridor / rock)
 var organ := PackedInt32Array()      # organ uid or -1
 var channel := PackedByteArray()     # 1 = living channel
 var scar := PackedFloat32Array()     # damage left on the cell (destroyed organs, burns)
+var sealed := PackedByteArray()      # 1 = a temporary muscle wall (command "Seal passage")
 
 var rooms: Array = []                # Array of Rect2i
 var heart_room: int = -1
@@ -41,6 +42,7 @@ func resize(width: int, height: int) -> void:
 	organ = PackedInt32Array(); organ.resize(n); organ.fill(-1)
 	channel = PackedByteArray(); channel.resize(n); channel.fill(0)
 	scar = PackedFloat32Array(); scar.resize(n); scar.fill(0.0)
+	sealed = PackedByteArray(); sealed.resize(n); sealed.fill(0)
 	rooms = []
 	heart_room = -1
 	entrances = []
@@ -76,7 +78,11 @@ func is_entrance(c: Vector2i) -> bool:
 
 ## Creatures and invaders walk on floor that no organ occupies.
 func walkable(c: Vector2i) -> bool:
-	return is_floor(c) and organ[idx(c)] == -1
+	return is_floor(c) and organ[idx(c)] == -1 and sealed[idx(c)] == 0
+
+
+func is_sealed(c: Vector2i) -> bool:
+	return in_bounds(c) and sealed[idx(c)] == 1
 
 
 func neighbors(c: Vector2i) -> Array:
@@ -120,6 +126,7 @@ func to_dict() -> Dictionary:
 		"floor": Marshalls.raw_to_base64(floor), "tissue": Marshalls.raw_to_base64(tissue),
 		"room": Marshalls.raw_to_base64(room.to_byte_array()), "organ": Marshalls.raw_to_base64(organ.to_byte_array()),
 		"channel": Marshalls.raw_to_base64(channel), "scar": Marshalls.raw_to_base64(scar.to_byte_array()),
+		"sealed": Marshalls.raw_to_base64(sealed),
 	}
 
 
@@ -135,6 +142,9 @@ static func from_dict(d: Dictionary):
 	if f.size() != n or t.size() != n or r.size() != n or o.size() != n or c.size() != n or s.size() != n:
 		return null
 	g.floor = f; g.tissue = t; g.room = r; g.organ = o; g.channel = c; g.scar = s
+	var sl := Marshalls.base64_to_raw(str(d.get("sealed", "")))
+	if sl.size() == n:
+		g.sealed = sl
 	for rr in d.get("rooms", []):
 		g.rooms.append(Rect2i(int(rr[0]), int(rr[1]), int(rr[2]), int(rr[3])))
 	g.heart_room = int(d.get("heart_room", -1))

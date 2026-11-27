@@ -161,6 +161,12 @@ func damage(uid: int, amount: float, kind: String = "physical", attacker_def: St
 	var dealt := maxf(0.0, amount * maxf(0.0, mult))
 	if evolution != null:
 		evolution.record(kind, dealt, attacker_def, str(o["def"]))
+	var note := ""
+	if mult < 1.0:
+		note = kind + " resisted"
+	elif mult > 1.0:
+		note = kind + " weakness"
+	o["last_hit"] = {"by": attacker_def, "reason": note, "kind": kind}
 	o["hp"] = maxf(0.0, float(o["hp"]) - dealt)
 	_bus("organ_damaged", [uid, dealt, kind])
 	s.alerts[uid] = float(Defs.AI["alert_time"])
@@ -184,6 +190,9 @@ func destroy(uid: int) -> void:
 	if not s.organs.has(uid):
 		return
 	var is_heart := str(s.organs[uid]["def"]) == "organ.heart"
+	var lh: Dictionary = s.organs[uid].get("last_hit", {})
+	s.log_death({"victim": str(s.organs[uid]["def"]), "team": "organ", "by": str(lh.get("by", "")),
+		"reason": str(lh.get("reason", "")), "kind": str(lh.get("kind", ""))})
 	for c in cells_of(uid):
 		var i: int = s.grid.idx(c)
 		s.grid.organ[i] = -1

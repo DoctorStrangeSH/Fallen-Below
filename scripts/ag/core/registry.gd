@@ -7,7 +7,7 @@ const Defs = preload("res://scripts/ag/data/defs.gd")
 const TABLES := {
 	"resource": "RESOURCES", "organ": "ORGANS", "species": "SPECIES", "trait": "TRAITS",
 	"mutation": "MUTATIONS", "faction": "FACTIONS", "enemy": "ENEMIES", "boss": "BOSSES",
-	"biome": "BIOMES", "decision": "DECISIONS", "body": "BODIES", "defect": "DEFECTS",
+	"biome": "BIOMES", "decision": "DECISIONS", "body": "BODIES", "defect": "DEFECTS", "command": "COMMANDS",
 }
 
 static var _cache := {}

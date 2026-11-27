@@ -13,6 +13,15 @@ const Reg = preload("res://scripts/ag/core/registry.gd")
 const UI = preload("res://scripts/ui/ui_style.gd")
 const ResourceBar = preload("res://scripts/ag/ui/resource_bar.gd")
 const Defs = preload("res://scripts/ag/data/defs.gd")
+const CombatLog = preload("res://scripts/ag/systems/combat_log.gd")
+const COMMAND_KEYS := {"command.focus": "F", "command.protect": "V", "command.seal": "T", "command.regen": "H"}
+const FX_SOUND := {
+	"unit_hit": "hit", "organ_hit": "hit", "unit_died": "death", "organ_destroyed": "blast", "creature_born": "place",
+	"organ_grow": "place", "channel_grow": "click", "zero_embodied": "ability", "bone_storm": "blast", "zero_level": "level",
+	"mutation": "combo", "recipe_found": "combo", "adaptation_offered": "ability", "mind_released": "loot", "mind_digest": "devour",
+	"mind_archive": "level", "mind_zero": "devour", "cmd_focus": "click", "cmd_protect": "click", "cmd_seal": "quench",
+	"cmd_regen": "ability", "spores": "ignite", "invader_arrives": "escape", "zero_fell": "boss", "organ_sleep": "click",
+}
 
 const TOOLS := ["organ.stomach", "organ.incubator", "organ.nerve_node", "organ.sensor", "organ.regen_tissue", "channel", "cut"]
 const STATE_NAMES := {
@@ -47,6 +56,11 @@ var gene_box: VBoxContainer
 var gene_line := ""
 var offer_box: VBoxContainer
 var offer_sig := ""
+var cmd_buttons := {}
+var mind_box: VBoxContainer
+var mind_sig := ""
+var log_panel: PanelContainer
+var log_label: Label
 var cam: Camera2D
 var shot_zoom := 1.0
 var panning := false
@@ -97,6 +111,15 @@ func _new_map(sd: int) -> void:
 	seed_value = sd
 	sp.start(sd)
 	bar.economy = sp.economy
+	sp.state.fx.connect(_on_fx)
+	mind_sig = "-"
+	offer_sig = "-"
+
+
+func _on_fx(kind: String, target, amount: float) -> void:
+	if FX_SOUND.has(kind):
+		Sfx.play(FX_SOUND[kind])
+	view.add_fx(kind, target, amount)
 
 
 func _build_hud() -> void:
@@ -138,6 +161,31 @@ func _build_hud() -> void:
 	layer.add_child(gene_panel)
 	gene_box = VBoxContainer.new()
 	gene_panel.add_child(gene_box)
+	var cmds := HBoxContainer.new()
+	cmds.position = Vector2(80, 604)
+	cmds.add_theme_constant_override("separation", 6)
+	layer.add_child(cmds)
+	for id in ["command.focus", "command.protect", "command.seal", "command.regen"]:
+		var c: Dictionary = Defs.COMMANDS[id]
+		var b := UI.button("", Vector2(200, 36))
+		b.add_theme_font_size_override("font_size", 13)
+		b.pressed.connect(_command_pressed.bind(id))
+		var tip_text := "%s\n%s" % [Loc.t(str(c["name"])), Loc.t(str(c["desc"]))]
+		b.mouse_entered.connect(func(): hover_text = tip_text)
+		b.mouse_exited.connect(func(): hover_text = "")
+		cmds.add_child(b)
+		cmd_buttons[id] = b
+	mind_box = VBoxContainer.new()
+	mind_box.add_theme_constant_override("separation", 4)
+	layer.add_child(mind_box)
+	log_panel = UI.panel()
+	log_panel.position = Vector2(860, 50)
+	log_panel.visible = false
+	layer.add_child(log_panel)
+	log_label = UI.label("", 13, Color(0.95, 0.92, 1.0))
+	log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	log_label.custom_minimum_size = Vector2(380, 0)
+	log_panel.add_child(log_label)
 	offer_box = VBoxContainer.new()
 	offer_box.position = Vector2(860, 420)
 	offer_box.add_theme_constant_override("separation", 6)
@@ -188,6 +236,7 @@ func tip_bind(b: Control, species_id: String) -> void:
 
 
 var hover_text := ""
+
 
 
 func _forecast_text(species_id: String) -> String:
@@ -255,7 +304,7 @@ func _refresh_offers() -> void:
 		for p in sp.state.proposals:
 			offer_box.add_child(_offer_card(p))
 	offer_box.reset_size()
-	offer_box.position = Vector2(1272.0 - offer_box.size.x, 640.0 - offer_box.size.y)
+	offer_box.position = Vector2(1272.0 - offer_box.size.x, 596.0 - offer_box.size.y)
 	for card in offer_box.get_children():
 		var pid: int = card.get_meta("pid")
 		var p: Dictionary = sp.evolution.find(pid)
@@ -306,11 +355,103 @@ func _offer_card(p: Dictionary) -> PanelContainer:
 	return card
 
 
+func _command_pressed(id: String) -> void:
+	if id == "command.regen":
+		sp.commands.issue(id, null)
+	else:
+		_select("cmd." + id.replace("command.", ""))
+
+
+func _refresh_commands() -> void:
+	for id in cmd_buttons:
+		var c: Dictionary = Defs.COMMANDS[id]
+		var b: Button = cmd_buttons[id]
+		var cd := float(sp.state.cmd_cd.get(id, 0.0))
+		b.text = "%s  %s · %d⚡%s" % [COMMAND_KEYS[id], Loc.t(str(c["name"])), int(c["cost"]), ("  %d s" % ceili(cd)) if cd > 0.0 else ""]
+		b.disabled = cd > 0.0 or sp.state.impulses < float(c["cost"])
+		b.set_pressed_no_signal(tool == "cmd." + id.replace("command.", ""))
+
+
+func _refresh_minds() -> void:
+	var sig: String = str(sp.state.mind_stance) + ":"
+	for m in sp.state.minds:
+		sig += str(m["id"]) + ","
+	if sig != mind_sig:
+		mind_sig = sig
+		for ch in mind_box.get_children():
+			ch.queue_free()
+		if not sp.state.minds.is_empty():
+			var stance := UI.button(Loc.t("If you do not decide: %s") % Loc.t(STANCE_NAMES[sp.state.mind_stance]), Vector2(380, 28))
+			stance.add_theme_font_size_override("font_size", 12)
+			stance.pressed.connect(func():
+				var order := ["digest", "archive", "zero"]
+				sp.minds.set_stance(order[(order.find(sp.state.mind_stance) + 1) % 3]))
+			mind_box.add_child(stance)
+		for m in sp.state.minds:
+			mind_box.add_child(_mind_card(m))
+	for card in mind_box.get_children():
+		if card.has_meta("mid"):
+			var m: Dictionary = sp.minds.find(card.get_meta("mid"))
+			if not m.is_empty():
+				(card.get_meta("timer") as Label).text = "%d s" % ceili(float(m["left"]))
+	mind_box.reset_size()
+	mind_box.position = Vector2(90, 596 - mind_box.size.y)
+
+
+const STANCE_NAMES := {"digest": "digest", "archive": "keep in the Archive", "zero": "give to Zero"}
+
+
+func _mind_card(m: Dictionary) -> PanelContainer:
+	var card := UI.panel()
+	card.set_meta("mid", int(m["id"]))
+	var box := VBoxContainer.new()
+	card.add_child(box)
+	var top := HBoxContainer.new()
+	top.add_child(UI.label(Loc.t("The mind of a %s waits") % Loc.t(str(Reg.get_def(str(m["def"]))["name"])), 14, Color(0.85, 0.9, 1.0)))
+	var timer := UI.label("", 12, UI.MUTED)
+	top.add_child(timer)
+	card.set_meta("timer", timer)
+	box.add_child(top)
+	var row := HBoxContainer.new()
+	var choices := [["digest", Loc.t("Digest · +10 bio, +5 gen")], ["archive", Loc.t("Keep · 0.2 en/s")], ["zero", Loc.t("Give to Zero")]]
+	for ch in choices:
+		var b := UI.button(str(ch[1]), Vector2(120, 28))
+		b.add_theme_font_size_override("font_size", 12)
+		var ok: Dictionary = sp.minds.can(int(m["id"]), str(ch[0]))
+		b.disabled = not ok["ok"]
+		var choice: String = ch[0]
+		b.pressed.connect(func(): sp.minds.resolve(int(m["id"]), choice))
+		if not ok["ok"]:
+			var why := Loc.t(str(ok["reason"]))
+			b.mouse_entered.connect(func(): hover_text = why)
+			b.mouse_exited.connect(func(): hover_text = "")
+		row.add_child(b)
+	box.add_child(row)
+	return card
+
+
+func _refresh_log() -> void:
+	if not log_panel.visible:
+		return
+	var lines: Array = [Loc.t("Combat log  [L]")]
+	var entries: Array = sp.state.combat_log.slice(maxi(0, sp.state.combat_log.size() - 10))
+	entries.reverse()
+	for e in entries:
+		var d: Array = CombatLog.describe(e)
+		var args: Array = []
+		for a in d[1]:
+			args.append(Loc.t(str(a)))
+		lines.append("• " + Loc.t(str(d[0])) % args)
+	if entries.is_empty():
+		lines.append(Loc.t("No one has died yet."))
+	log_label.text = "\n".join(lines)
+
+
 func _select(id: String) -> void:
 	tool = "" if tool == id else id
 	for k in buttons:
 		(buttons[k] as Button).set_pressed_no_signal(k == tool)
-	view.ghost_def = tool if tool != "" and tool != "cut" else ""
+	view.ghost_def = "seal" if tool == "cmd.seal" else (tool if tool != "" and tool != "cut" and not tool.begins_with("cmd.") else "")
 
 
 func _unhandled_input(e: InputEvent) -> void:
@@ -347,6 +488,16 @@ func _unhandled_input(e: InputEvent) -> void:
 			KEY_W:
 				for i in 3:
 					_send_invader()
+			KEY_F:
+				_select("cmd.focus")
+			KEY_V:
+				_select("cmd.protect")
+			KEY_T:
+				_select("cmd.seal")
+			KEY_H:
+				sp.commands.issue("command.regen", null)
+			KEY_L:
+				log_panel.visible = not log_panel.visible
 			KEY_G:
 				var near := _unit_under(view.get_global_mouse_position())
 				if near >= 0 and str(sp.state.units[near]["team"]) == "abyss":
@@ -396,6 +547,17 @@ func _apply(c: Vector2i, shift: bool) -> void:
 				sp.organs.lay_channel(c)
 		"cut":
 			sp.organs.cut_channel(c)
+		"cmd.focus":
+			var u := _unit_under(view.get_global_mouse_position())
+			if u >= 0 and sp.commands.issue("command.focus", u):
+				_select("")
+		"cmd.protect":
+			var o: int = sp.state.grid.organ_at(c) if sp.state.grid.in_bounds(c) else -1
+			if o >= 0 and sp.commands.issue("command.protect", o):
+				_select("")
+		"cmd.seal":
+			if sp.commands.issue("command.seal", c):
+				_select("")
 		_:
 			sp.organs.place(tool, c)
 
@@ -427,6 +589,16 @@ func _process(delta: float) -> void:
 		if Input.is_key_pressed(KEY_SHIFT) and g.in_bounds(c):
 			view.ghost_route = sp.organs.channel_route(c)
 		text = Loc.t("Lay a living channel. Shift+click grows the shortest route to the network.") if ok["ok"] else _reason(ok)
+	elif tool.begins_with("cmd."):
+		var cid := "command." + tool.substr(4)
+		var target = c
+		if cid == "command.focus":
+			target = _unit_under(world)
+		elif cid == "command.protect":
+			target = g.organ_at(c) if g.in_bounds(c) else -1
+		var ok: Dictionary = sp.commands.check(cid, target)
+		view.ghost_ok = ok["ok"]
+		text = Loc.t(str(Defs.COMMANDS[cid]["desc"])) + "\n" + (Loc.t("Impulses: %d") % int(ok["cost"]) if ok["ok"] else _reason(ok))
 	elif tool != "" and tool != "cut":
 		var ok: Dictionary = sp.organs.can_place(tool, c)
 		view.ghost_ok = ok["ok"]
@@ -477,12 +649,15 @@ func _process(delta: float) -> void:
 	for uid in sp.state.organs:
 		if sp.economy.is_working(int(uid)):
 			working += 1
-	info.text = Loc.t("Seed %d · creatures %d · invaders %d · bodies %d · %s · [Z] Zero [Q] storm [E] invader [W] wave [B] body [R] new map [Space] pause") % [
+	info.text = Loc.t("Seed %d · creatures %d · invaders %d · bodies %d · %s · [Z] Zero [Q] storm [E] invader [W] wave [B] body [L] log [R] new map [Space] pause") % [
 		seed_value, sp.creatures.team_units("abyss").size(), sp.creatures.team_units("order").size(), sp.state.bodies.size(),
 		Loc.t("Paused") if sp.state.paused else Loc.t("Running")]
 	if view.selected_uid >= 0 and not sp.state.organs.has(view.selected_uid):
 		_open_breeding(-1)
 	_refresh_offers()
+	_refresh_commands()
+	_refresh_minds()
+	_refresh_log()
 	if sp.state.lost:
 		info.text = Loc.t("The Heart Bud is dead. The sprout burns out. [R] new map")
 
@@ -593,4 +768,19 @@ func _demo_layout() -> void:
 				sp.organs.heal(int(uid), 999.0)
 	for i in 10:
 		sp.step()
-	_open_genes("species.devourer")
+	# a fight in front of the Heart: two knights fall, their minds wait; a passage is sealed
+	sp.state.impulses = 5.0
+	for i in 2:
+		var kn: int = sp.creatures.spawn_enemy("enemy.knight", stand[i])
+		sp.state.units[kn]["hp"] = 5.0
+	for i in 25:
+		sp.step()
+	var g2 = sp.state.grid
+	for e in g2.entrances:
+		var p: Array = sp.creatures.paths.path(e, stand[0])
+		if p.size() > 6 and sp.commands.issue("command.seal", p[3]):
+			break
+	log_panel.visible = true
+	# only one adaptation card in the picture
+	while sp.state.proposals.size() > 1:
+		sp.evolution.reject(int(sp.state.proposals[1]["id"]))

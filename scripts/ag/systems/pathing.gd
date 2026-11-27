@@ -42,7 +42,7 @@ func ensure() -> void:
 	for y in g.h:
 		for x in g.w:
 			var c := Vector2i(x, y)
-			if not g.is_floor(c):
+			if not g.is_floor(c) or g.is_sealed(c):
 				walk.set_point_solid(c, true)
 				breach.set_point_solid(c, true)
 			elif g.organ_at(c) >= 0:

@@ -39,6 +39,13 @@ var threats: Array = []     # [tick, kind, amount, attacker def, victim line] wi
 var proposals: Array = []   # adaptation offers (evolution_system.gd)
 var adapt_cd := {}          # kind -> seconds before another offer
 var next_proposal: int = 0
+var seals := {}             # cell index -> seconds left (command "Seal passage")
+var cmd_cd := {}            # command id -> cooldown seconds
+var minds: Array = []       # pending minds: {"id", "def", "cell": [x, y], "left"}
+var next_mind: int = 0
+var kept_minds: int = 0     # minds archived in this sprout (cost energy upkeep)
+var mind_stance := "digest" # what happens to a mind nobody decided about
+var combat_log: Array = []  # last deaths and destroyed organs, each with its cause
 var ledger := {}            # res -> {source: total change}; explains every change of the stock
 
 
@@ -62,6 +69,8 @@ func to_dict() -> Dictionary:
 		"alerts": _int_keys_to_str(alerts),
 		"strains": strains.duplicate(true), "recipes": recipes.duplicate(), "threats": threats.duplicate(true),
 		"proposals": proposals.duplicate(true), "adapt_cd": adapt_cd.duplicate(), "next_proposal": next_proposal,
+		"seals": _int_keys_to_str(seals), "cmd_cd": cmd_cd.duplicate(), "minds": minds.duplicate(true), "next_mind": next_mind,
+		"kept_minds": kept_minds, "mind_stance": mind_stance, "combat_log": combat_log.duplicate(true),
 	}
 
 
@@ -145,6 +154,28 @@ static func from_dict(d: Dictionary):
 		for k in ac:
 			s.adapt_cd[str(k)] = float(ac[k])
 	s.next_proposal = int(d.get("next_proposal", 0))
+	var se = d.get("seals", {})
+	if se is Dictionary:
+		var sk: Array = se.keys()
+		sk.sort_custom(func(a, b): return int(a) < int(b))
+		for k in sk:
+			s.seals[int(k)] = float(se[k])
+	var cc = d.get("cmd_cd", {})
+	if cc is Dictionary:
+		for k in cc:
+			s.cmd_cd[str(k)] = float(cc[k])
+	var mi = d.get("minds", [])
+	if mi is Array:
+		for m in mi:
+			var q: Dictionary = (m as Dictionary).duplicate(true)
+			q["id"] = int(q["id"])
+			s.minds.append(q)
+	s.next_mind = int(d.get("next_mind", 0))
+	s.kept_minds = int(d.get("kept_minds", 0))
+	s.mind_stance = str(d.get("mind_stance", "digest"))
+	var cl = d.get("combat_log", [])
+	if cl is Array:
+		s.combat_log = (cl as Array).duplicate(true)
 	var st = d.get("stats", {})
 	if st is Dictionary:
 		for k in st:
@@ -175,6 +206,15 @@ static func _int_keys_to_str(d: Dictionary) -> Dictionary:
 	for k in d:
 		out[str(k)] = d[k]
 	return out
+
+
+## Every death and every destroyed organ is logged with what caused it (GDD 9).
+func log_death(entry: Dictionary) -> void:
+	entry["t"] = tick
+	combat_log.append(entry)
+	if combat_log.size() > 60:
+		combat_log.pop_front()
+	count("deaths_logged")
 
 
 func count(stat: String, n: int = 1) -> void:

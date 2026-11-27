@@ -25,6 +25,7 @@ func _ready() -> void:
 	var total_ticks := 0
 	var t0 := Time.get_ticks_msec()
 	var counters := {}
+	var unexplained: Array = []
 	var first := 0
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--from="):
@@ -53,6 +54,9 @@ func _ready() -> void:
 				outcome = "abyss"
 				break
 		res[outcome] += 1
+		for entry in sp.state.combat_log:
+			if str(entry["by"]) == "" and not ["starvation", "infection"].has(str(entry["reason"])):
+				unexplained.append(entry)
 		if outcome == "timeout" and OS.get_cmdline_user_args().has("--why"):
 			for uid in sp.state.units:
 				var u: Dictionary = sp.state.units[uid]
@@ -70,9 +74,10 @@ func _ready() -> void:
 	var ms := Time.get_ticks_msec() - t0
 	print("SKIRMISHES: %d  abyss %d  order %d  timeout %d" % [n, res["abyss"], res["order"], res["timeout"]])
 	print("STUCK: %d %s" % [stuck.size(), str(stuck.slice(0, 5))])
+	print("UNEXPLAINED DEATHS: %d %s" % [unexplained.size(), str(unexplained.slice(0, 3))])
 	print("COUNTERS: %s" % str(counters))
 	print("TIME: %d ms total, %d sim ticks, slowest tick %.2f ms" % [ms, total_ticks, slowest / 1000.0])
-	get_tree().quit(1 if not stuck.is_empty() else 0)
+	get_tree().quit(1 if not stuck.is_empty() or not unexplained.is_empty() else 0)
 
 
 func _setup(sp, r: RandomNumberGenerator) -> void:

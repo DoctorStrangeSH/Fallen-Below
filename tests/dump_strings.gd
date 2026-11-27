@@ -36,7 +36,7 @@ func _init() -> void:
 	_add(D.WARDEN_TRUE_NAME)
 	for s in D.GEAR_SLOTS:
 		_add(str(s).capitalize())
-	for c in ["RESOURCES", "ORGANS", "SPECIES", "TRAITS", "MUTATIONS", "FACTIONS", "ENEMIES", "BOSSES", "BIOMES", "DECISIONS", "BODIES", "ZERO", "DEFECTS"]:
+	for c in ["RESOURCES", "ORGANS", "SPECIES", "TRAITS", "MUTATIONS", "FACTIONS", "ENEMIES", "BOSSES", "BIOMES", "DECISIONS", "BODIES", "ZERO", "DEFECTS", "COMMANDS"]:
 		_walk(AG.new().get(c))
 	print("JSONSTART" + JSON.stringify(out.keys()) + "JSONEND")
 	quit()

@@ -202,6 +202,24 @@ const MUTATIONS := {
 		"requires": [], "excludes": [], "effect": {"predator": 0.25, "ignores_alarm": true}},
 }
 
+## Nerve-impulse commands (GDD 9). Reach: within `reach_heart` of the Heart or `reach_node` of a working Nerve Node.
+const COMMANDS := {
+	"command.focus": {"name": "Focus", "desc": "Creatures near the target attack it and nothing else.", "cost": 1, "cooldown": 2.0, "radius": 7.0, "time": 8.0},
+	"command.protect": {"name": "Protect organ", "desc": "Creatures nearby rush to the organ and guard it.", "cost": 1, "cooldown": 4.0, "radius": 10.0, "time": 12.0},
+	"command.seal": {"name": "Seal passage", "desc": "A muscle wall closes a passage for a while. Invaders must find another way.", "cost": 2, "cooldown": 6.0, "time": 10.0},
+	"command.regen": {"name": "Emergency regeneration", "desc": "Every working organ heals a fifth of its health at once.", "cost": 3, "cooldown": 30.0, "heal": 0.2, "biomass": 10},
+}
+const COMMAND_REACH := {"reach_heart": 8.0, "reach_node": 8.0}
+
+## Minds of fallen sentient invaders (GDD 7). Each waits `time` seconds (paused time stops it) for a choice.
+const MINDS := {
+	"time": 10.0,
+	"digest": {"resource.biomass": 10.0, "resource.genome": 5.0},
+	"archive_upkeep": 0.2,      # energy per second for every mind kept in this sprout
+	"zero_xp": 6,
+	"zero_heal": 0.3,
+}
+
 ## Inheritance rules (GDD 8). Deterministic given the "breeding" RNG stream; results become known recipes.
 const GENETICS := {
 	"strain_slots": 2,          # mutations per species line

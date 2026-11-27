@@ -30,7 +30,34 @@ var ghost_ok := false
 var ghost_route: Array = []  # preview of an auto-routed channel
 var hover_uid := -1
 var selected_uid := -1
+var floaters: Array = []   # {"p": Vector2, "text": String, "col": Color, "age": float}
 
+
+## Visible feedback for state.fx events (TECH_SPEC: emit fx for every visible event).
+func add_fx(kind: String, target, amount: float) -> void:
+	var p := Vector2(-1, -1)
+	if target is int and sp.state.units.has(target):
+		p = unit_screen_pos(sp.state.units[target])
+	elif target is int and sp.state.organs.has(target):
+		p = organ_rect(target).get_center()
+	elif target is Vector2i:
+		p = cell_center(target)
+	if p.x < 0.0:
+		return
+	match kind:
+		"unit_hit", "organ_hit":
+			if amount >= 1.0:
+				floaters.append({"p": p + Vector2(0, -10), "text": str(int(round(amount))), "col": Color(1, 0.85, 0.6) if kind == "unit_hit" else Color(1, 0.45, 0.4), "age": 0.0})
+		"zero_level":
+			floaters.append({"p": p + Vector2(0, -16), "text": "LV %d" % int(amount), "col": Color(0.7, 0.85, 1.0), "age": 0.0})
+		"mind_digest":
+			floaters.append({"p": p, "text": "+bio", "col": Color(0.9, 0.3, 0.35), "age": 0.0})
+		"mind_archive":
+			floaters.append({"p": p, "text": "✦", "col": Color(0.75, 0.55, 1.0), "age": 0.0})
+		"mind_zero":
+			floaters.append({"p": p, "text": "✦", "col": Color(0.6, 0.85, 1.0), "age": 0.0})
+	if floaters.size() > 60:
+		floaters.pop_front()
 
 func cell_center(c: Vector2i) -> Vector2:
 	return ORIGIN + (Vector2(c) + Vector2(0.5, 0.5)) * CS
@@ -51,6 +78,9 @@ func organ_rect(uid: int) -> Rect2:
 
 func _process(delta: float) -> void:
 	t += delta
+	for f in floaters:
+		f["age"] = float(f["age"]) + delta
+	floaters = floaters.filter(func(f): return float(f["age"]) < 1.0)
 	queue_redraw()
 
 
@@ -72,7 +102,14 @@ func _draw() -> void:
 	for uid in sp.state.organs:
 		_draw_organ(int(uid))
 	_draw_units()
+	_draw_minds()
 	_draw_ghost(g)
+	var font := ThemeDB.fallback_font
+	for f in floaters:
+		var a := 1.0 - float(f["age"])
+		var col: Color = f["col"]
+		col.a = a
+		draw_string(font, (f["p"] as Vector2) + Vector2(-6, -18.0 * float(f["age"])), str(f["text"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, col)
 
 
 func _draw_cell(g, c: Vector2i) -> void:
@@ -119,6 +156,10 @@ func _draw_cell(g, c: Vector2i) -> void:
 		_:
 			if n > 0.82:
 				draw_circle(r.get_center() + Vector2(n * 6 - 3, 2), 1.5, Color(0.35, 0.12, 0.14))
+	if g.is_sealed(c):
+		draw_rect(r.grow(-1), Color(0.55, 0.12, 0.16))
+		for k in 3:
+			draw_line(r.position + Vector2(3, 4 + k * 5), r.position + Vector2(CS - 3, 4 + k * 5), Color(0.85, 0.35, 0.4), 1.5)
 	var sc: float = g.scar[g.idx(c)]
 	if sc > 0.0:
 		draw_circle(r.get_center(), CS * 0.42, Color(0.05, 0.02, 0.02, 0.7 * sc))
@@ -396,10 +437,22 @@ func _draw_invader(p: Vector2, def_id: String, bob: float) -> void:
 	draw_line(p + Vector2(-4, 1), p + Vector2(4, 1), trim, 1.0)
 
 
+## Freed minds wait as wisps until the player (or the stance) decides.
+func _draw_minds() -> void:
+	for m in sp.state.minds:
+		var p := cell_center(Vector2i(int(m["cell"][0]), int(m["cell"][1]))) + Vector2(0, -6 + sin(t * 3.0 + float(m["id"])) * 2.0)
+		draw_circle(p, 6.0, Color(0.7, 0.85, 1.0, 0.25))
+		draw_circle(p, 3.0, Color(0.9, 0.95, 1.0, 0.9))
+		draw_arc(p, 8.0, -PI / 2.0, -PI / 2.0 + TAU * float(m["left"]) / 10.0, 16, Color(0.75, 0.55, 1.0, 0.8), 1.5)
+
+
 func _draw_ghost(g) -> void:
 	if ghost_def == "" or not g.in_bounds(ghost_cell):
 		return
 	var col := Color(0.4, 1.0, 0.5, 0.45) if ghost_ok else Color(1.0, 0.3, 0.3, 0.45)
+	if ghost_def == "seal":
+		draw_rect(Rect2(ORIGIN + Vector2(ghost_cell) * CS, Vector2(CS, CS)).grow(-1), col)
+		return
 	if ghost_def == "channel":
 		for c in ghost_route:
 			draw_circle(cell_center(c), 4.0, Color(0.4, 1.0, 0.5, 0.45))
