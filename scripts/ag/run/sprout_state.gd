@@ -3,6 +3,10 @@ extends RefCounted
 ## Grid, organs, creatures, enemies and scene queue are added in stages 03-10 (TECH_SPEC 3, 5).
 
 const Rng = preload("res://scripts/ag/core/rng_streams.gd")
+const Grid = preload("res://scripts/ag/run/grid_state.gd")
+
+## Visible event for sound and effects: kind, target (uid or Vector2i), amount.
+signal fx(kind: String, target, amount: float)
 
 const SCHEMA := 3
 const GEN_VERSION := 1      # bump when the map generator changes; old mid-run saves are then refused
@@ -14,6 +18,11 @@ var tick: int = 0           # fixed 10 Hz simulation ticks
 var rng: Rng
 var resources := {"resource.biomass": 0.0, "resource.energy": 0.0, "resource.genome": 0.0}
 var paused := false
+var grid = null             # GridState
+var organs := {}            # uid -> organ instance (TECH_SPEC 3 OrganInstance)
+var next_uid: int = 1
+var network := {}           # Vector2i -> true: cells linked to the Heart (recomputed, not saved)
+var lost := false           # the Heart Bud died
 
 
 func _init(seed_in: int = 0, biome: String = "biome.catacombs") -> void:
@@ -30,6 +39,7 @@ func to_dict() -> Dictionary:
 	return {
 		"schema": SCHEMA, "gen_version": gen_version, "seed": str(seed_value), "biome": biome_id,
 		"tick": tick, "rng": rng.to_dict(), "resources": resources.duplicate(),
+		"grid": grid.to_dict() if grid else {}, "organs": organs.values(), "next_uid": next_uid, "lost": lost,
 	}
 
 
@@ -46,6 +56,23 @@ static func from_dict(d: Dictionary):
 	if res is Dictionary:
 		for k in s.resources:
 			s.resources[k] = float(res.get(k, 0.0))
+	var g = d.get("grid", {})
+	if g is Dictionary and not (g as Dictionary).is_empty():
+		s.grid = Grid.from_dict(g)
+		if s.grid == null:
+			return null
+	var os = d.get("organs", [])
+	if os is Array:
+		for o in os:
+			if o is Dictionary:
+				var inst: Dictionary = (o as Dictionary).duplicate(true)
+				inst["uid"] = int(inst.get("uid", 0))
+				inst["cell"] = [int(inst["cell"][0]), int(inst["cell"][1])]
+				for k in ["hp", "max_hp", "recover"]:
+					inst[k] = float(inst.get(k, 0.0))
+				s.organs[int(inst["uid"])] = inst
+	s.next_uid = int(d.get("next_uid", 1))
+	s.lost = bool(d.get("lost", false))
 	return s
 
 
