@@ -124,6 +124,8 @@ func rates(dt: float = 0.0) -> Array:
 		var up: Dictionary = d.get("upkeep", {})
 		for r in up:
 			out.append({"res": str(r), "amount": -float(up[r]), "source": name})
+		if float(o.get("upkeep_extra", 0.0)) > 0.0:
+			out.append({"res": ENERGY, "amount": -float(o["upkeep_extra"]), "source": name})
 	if creatures != null:
 		var cu: float = creatures.upkeep_rate() * (1.0 - s.starve_frac)
 		if cu > 0.0:
@@ -228,7 +230,7 @@ func balance_energy(dt: float) -> void:
 			sleepers.append(uid)
 	sleepers.sort_custom(func(a, b): return _wake_key(a) > _wake_key(b))
 	for uid in sleepers:
-		var up := float((Reg.get_def(str(s.organs[uid]["def"])).get("upkeep", {}) as Dictionary).get(ENERGY, 0.0))
+		var up := float((Reg.get_def(str(s.organs[uid]["def"])).get("upkeep", {}) as Dictionary).get(ENERGY, 0.0)) + float(s.organs[uid].get("upkeep_extra", 0.0))
 		if net(ENERGY) - up >= 0.0:
 			s.organs[uid]["asleep"] = false
 			organs.refresh(uid)
@@ -242,7 +244,7 @@ func _sleep_candidate() -> int:
 		var o: Dictionary = s.organs[uid]
 		if str(o["def"]) == "organ.heart" or not is_working(uid):
 			continue
-		var up := float((Reg.get_def(str(o["def"])).get("upkeep", {}) as Dictionary).get(ENERGY, 0.0))
+		var up := float((Reg.get_def(str(o["def"])).get("upkeep", {}) as Dictionary).get(ENERGY, 0.0)) + float(o.get("upkeep_extra", 0.0))
 		if up <= 0.0:
 			continue
 		var key := [int(o.get("priority", 1)), -up, -int(uid)]

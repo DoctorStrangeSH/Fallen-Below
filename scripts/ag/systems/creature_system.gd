@@ -19,6 +19,8 @@ var s
 var organs
 var economy
 var paths := Pathing.new()
+var genetics = null   # GeneticsSystem
+var evolution = null  # EvolutionSystem
 
 
 func setup(state, organ_system, economy_system) -> void:
@@ -95,6 +97,9 @@ func _new_unit(def_id: String, team: String, cell: Vector2i, d: Dictionary) -> i
 		"infect_t": 0.0, "still_t": 0.0, "last_cell": [cell.x, cell.y], "resets": 0,
 		"aggro": -1, "aggro_t": 0.0, "kills": 0, "xp": 0, "level": 1, "storm_cd": 0.0,
 		"sees_hidden": bool(d.get("sees_hidden", false)),
+		"mutations": [], "defects": [], "bonus_hp": 0.0, "bonus_atk": 0.0, "resist": {}, "weak": {},
+		"heal_mult": 1.0, "thorns": 0.0, "regen": 0.0, "upkeep_extra": 0.0, "spores": false, "predator": 0.0,
+		"ignores_alarm": false, "impulse_cost": 0, "insulated": false, "slow_t": 0.0,
 	}
 	return uid
 
@@ -104,6 +109,8 @@ func spawn_creature(species_id: String, cell: Vector2i) -> int:
 	if d.is_empty() or not s.grid.walkable(cell):
 		return -1
 	var uid := _new_unit(species_id, ABYSS, cell, d)
+	if genetics != null:
+		genetics.on_creature_born(s.units[uid])
 	s.count("creatures_born")
 	_bus("creature_born", [uid, species_id])
 	s.fx.emit("creature_born", uid, 0.0)
@@ -129,7 +136,7 @@ func can_breed(incubator_uid: int, species_id: String) -> Dictionary:
 	var d := Reg.get_def(species_id)
 	if d.is_empty() or not d.has("breed"):
 		return {"ok": false, "reason": "This creature cannot be bred."}
-	var cost: Dictionary = d["breed"].get("cost", {})
+	var cost: Dictionary = breed_cost(species_id)
 	var m: String = economy.missing(cost)
 	if m != "":
 		return {"ok": false, "reason": "Not enough %s.", "arg": str(Reg.get_def(m).get("name", m))}
@@ -140,11 +147,17 @@ func can_breed(incubator_uid: int, species_id: String) -> Dictionary:
 func queue_breed(incubator_uid: int, species_id: String) -> bool:
 	if not can_breed(incubator_uid, species_id)["ok"]:
 		return false
-	economy.pay(Reg.get_def(species_id)["breed"]["cost"], "Breeding")
+	economy.pay(breed_cost(species_id), "Breeding")
 	if not s.breeding.has(incubator_uid):
 		s.breeding[incubator_uid] = {"queue": [], "progress": 0.0}
 	(s.breeding[incubator_uid]["queue"] as Array).append(species_id)
 	return true
+
+
+func breed_cost(species_id: String) -> Dictionary:
+	if genetics != null:
+		return genetics.breed_cost(species_id)
+	return Reg.get_def(species_id).get("breed", {}).get("cost", {})
 
 
 func breed_progress(incubator_uid: int) -> float:
@@ -228,10 +241,23 @@ func _gain_xp(u: Dictionary, amount: int) -> void:
 	while int(u["level"]) - 1 < levels.size() and int(u["xp"]) >= int(levels[int(u["level"]) - 1]):
 		u["level"] = int(u["level"]) + 1
 		var lu: Dictionary = z["level_up"]
-		u["max_hp"] = float(u["max_hp"]) * (1.0 + float(lu["hp"]))
-		u["atk"] = float(u["atk"]) + float(lu["atk"])
+		u["bonus_hp"] = float(u["bonus_hp"]) + float(z["stats"]["hp"]) * float(lu["hp"])
+		u["bonus_atk"] = float(u["bonus_atk"]) + float(lu["atk"])
+		_restat(u)
 		u["hp"] = minf(float(u["max_hp"]), float(u["hp"]) + float(u["max_hp"]) * float(lu["heal"]))
 		s.fx.emit("zero_level", int(u["uid"]), float(u["level"]))
+
+
+## Recompute stats after a permanent change (level, gorge, mutation).
+func _restat(u: Dictionary) -> void:
+	if genetics != null:
+		genetics.recompute_unit(u)
+	else:
+		var st: Dictionary = Reg.get_def(str(u["def"]))["stats"]
+		var ratio := float(u["hp"]) / maxf(1.0, float(u["max_hp"]))
+		u["max_hp"] = float(st["hp"]) + float(u["bonus_hp"])
+		u["hp"] = ratio * float(u["max_hp"])
+		u["atk"] = float(st["atk"]) + float(u["bonus_atk"])
 
 
 # ------------------------------------------------------------------ upkeep (read by economy)
@@ -239,7 +265,7 @@ func _gain_xp(u: Dictionary, amount: int) -> void:
 func upkeep_rate() -> float:
 	var total := 0.0
 	for uid in team_units(ABYSS):
-		total += float(Reg.get_def(str(s.units[uid]["def"]))["stats"].get("upkeep", 0.0))
+		total += float(Reg.get_def(str(s.units[uid]["def"]))["stats"].get("upkeep", 0.0)) + float(s.units[uid].get("upkeep_extra", 0.0))
 	return total
 
 
@@ -277,11 +303,18 @@ func _timers(u: Dictionary, dt: float) -> void:
 		u["hp"] = float(u["hp"]) - ai("infect_dps") * dt
 	if str(u["team"]) == ABYSS and s.starving:
 		u["hp"] = float(u["hp"]) - ai("starve_dps") * s.starve_frac * dt
+	if float(u.get("regen", 0.0)) > 0.0 and float(u["hp"]) > 0.0:
+		_heal_unit(u, float(u["regen"]) * float(u["max_hp"]) * dt)
+	u["slow_t"] = maxf(0.0, float(u.get("slow_t", 0.0)) - dt)
 	if Rules.has_trait(u, "trait.stealth") and not bool(u["hidden"]):
 		u["hide_t"] = float(u["hide_t"]) + dt
 		if float(u["hide_t"]) >= ai("rehide_time"):
 			u["hidden"] = true
 			u["first_strike_ready"] = Rules.has_trait(u, "trait.first_strike")
+
+
+func _heal_unit(u: Dictionary, amount: float) -> void:
+	u["hp"] = minf(float(u["max_hp"]), float(u["hp"]) + amount * float(u.get("heal_mult", 1.0)))
 
 
 # ------------------------------------------------------------------ thinking: creatures
@@ -320,7 +353,7 @@ func _think_creature(u: Dictionary, dt: float) -> void:
 			u["state"] = "recover"
 		return
 	if st == "recover":
-		u["hp"] = minf(float(u["max_hp"]), float(u["hp"]) + float(u["max_hp"]) * ai("recover_rate") * dt)
+		_heal_unit(u, float(u["max_hp"]) * ai("recover_rate") * dt)
 		var attacker := int(u["aggro"])
 		if float(u["aggro_t"]) > 0.0 and s.units.has(attacker) and pos_of(s.units[attacker]).distance_to(me) <= ai("attack_range"):
 			_set_target(u, attacker, "unit", "engage")   # cornered: fight back
@@ -366,7 +399,7 @@ func _think_creature(u: Dictionary, dt: float) -> void:
 		_set_target(u, best, "unit", "engage")
 		return
 	# no enemy seen: answer an organ under attack
-	if role != "ambusher" and role != "support":
+	if role != "ambusher" and role != "support" and not bool(u.get("ignores_alarm", false)):
 		var alert := _nearest_alert(me)
 		if alert >= 0:
 			_set_target(u, alert, "guard", "protect")
@@ -479,8 +512,7 @@ func _act(u: Dictionary, dt: float) -> void:
 				u["state"] = "idle"
 				return
 			if pos_of(s.units[a]).distance_to(me) <= ai("heal_range"):
-				var au: Dictionary = s.units[a]
-				au["hp"] = minf(float(au["max_hp"]), float(au["hp"]) + ai("heal_rate") * dt)
+				_heal_unit(s.units[a], ai("heal_rate") * dt)
 				u["path"] = []
 				u["still_t"] = 0.0
 			else:
@@ -611,7 +643,7 @@ func _follow(u: Dictionary, dt: float) -> void:
 ## Moves toward `to`; true when arrived.
 func _slide(u: Dictionary, to: Vector2, dt: float) -> bool:
 	var me := pos_of(u)
-	var step := float(u["speed"]) * ai("move_speed") * dt
+	var step := float(u["speed"]) * ai("move_speed") * dt * (0.5 if float(u.get("slow_t", 0.0)) > 0.0 else 1.0)
 	var d := me.distance_to(to)
 	var np := to if d <= step else me + (to - me) / d * step
 	u["pos"] = [np.x, np.y]
@@ -666,9 +698,17 @@ func _strike_unit(att_uid: int, def_uid: int) -> void:
 	var r: Dictionary = Rules.unit_vs_unit(a, s.units[def_uid])
 	a["cd"] = ai("attack_period")
 	_reveal(a)
+	var victim: Dictionary = s.units[def_uid]
+	if str(victim["team"]) == ABYSS and evolution != null:
+		evolution.record(str(r["kind"]), float(r["amount"]), str(a["def"]), str(victim["def"]))
+	var thorns := float(victim.get("thorns", 0.0))
 	_hurt_unit(att_uid, def_uid, float(r["amount"]), str(r["reason"]))
+	if thorns > 0.0 and s.units.has(att_uid):
+		_hurt_unit(def_uid if s.units.has(def_uid) else -1, att_uid, thorns, "acid")
+	if not s.units.has(att_uid):
+		return
 	if Rules.has_trait(a, "trait.drain"):
-		a["hp"] = minf(float(a["max_hp"]), float(a["hp"]) + float(r["amount"]) * ai("drain"))
+		_heal_unit(a, float(r["amount"]) * ai("drain"))
 	if Rules.has_trait(a, "trait.infect") and s.units.has(def_uid):
 		s.units[def_uid]["infect_t"] = ai("infect_time")
 
@@ -677,7 +717,7 @@ func _strike_organ(u: Dictionary, organ_uid: int) -> void:
 	var r: Dictionary = Rules.unit_vs_organ(u)
 	u["cd"] = ai("attack_period")
 	_reveal(u)
-	organs.damage(organ_uid, float(r["amount"]), str(r["kind"]))
+	organs.damage(organ_uid, float(r["amount"]), str(r["kind"]), str(u["def"]))
 
 
 func _reveal(u: Dictionary) -> void:
@@ -691,8 +731,9 @@ func _hurt_unit(att_uid: int, def_uid: int, amount: float, reason: String) -> vo
 		return
 	var d: Dictionary = s.units[def_uid]
 	d["hp"] = float(d["hp"]) - amount
-	d["aggro"] = att_uid
-	d["aggro_t"] = 3.0
+	if att_uid >= 0:
+		d["aggro"] = att_uid
+		d["aggro_t"] = 3.0
 	d["hide_t"] = 0.0
 	s.fx.emit("unit_hit", def_uid, amount)
 	if float(d["hp"]) <= 0.0:
@@ -717,11 +758,17 @@ func _die(uid: int, killer: int) -> void:
 			var k: Dictionary = s.units[killer]
 			k["kills"] = int(k["kills"]) + 1
 			if Rules.has_trait(k, "trait.grow_on_kill"):
-				k["max_hp"] = float(k["max_hp"]) + ai("gorge_hp")
-				k["hp"] = float(k["hp"]) + ai("gorge_hp")
+				k["bonus_hp"] = float(k["bonus_hp"]) + ai("gorge_hp")
+				_restat(k)
+				k["hp"] = minf(float(k["max_hp"]), float(k["hp"]) + ai("gorge_hp"))
 			_gain_xp(k, int(Defs.ZERO["species.zero"]["xp_per_kill"]))
 	else:
 		s.count("creatures_lost")
+		if bool(u.get("spores", false)):
+			for e in team_units(ORDER):
+				if pos_of(s.units[e]).distance_to(pos_of(u)) <= 2.0:
+					s.units[e]["slow_t"] = 4.0
+			s.fx.emit("spores", uid, 0.0)
 		if def_id == "species.zero":
 			s.zero_dead = true
 			s.fx.emit("zero_fell", uid, 0.0)

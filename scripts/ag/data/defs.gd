@@ -152,30 +152,81 @@ const TRAITS := {
 	"trait.stealth": {"name": "Stealth", "desc": "Invisible until it attacks, unless the enemy can see hidden things."},
 	"trait.first_strike": {"name": "First strike", "desc": "The first attack from stealth deals double damage."},
 	"trait.heal_aura": {"name": "Mending", "desc": "Heals nearby creatures and channels."},
+	"trait.ash_carapace": {"name": "Ash Carapace", "desc": "A rare union of bone and ash: fire cannot harm it.", "effect": {"resist": {"fire": 0.5}}, "rare": true},
 }
 
-## Every mutation has a cost or drawback (GDD 8).
+## Every mutation has a cost and a drawback (GDD 8). A mutation is applied to a line:
+## a species strain (all living members and future broods) or an organ type (all such organs).
+## "effect" applies to creatures, "organ_effect" to organs (with its own drawback text).
+## "inherit": dominant = always passed to offspring, recessive = with GENETICS.recessive_chance.
 const MUTATIONS := {
 	"mutation.bone_plate": {"name": "Bone Plate", "desc": "+3 armour.", "drawback": "-15% speed.",
-		"targets": ["species", "organ"], "slots": 1, "cost": {"resource.genome": 10}, "requires": [], "excludes": []},
-	"mutation.acid_blood": {"name": "Acid Blood", "desc": "Attackers take damage when they hit.", "drawback": "-10% maximum health.",
-		"targets": ["species"], "slots": 1, "cost": {"resource.genome": 12}, "requires": [], "excludes": []},
+		"organ_desc": "Takes 30% less physical damage.", "organ_drawback": "+0.2 energy upkeep.",
+		"targets": ["species", "organ"], "slots": 1, "cost": {"resource.genome": 10}, "inherit": "dominant",
+		"requires": [], "excludes": ["mutation.swift_tendons"],
+		"effect": {"armor": 3.0, "speed_mult": 0.85}, "organ_effect": {"resist": {"physical": 0.3}, "upkeep": 0.2}},
+	"mutation.acid_blood": {"name": "Acid Blood", "desc": "Attackers take 3 damage when they hit.", "drawback": "-10% maximum health.",
+		"targets": ["species"], "slots": 1, "cost": {"resource.genome": 12}, "inherit": "dominant",
+		"requires": [], "excludes": [], "effect": {"thorns": 3.0, "hp_mult": 0.9}},
 	"mutation.fireproof_shell": {"name": "Fireproof Shell", "desc": "Fire damage halved.", "drawback": "Healing received -25%.",
-		"targets": ["species", "organ"], "slots": 1, "cost": {"resource.genome": 14}, "requires": [], "excludes": []},
+		"organ_desc": "Fire damage halved.", "organ_drawback": "Healing received -25%.",
+		"targets": ["species", "organ"], "slots": 1, "cost": {"resource.genome": 14}, "inherit": "dominant",
+		"requires": [], "excludes": [],
+		"effect": {"resist": {"fire": 0.5}, "heal_mult": 0.75}, "organ_effect": {"resist": {"fire": 0.5}, "heal_mult": 0.75}},
 	"mutation.swift_tendons": {"name": "Swift Tendons", "desc": "+30% speed.", "drawback": "-1 armour.",
-		"targets": ["species"], "slots": 1, "cost": {"resource.genome": 8}, "requires": [], "excludes": ["mutation.bone_plate"]},
-	"mutation.spore_sac": {"name": "Spore Sac", "desc": "On death releases spores that slow enemies.", "drawback": "+20% biomass cost to breed.",
-		"targets": ["species"], "slots": 1, "cost": {"resource.genome": 10}, "requires": [], "excludes": []},
+		"targets": ["species"], "slots": 1, "cost": {"resource.genome": 8}, "inherit": "recessive",
+		"requires": [], "excludes": ["mutation.bone_plate"], "effect": {"speed_mult": 1.3, "armor": -1.0}},
+	"mutation.spore_sac": {"name": "Spore Sac", "desc": "On death releases spores that slow nearby invaders by half for 4 s.", "drawback": "+20% biomass cost to breed.",
+		"targets": ["species"], "slots": 1, "cost": {"resource.genome": 10}, "inherit": "recessive",
+		"requires": [], "excludes": [], "effect": {"spores": true, "breed_cost_mult": 1.2}},
 	"mutation.dark_sight": {"name": "Dark Sight", "desc": "Sees hidden enemies.", "drawback": "Takes +25% holy damage.",
-		"targets": ["species", "organ"], "slots": 1, "cost": {"resource.genome": 9}, "requires": [], "excludes": []},
+		"targets": ["species"], "slots": 1, "cost": {"resource.genome": 9}, "inherit": "recessive",
+		"requires": [], "excludes": [], "effect": {"sees_hidden": true, "weak": {"holy": 0.25}}},
 	"mutation.regenerative_tissue": {"name": "Regenerative Tissue", "desc": "Regenerates 1% health per second.", "drawback": "+0.3 energy upkeep.",
-		"targets": ["species", "organ"], "slots": 1, "cost": {"resource.genome": 12}, "requires": [], "excludes": []},
+		"organ_desc": "Regenerates 1% health per second.", "organ_drawback": "+0.3 energy upkeep.",
+		"targets": ["species", "organ"], "slots": 1, "cost": {"resource.genome": 12}, "inherit": "recessive",
+		"requires": [], "excludes": [],
+		"effect": {"regen": 0.01, "upkeep": 0.3}, "organ_effect": {"regen": 0.01, "upkeep": 0.3}},
 	"mutation.dense_tissue": {"name": "Dense Tissue", "desc": "+25% maximum health.", "drawback": "-10% damage.",
-		"targets": ["species", "organ"], "slots": 1, "cost": {"resource.genome": 10}, "requires": [], "excludes": []},
+		"organ_desc": "+25% maximum health.", "organ_drawback": "+0.2 energy upkeep.",
+		"targets": ["species", "organ"], "slots": 1, "cost": {"resource.genome": 10}, "inherit": "dominant",
+		"requires": [], "excludes": [],
+		"effect": {"hp_mult": 1.25, "atk_mult": 0.9}, "organ_effect": {"hp_mult": 1.25, "upkeep": 0.2}},
 	"mutation.nerve_insulation": {"name": "Nerve Insulation", "desc": "Immune to stun and the Executioner's dampening.", "drawback": "Nerve impulses cost +1 on this target.",
-		"targets": ["species", "organ"], "slots": 1, "cost": {"resource.genome": 15}, "requires": [], "excludes": []},
-	"mutation.predator_instinct": {"name": "Predator Instinct", "desc": "+25% damage against wounded enemies.", "drawback": "Ignores Protect commands while prey is near.",
-		"targets": ["species"], "slots": 1, "cost": {"resource.genome": 11}, "requires": [], "excludes": []},
+		"organ_desc": "Immune to the Executioner's dampening.", "organ_drawback": "+0.2 energy upkeep.",
+		"targets": ["species", "organ"], "slots": 1, "cost": {"resource.genome": 15}, "inherit": "recessive",
+		"requires": [], "excludes": [],
+		"effect": {"insulated": true, "impulse_cost": 1}, "organ_effect": {"insulated": true, "upkeep": 0.2}},
+	"mutation.predator_instinct": {"name": "Predator Instinct", "desc": "+25% damage against invaders below half health.", "drawback": "Ignores calls to protect organs.",
+		"targets": ["species"], "slots": 1, "cost": {"resource.genome": 11}, "inherit": "recessive",
+		"requires": [], "excludes": [], "effect": {"predator": 0.25, "ignores_alarm": true}},
+}
+
+## Inheritance rules (GDD 8). Deterministic given the "breeding" RNG stream; results become known recipes.
+const GENETICS := {
+	"strain_slots": 2,          # mutations per species line
+	"zero_slots": 3,
+	"recessive_chance": 0.5,
+	"combos": [
+		{"all": ["mutation.acid_blood", "mutation.regenerative_tissue"], "result": "defect.unstable_flesh", "chance": 1.0},
+		{"all": ["mutation.bone_plate", "mutation.fireproof_shell"], "result": "trait.ash_carapace", "chance": 0.25},
+	],
+	# adaptation (GDD 8 "Адаптивная эволюция")
+	"threat_window": 60.0,      # seconds of memory
+	"threat_threshold": {"fire": 120.0, "holy": 150.0, "physical": 250.0, "swarm": 5.0},
+	"threat_answers": {
+		"fire": ["mutation.fireproof_shell"],
+		"holy": ["mutation.dense_tissue", "mutation.nerve_insulation"],
+		"physical": ["mutation.bone_plate", "mutation.dense_tissue"],
+		"swarm": ["mutation.spore_sac", "mutation.acid_blood"],
+	},
+	"adapt_discount": 0.5,      # adaptations cost half of a deliberate mutation
+	"proposal_time": 45.0,
+	"reject_cooldown": 60.0,
+}
+
+const DEFECTS := {
+	"defect.unstable_flesh": {"name": "Unstable Flesh", "desc": "Acid eats the regrowing tissue: -20% maximum health.", "effect": {"hp_mult": 0.8}},
 }
 
 const FACTIONS := {

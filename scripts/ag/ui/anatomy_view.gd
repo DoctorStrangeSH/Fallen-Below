@@ -196,6 +196,10 @@ func _draw_organ(uid: int) -> void:
 		# sleeping: a drifting "z"
 		var zp := r.position + Vector2(r.size.x - 4, 2 - fmod(t * 6.0, 6.0))
 		draw_string(ThemeDB.fallback_font, zp, "z", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.8, 0.85, 1.0, 0.9))
+	var om := 0
+	for m in o.get("mutations", []):
+		draw_circle(r.position + Vector2(r.size.x - 3 - om * 4, r.size.y - 3), 1.6, Color(0.75, 0.5, 1.0))
+		om += 1
 	var pr := int(o.get("priority", 1))
 	if pr != 1:
 		draw_circle(r.position + Vector2(3, 3), 2.5, Color(1.0, 0.8, 0.45) if pr == 2 else Color(0.5, 0.5, 0.6))
@@ -330,6 +334,15 @@ func _draw_unit(u: Dictionary) -> void:
 		draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(ratio, 0.0, 1.0), 2.5)), col)
 	if str(u["state"]) == "retreat" or str(u["state"]) == "recover":
 		draw_arc(p, 9.0, 0.0, TAU * fmod(t, 1.0), 10, Color(0.6, 0.8, 1.0, 0.6), 1.0)
+	var mk := 0
+	for m in u.get("mutations", []):
+		draw_circle(p + Vector2(-8 + mk * 3.5, 9), 1.4, Color(0.75, 0.5, 1.0))
+		mk += 1
+	for x in u.get("defects", []):
+		draw_circle(p + Vector2(-8 + mk * 3.5, 9), 1.4, Color(1.0, 0.3, 0.25))
+		mk += 1
+	if float(u.get("slow_t", 0.0)) > 0.0:
+		draw_arc(p, 7.0, 0.0, TAU, 10, Color(0.6, 0.9, 0.4, 0.5), 1.0)
 	if float(u.get("infect_t", 0.0)) > 0.0:
 		draw_circle(p + Vector2(6, -6), 2.0, Color(0.4, 0.9, 0.2, 0.9))
 

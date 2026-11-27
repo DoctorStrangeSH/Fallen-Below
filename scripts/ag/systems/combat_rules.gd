@@ -21,8 +21,16 @@ static func unit_vs_unit(att: Dictionary, def: Dictionary) -> Dictionary:
 	if has_trait(att, "trait.execute") and ratio < float(Defs.AI["execute_below"]):
 		base *= 1.0 + float(Defs.AI["execute_bonus"])
 		reasons.append("execute")
+	if float(att.get("predator", 0.0)) > 0.0 and ratio < 0.5:
+		base *= 1.0 + float(att["predator"])
+		reasons.append("predator")
 	var amount := maxf(1.0, base - float(def.get("armor", 0.0)))
-	return {"amount": amount, "reason": ", ".join(reasons)}
+	var kind := str(att.get("damage", "physical"))
+	var mult := 1.0 - float((def.get("resist", {}) as Dictionary).get(kind, 0.0)) + float((def.get("weak", {}) as Dictionary).get(kind, 0.0))
+	if mult != 1.0:
+		reasons.append(kind + (" resisted" if mult < 1.0 else " weakness"))
+	amount *= maxf(0.0, mult)
+	return {"amount": amount, "reason": ", ".join(reasons), "kind": kind}
 
 
 ## Unit hits an organ: raw damage and its kind; organ_system.damage applies resist/weak.

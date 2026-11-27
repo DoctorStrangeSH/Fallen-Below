@@ -33,6 +33,12 @@ var zero_dead := false      # Zero fell in this sprout
 var starving := false       # energy cannot pay the creatures: they weaken
 var starve_frac := 0.0      # share of creature upkeep that is not paid this tick
 var stats := {}             # counters for tests and the run summary
+var strains := {}           # line id (species.x / organ.x) -> [mutation ids] (genetics_system.gd)
+var recipes := {}           # "a+b" -> result found by breeding
+var threats: Array = []     # [tick, kind, amount, attacker def, victim line] within the window
+var proposals: Array = []   # adaptation offers (evolution_system.gd)
+var adapt_cd := {}          # kind -> seconds before another offer
+var next_proposal: int = 0
 var ledger := {}            # res -> {source: total change}; explains every change of the stock
 
 
@@ -54,6 +60,8 @@ func to_dict() -> Dictionary:
 		"bodies": bodies.duplicate(true), "impulses": impulses, "ledger": ledger.duplicate(true),
 		"units": units.values(), "breeding": _int_keys_to_str(breeding), "zero_dead": zero_dead, "stats": stats.duplicate(true),
 		"alerts": _int_keys_to_str(alerts),
+		"strains": strains.duplicate(true), "recipes": recipes.duplicate(), "threats": threats.duplicate(true),
+		"proposals": proposals.duplicate(true), "adapt_cd": adapt_cd.duplicate(), "next_proposal": next_proposal,
 	}
 
 
@@ -115,6 +123,28 @@ static func from_dict(d: Dictionary):
 		ak.sort_custom(func(a, b): return int(a) < int(b))
 		for k in ak:
 			s.alerts[int(k)] = float(al[k])
+	var sr = d.get("strains", {})
+	if sr is Dictionary:
+		for k in sr:
+			s.strains[str(k)] = (sr[k] as Array).duplicate()
+	var rc = d.get("recipes", {})
+	if rc is Dictionary:
+		s.recipes = rc.duplicate()
+	var th = d.get("threats", [])
+	if th is Array:
+		for t in th:
+			s.threats.append([int(t[0]), str(t[1]), float(t[2]), str(t[3]), str(t[4])])
+	var pr = d.get("proposals", [])
+	if pr is Array:
+		for p in pr:
+			var q: Dictionary = (p as Dictionary).duplicate(true)
+			q["id"] = int(q["id"])
+			s.proposals.append(q)
+	var ac = d.get("adapt_cd", {})
+	if ac is Dictionary:
+		for k in ac:
+			s.adapt_cd[str(k)] = float(ac[k])
+	s.next_proposal = int(d.get("next_proposal", 0))
 	var st = d.get("stats", {})
 	if st is Dictionary:
 		for k in st:

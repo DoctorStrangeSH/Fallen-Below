@@ -17,6 +17,8 @@ const PRIORITY_NAMES := ["Low priority", "Normal priority", "High priority"]
 
 var s   # SproutState
 var economy = null   # EconomySystem; when set, organs and channels cost resources
+var genetics = null  # GeneticsSystem: line mutations on new organs, organ stats
+var evolution = null # EvolutionSystem: threat log
 
 
 func setup(state) -> void:
@@ -120,6 +122,8 @@ func place(def_id: String, at: Vector2i) -> int:
 		s.grid.organ[i] = uid
 		s.grid.channel[i] = 0   # the organ itself carries the signal now
 	s.grid_version += 1
+	if genetics != null:
+		genetics.on_organ_placed(uid)
 	recompute(true)
 	s.fx.emit("organ_grow", uid, 0.0)
 	return uid
@@ -147,13 +151,16 @@ func cut_channel(c: Vector2i) -> bool:
 
 
 ## Applies damage with resistances and weaknesses. Returns the damage actually dealt.
-func damage(uid: int, amount: float, kind: String = "physical") -> float:
+func damage(uid: int, amount: float, kind: String = "physical", attacker_def: String = "") -> float:
 	if not s.organs.has(uid):
 		return 0.0
 	var d := def_of(uid)
-	var mult := 1.0 - float((d.get("resist", {}) as Dictionary).get(kind, 0.0)) + float((d.get("weak", {}) as Dictionary).get(kind, 0.0))
-	var dealt := maxf(0.0, amount * mult)
 	var o: Dictionary = s.organs[uid]
+	var mult := 1.0 - float((d.get("resist", {}) as Dictionary).get(kind, 0.0)) \
+		- float((o.get("resist", {}) as Dictionary).get(kind, 0.0)) + float((d.get("weak", {}) as Dictionary).get(kind, 0.0))
+	var dealt := maxf(0.0, amount * maxf(0.0, mult))
+	if evolution != null:
+		evolution.record(kind, dealt, attacker_def, str(o["def"]))
 	o["hp"] = maxf(0.0, float(o["hp"]) - dealt)
 	_bus("organ_damaged", [uid, dealt, kind])
 	s.alerts[uid] = float(Defs.AI["alert_time"])
@@ -169,7 +176,7 @@ func heal(uid: int, amount: float) -> void:
 	if not s.organs.has(uid):
 		return
 	var o: Dictionary = s.organs[uid]
-	o["hp"] = minf(float(o["max_hp"]), float(o["hp"]) + amount)
+	o["hp"] = minf(float(o["max_hp"]), float(o["hp"]) + amount * float(o.get("heal_mult", 1.0)))
 	refresh(uid)
 
 
@@ -232,6 +239,8 @@ func cycle_priority(uid: int) -> int:
 func tick(delta: float) -> void:
 	for uid in s.organs:
 		var o: Dictionary = s.organs[uid]
+		if float(o.get("regen", 0.0)) > 0.0 and float(o["hp"]) < float(o["max_hp"]):
+			heal(int(uid), float(o["regen"]) * float(o["max_hp"]) * delta)
 		if float(o["recover"]) > 0.0:
 			o["recover"] = maxf(0.0, float(o["recover"]) - delta)
 			if float(o["recover"]) == 0.0:

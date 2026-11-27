@@ -7,7 +7,7 @@ const Defs = preload("res://scripts/ag/data/defs.gd")
 const TABLES := {
 	"resource": "RESOURCES", "organ": "ORGANS", "species": "SPECIES", "trait": "TRAITS",
 	"mutation": "MUTATIONS", "faction": "FACTIONS", "enemy": "ENEMIES", "boss": "BOSSES",
-	"biome": "BIOMES", "decision": "DECISIONS", "body": "BODIES",
+	"biome": "BIOMES", "decision": "DECISIONS", "body": "BODIES", "defect": "DEFECTS",
 }
 
 static var _cache := {}
@@ -71,6 +71,16 @@ static func validate() -> Array:
 			if str(d.get("name", "")) == "":
 				errors.append("%s: empty name" % sid)
 			_check_refs(sid, d, errors)
+	for combo in Defs.GENETICS["combos"]:
+		for m in combo["all"]:
+			if not has(str(m)):
+				errors.append("combo refers to unknown %s" % m)
+		if not has(str(combo["result"])):
+			errors.append("combo result unknown %s" % combo["result"])
+	for kind in Defs.GENETICS["threat_answers"]:
+		for m in Defs.GENETICS["threat_answers"][kind]:
+			if not has(str(m)):
+				errors.append("threat answer unknown %s" % m)
 	for old in Defs.RENAMED:
 		if has(str(old)):
 			errors.append("%s: renamed id still defined" % old)
@@ -111,8 +121,12 @@ static func _check_refs(id: String, d: Dictionary, errors: Array) -> void:
 		if not fp is Array or (fp as Array).is_empty() or not (fp as Array).has(Vector2i.ZERO):
 			errors.append("%s: footprint must contain Vector2i(0, 0)" % id)
 	if kind_of(id) == "mutation":
-		if str(d.get("drawback", "")) == "" and (d.get("cost", {}) as Dictionary).is_empty():
-			errors.append("%s: mutation needs a drawback or a cost" % id)
+		if str(d.get("drawback", "")) == "" or (d.get("cost", {}) as Dictionary).is_empty():
+			errors.append("%s: mutation needs a drawback and a cost" % id)
+		if (d.get("targets", []) as Array).has("organ") and (not d.has("organ_effect") or str(d.get("organ_drawback", "")) == ""):
+			errors.append("%s: organ mutation needs organ_effect and organ_drawback" % id)
+		if not ["dominant", "recessive"].has(str(d.get("inherit", ""))):
+			errors.append("%s: inherit must be dominant or recessive" % id)
 	if kind_of(id) == "boss":
 		var phases = d.get("phases", [])
 		if not phases is Array or (phases as Array).is_empty():
