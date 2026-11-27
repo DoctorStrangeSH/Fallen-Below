@@ -1,3 +1,5 @@
+> **Архив Fallen Below.** Для ABYSSAL GENESIS источник истины по сюжету — `docs/NARRATIVE_BIBLE.md`.
+
 # Fallen Below — Сюжет
 
 > Библия сюжета. Внутриигровой текст на английском лежит в `scripts/data/game_data.gd`.
